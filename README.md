@@ -4,7 +4,7 @@ A local transcription workstation for Windows x64, using Whisper and Canary to r
 
 Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
 
-**Version 0.1.13 — release candidate**
+**Version 0.1.15 — release candidate**
 
 <div align="center">
 
@@ -16,7 +16,7 @@ One click, one file. Windows requests permission, creates `C:\Mockingbird Studio
 
 ## Install
 
-Download the Windows MSI from GitHub Releases and double-click it. Alternatively, download `install-mockingbird.cmd` from the `Installer` release and double-click it. Installation is per user; the .NET runtime is included. Download models inside the app.
+Download the Windows MSI from GitHub Releases and double-click it. Alternatively, download `install-mockingbird.cmd` from the `download` release and double-click it. Installation is per user; the .NET runtime is included. Download models inside the app.
 
 Native Linux support is pending; there is currently no native Linux build.
 
