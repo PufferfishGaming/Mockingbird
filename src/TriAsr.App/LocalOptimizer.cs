@@ -12,7 +12,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.App;
 
-public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IProcessRunner runner, IAudioNormalizer normalizer, ModelStore models, IRecordRepository records)
+public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IProcessRunner runner, IAudioNormalizer normalizer, ModelStore models, IRecordRepository records, ResourceGovernor governor)
 {
     public async Task<ExecutionProfile> OptimizeAsync(string source, HardwareProfile hardware, IProgress<string>? progress, CancellationToken token, IProgress<BenchmarkRow>? measurements = null)
     {
@@ -28,11 +28,12 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         var normalized = Path.Combine(directory, "normalized.wav");
         await normalizer.NormalizeAsync(source, normalized, token);
         var sample = Path.Combine(directory, "sample.wav");
-        var cut = await runner.RunAsync(new(paths.Ffmpeg, ["-nostdin", "-v", "error", "-n", "-i", normalized, "-t", "8", "-c:a", "pcm_s16le", sample], directory, TimeSpan.FromMinutes(1)), token);
+        var cut = await runner.RunAsync(new(paths.Ffmpeg, ["-nostdin", "-v", "error", "-n", "-threads", "2", "-i", normalized, "-t", "8", "-c:a", "pcm_s16le", sample], directory, TimeSpan.FromMinutes(1)), token);
         if (cut.ExitCode != 0) throw new InvalidOperationException("Benchmark sample extraction failed.");
         var seconds = WaveAudio.Inspect(sample).DurationSeconds;
         if (seconds < 3) throw new InvalidDataException("Choose at least three seconds of speech for optimization.");
-        var defaultThreads = Math.Clamp(hardware.Topology.PerformanceCores ?? hardware.Topology.LogicalProcessors / 2, 1, 12);
+        var budget = governor.For(ResourceProfile.Default).Threads; // tuning never tests more threads than a normal job may use
+        var defaultThreads = Math.Clamp(hardware.Topology.PerformanceCores ?? hardware.Topology.LogicalProcessors / 2, 1, Math.Min(12, budget));
         var vram = hardware.Gpus.MaxBy(gpu => gpu.DedicatedBytes)?.DedicatedBytes ?? 0;
         var gpuAllowed = GpuMemoryPlanner.Fits(vram, (ulong)Math.Max(new FileInfo(paths.WhisperModel).Length, new FileInfo(paths.CorrectionModel).Length), 1024UL * 1024 * 1024, 512UL * 1024 * 1024, 1024UL * 1024 * 1024);
         var backends = new[] { "Whisper", "Canary", "Correction" }.SelectMany(engine => BackendRuntimes.Candidates(paths, hardware, engine))
@@ -70,7 +71,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         }
         foreach (var backend in backends)
         {
-            var threads = backend == "cpu" ? new[] { Math.Min(4, hardware.Topology.LogicalProcessors), defaultThreads, Math.Min(24, hardware.Topology.LogicalProcessors) }.Select(value => Math.Max(1, value)).Distinct().Order().ToArray() : [defaultThreads];
+            var threads = backend == "cpu" ? new[] { Math.Min(4, hardware.Topology.LogicalProcessors), defaultThreads, Math.Min(Math.Min(24, hardware.Topology.LogicalProcessors), budget) }.Select(value => Math.Max(1, value)).Distinct().Order().ToArray() : [defaultThreads];
             foreach (var count in threads)
             {
                 foreach (var engine in new[] { "Whisper", "Canary" })

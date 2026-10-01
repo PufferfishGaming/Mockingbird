@@ -20,7 +20,7 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
             var window = Path.Combine(directory, $"window-{i}.wav");
             if (!File.Exists(window))
             {
-                var convert = await runner.RunAsync(new(ffmpeg, ["-nostdin", "-v", "error", "-n", "-ss", offsets[i].ToString(CultureInfo.InvariantCulture), "-i", audio, "-t", "15", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", window], directory, TimeSpan.FromMinutes(1)), token);
+                var convert = await runner.RunAsync(new(ffmpeg, ["-nostdin", "-v", "error", "-n", "-threads", "2", "-ss", offsets[i].ToString(CultureInfo.InvariantCulture), "-i", audio, "-t", "15", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", window], directory, TimeSpan.FromMinutes(1)), token);
                 if (convert.ExitCode != 0) throw new InvalidOperationException("Language sample extraction failed.");
             }
             var arguments = new List<string> { "-m", model, "-f", window, "-l", "auto", "-dl", "-t", threads.ToString(CultureInfo.InvariantCulture) };

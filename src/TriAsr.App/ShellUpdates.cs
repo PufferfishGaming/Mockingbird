@@ -44,7 +44,7 @@ public sealed partial class ShellViewModel
     }
 
     private AppSettings CurrentSettings() => new(SelectedTheme, SelectedDensity, AnimateErrors: AnimateErrors,
-        CheckForUpdates: AutoCheckUpdates, SkippedUpdateVersion: _skippedUpdateVersion, LastUpdateCheckUtc: _lastUpdateCheck);
+        CheckForUpdates: AutoCheckUpdates, SkippedUpdateVersion: _skippedUpdateVersion, LastUpdateCheckUtc: _lastUpdateCheck, ResourceProfile: SelectedResourceProfile);
 
     private void RestoreUpdateSettings(AppSettings settings)
     {

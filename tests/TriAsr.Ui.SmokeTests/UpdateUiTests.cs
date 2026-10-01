@@ -44,8 +44,7 @@ public sealed class UpdateUiTests
         public void Dispose()
         {
             Host?.Dispose();
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            if (Directory.Exists(Root)) Directory.Delete(Root, true);
+            TestCleanup.Delete(Root);
         }
     }
 

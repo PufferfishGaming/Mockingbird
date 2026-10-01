@@ -16,7 +16,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNormalizer audio, IProcessRunner runner,
-    RuntimePaths paths, IStoragePaths storage, ModelStore models, IRecordRepository records) : ITranscriptionStages, IProgressReportingStages
+    RuntimePaths paths, IStoragePaths storage, ModelStore models, IRecordRepository records, ResourceGovernor governor) : ITranscriptionStages, IProgressReportingStages
 {
     public event EventHandler<StageProgress>? StageProgressChanged;
     public event EventHandler<(string Title, string Message)>? IssueOccurred;
@@ -82,7 +82,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
         }
         var configuration = await Read<Configuration>(job.Id, "configuration.json", token);
         var seconds = WaveAudio.Inspect(normalized).DurationSeconds;
-        var whisper = new WhisperEngine(runner, paths.WhisperFor(configuration.WhisperBackend), paths.WhisperModel, configuration.WhisperThreads);
+        var whisper = new WhisperEngine(runner, paths.WhisperFor(configuration.WhisperBackend), paths.WhisperModel, governor.Clamp(configuration.WhisperThreads));
         switch (stage)
         {
             case JobState.DetectingLanguage:
@@ -98,7 +98,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 {
                     await Write(job.Id, "Language/fallback.json", new { Error = error.Message, Requested = configuration.WhisperBackend, Retry = "cpu" }, token);
                     Issue("GPU language detection failed", "Retrying on CPU. " + error.Message);
-                    detected = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, configuration.WhisperThreads).DetectLanguageAsync(normalized, seconds, FileFor(job.Id, "LanguageCpu"), "cpu", paths.Ffmpeg, token);
+                    detected = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)).DetectLanguageAsync(normalized, seconds, FileFor(job.Id, "LanguageCpu"), "cpu", paths.Ffmpeg, token);
                 }
                 if (!LanguageCatalog.Supports(detected.Language)) throw new InvalidDataException($"Detected unsupported language '{detected.Language}'. Choose a language listed in Languages.");
                 if (detected.Confidence < .65) throw new InvalidDataException("Language detection is uncertain. Create a job with an explicit speech language.");
@@ -112,7 +112,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 {
                     await Write(job.Id, "Whisper/fallback.json", new { Error = error.Message, Requested = configuration.WhisperBackend, Retry = "cpu" }, token);
                     Issue("Whisper GPU attempt failed", "Retrying on CPU. " + error.Message);
-                    first = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, configuration.WhisperThreads).TranscribeAsync(normalized, seconds, language, FileFor(job.Id, "WhisperCpu"), "cpu", token, value => Report(job.Id, stage, value));
+                    first = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)).TranscribeAsync(normalized, seconds, language, FileFor(job.Id, "WhisperCpu"), "cpu", token, value => Report(job.Id, stage, value));
                 }
                 await Write(job.Id, "whisper.json", first, token); break;
             case JobState.RunningCanary:
@@ -127,7 +127,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 if (!File.Exists(paths.CanaryModel))
                     throw new FileNotFoundException($"Selected Canary model {Path.GetFileName(paths.CanaryModel)} is not downloaded. Open Models and download it, or choose the Balanced preset to use the installed Q8 model.", paths.CanaryModel);
                 var request = new CanaryRequest(paths.CanaryFor(configuration.CanaryBackend), paths.CanaryModel, normalized, speechLanguage,
-                    configuration.CanaryBackend, configuration.CanaryThreads, raw);
+                    configuration.CanaryBackend, governor.Clamp(configuration.CanaryThreads), raw);
                 await Write(job.Id, "Canary/request.json", request, token);
                 var result = await runner.RunAsync(new(paths.CanaryWorker, ["--canary", FileFor(job.Id, "Canary/request.json")],
                     Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromHours(12), line => CanaryProgress(job.Id, line)), token);
@@ -180,7 +180,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 var decisions = new List<Correction>();
                 if (disputes.Count > 0)
                 {
-                    await using var arbiter = new LlamaArbiter(runner, paths.CorrectionFor(configuration.CorrectionBackend), paths.CorrectionModel, configuration.CorrectionBackend, configuration.CorrectionThreads);
+                    await using var arbiter = new LlamaArbiter(runner, paths.CorrectionFor(configuration.CorrectionBackend), paths.CorrectionModel, configuration.CorrectionBackend, governor.Clamp(configuration.CorrectionThreads));
                     try
                     {
                         var correctionEntry = ModelManifest.Entries.First(item => models.PathFor(item) == paths.CorrectionModel);

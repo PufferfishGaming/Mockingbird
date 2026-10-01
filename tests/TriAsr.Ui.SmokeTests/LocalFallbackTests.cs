@@ -137,7 +137,8 @@ public sealed class LocalFallbackTests
             writer.Write("data"u8); writer.Write(32000); writer.Write(new byte[32000]);
         }
         public LocalTranscriptionStages Stages(IProcessRunner runner) => new(_workspace,
-            new TriAsr.Audio.FfmpegNormalizer(runner, "unused"), runner, new RuntimePaths { CanaryModel = ModelPath }, _storage, new ModelStore(_root), new Records());
+            new TriAsr.Audio.FfmpegNormalizer(runner, "unused"), runner, new RuntimePaths { CanaryModel = ModelPath }, _storage, new ModelStore(_root), new Records(),
+            new TriAsr.Hardware.ResourceGovernor(() => 24, () => TriAsr.Hardware.PowerSource.Ac));
         public void Dispose() { System.IO.Directory.Delete(_root, true); }
     }
     private sealed class Records : IRecordRepository

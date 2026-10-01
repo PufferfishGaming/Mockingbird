@@ -101,7 +101,7 @@ public sealed class FfmpegNormalizer(IProcessRunner runner, string executable) :
         try
         {
             var result = await runner.RunAsync(new(executable,
-                ["-nostdin", "-hide_banner", "-v", "error", "-n", "-i", source, "-map", "0:a:0", "-vn", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", temporary],
+                ["-nostdin", "-hide_banner", "-v", "error", "-n", "-threads", "2", "-i", source, "-map", "0:a:0", "-vn", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", temporary],
                 Path.GetDirectoryName(destination)!, TimeSpan.FromHours(6)), cancellationToken);
             if (result.ExitCode != 0) throw new InvalidOperationException($"FFmpeg exited with code {result.ExitCode}: {result.StandardError}");
             var audio = WaveAudio.Inspect(temporary);

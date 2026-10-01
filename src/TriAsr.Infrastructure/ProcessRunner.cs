@@ -19,7 +19,7 @@ public sealed class ProcessRunner(ActivityFeed? activity = null) : IProcessRunne
         using var process = new Process { StartInfo = info };
         var stopwatch = Stopwatch.StartNew();
         if (!process.Start()) throw new InvalidOperationException("Worker could not start.");
-        using var ownership = WorkerOwnership.TryAttach(process);
+        using var ownership = WorkerOwnership.TryAttach(process, ProcessPriorityClass.BelowNormal);
         using var timeout = new CancellationTokenSource(request.Timeout);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         var name = Path.GetFileName(request.Executable);

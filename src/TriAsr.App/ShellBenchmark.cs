@@ -69,7 +69,7 @@ public sealed partial class ShellViewModel
             ReportError("Choose a tuning recording", "Select a recording with at least three seconds of speech. Tuning uses up to eight seconds of it.");
             BenchmarkProgress = "Step 3: choose a speech recording."; return;
         }
-        IsBenchmarking = true; _benchmarkCancellation = new();
+        IsBenchmarking = true; _benchmarkCancellation = new(); using var awake = TriAsr.Infrastructure.SleepGuard.Begin("Mockingbird Studio is tuning");
         BenchmarkResults.Clear();
         try
         {

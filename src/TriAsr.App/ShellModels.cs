@@ -133,7 +133,7 @@ public sealed partial class ShellViewModel
     private async Task VerifyModelAsync()
     {
         if (SelectedModel is null || SetupBusy()) return;
-        var card = SelectedModel; IsModelBusy = true; _modelCancellation = new();
+        var card = SelectedModel; IsModelBusy = true; _modelCancellation = new(); using var awake = TriAsr.Infrastructure.SleepGuard.Begin("Mockingbird Studio is downloading");
         try
         {
             card.Status = "Checking SHA256…";
@@ -173,7 +173,7 @@ public sealed partial class ShellViewModel
     }
     private async Task DownloadCardsAsync(ModelCard[] cards)
     {
-        IsModelBusy = true; _modelCancellation = new();
+        IsModelBusy = true; _modelCancellation = new(); using var awake = TriAsr.Infrastructure.SleepGuard.Begin("Mockingbird Studio is downloading");
         try
         {
             var remaining = cards.Sum(card => { var state = models.Inspect(card.Entry); return state.Installed ? 0 : Math.Max(0, card.Entry.Bytes - state.PartialBytes); });

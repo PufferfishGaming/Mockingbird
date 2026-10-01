@@ -6,7 +6,7 @@ using TriAsr.Application;
 namespace TriAsr.App;
 
 public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = 1, bool AnimateErrors = true,
-    bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null);
+    bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto");
 
 public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)
 {
@@ -21,12 +21,14 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
         try
         {
             if (!File.Exists(FilePath)) return new();
-            await using var stream = File.OpenRead(FilePath);
+            // Readers must never block the atomic replace performed by a save, so they share the file for writing and replacing.
+            await using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, _json) ?? new();
             return settings with
             {
                 Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System",
-                Density = settings.Density is "Comfortable" or "Compact" ? settings.Density : "Comfortable"
+                Density = settings.Density is "Comfortable" or "Compact" ? settings.Density : "Comfortable",
+                ResourceProfile = settings.ResourceProfile is "Auto" or "Quiet" or "Default" or "Max" ? settings.ResourceProfile : "Auto"
             };
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)

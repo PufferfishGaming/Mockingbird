@@ -87,7 +87,7 @@ public sealed partial class ShellViewModel
     {
         if (SetupBusy()) return;
         if (Hardware is null || !BackendRuntimes.HardwareFits(Hardware, RuntimeBackend)) { ReportError("Backend is incompatible", "This backend needs compatible GPU hardware. Check your computer first."); return; }
-        IsModelBusy = true; _modelCancellation = new();
+        IsModelBusy = true; _modelCancellation = new(); using var awake = TriAsr.Infrastructure.SleepGuard.Begin("Mockingbird Studio is downloading");
         var acceptingProgress = true;
         try
         {
@@ -105,7 +105,7 @@ public sealed partial class ShellViewModel
     public async Task ImportBackendAsync(string source)
     {
         if (SetupBusy()) return;
-        IsModelBusy = true; _modelCancellation = new();
+        IsModelBusy = true; _modelCancellation = new(); using var awake = TriAsr.Infrastructure.SleepGuard.Begin("Mockingbird Studio is downloading");
         try
         {
             await BackendRuntimes.ImportAsync(runtimes, RuntimeEngine, RuntimeBackend, source, _modelCancellation.Token);

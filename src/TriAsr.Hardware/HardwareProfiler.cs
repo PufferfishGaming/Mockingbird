@@ -88,7 +88,7 @@ public sealed class HardwareProfiler(IProcessRunner runner)
         var registers = X86Base.CpuId(0, 0);
         return Encoding.ASCII.GetString(BitConverter.GetBytes(registers.Ebx).Concat(BitConverter.GetBytes(registers.Edx)).Concat(BitConverter.GetBytes(registers.Ecx)).ToArray());
     }
-    private static CpuTopology ReadTopology()
+    public static CpuTopology ReadTopology()
     {
         uint size = 0;
         GetLogicalProcessorInformationEx(0, IntPtr.Zero, ref size);

@@ -18,7 +18,7 @@ public sealed record NavigationItem(string Name, string Title, string Descriptio
 public sealed partial class ShellViewModel(SettingsStore store, ThemeManager themes, ILogger<ShellViewModel> logger,
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
-    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates) : ObservableObject
+    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
@@ -108,6 +108,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         SelectedDensity = settings.Density;
         AnimateErrors = settings.AnimateErrors;
         RestoreUpdateSettings(settings);
+        RestoreResourceSettings(settings);
         if (store.LastLoadError is not null) ReportError("Preferences could not be restored", "Defaults were loaded. " + store.LastLoadError);
         if (runtimes.StorageLoadError is not null) ReportError("Saved folders could not be restored", "Existing model files have not been removed. Select your previous model repository in Settings. " + runtimes.StorageLoadError);
         SelectedPage = Navigation[0];
@@ -168,6 +169,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         OnPropertyChanged(nameof(IsBenchmarkPage));
         OnPropertyChanged(nameof(IsLanguagesPage)); OnPropertyChanged(nameof(IsBackendsPage));
         OnPropertyChanged(nameof(IsTerminalPage)); RefreshTerminal();
+        if (value?.IsSettings == true) RefreshResourceSummary(); // the computer may have been plugged in or unplugged since the summary was built
     }
     partial void OnSelectedThemeChanged(string value)
     {
@@ -205,6 +207,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         _jobCancellation = new();
         try
         {
+            using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing");
             var job = await queue.EnqueueAsync(SourcePath, SelectedLanguage, _jobCancellation.Token);
             job = await pipeline.RunAsync(job, _jobCancellation.Token);
             if (job.State == JobState.Complete) await OpenReviewAsync();
@@ -219,7 +222,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         if (SelectedJob is null || IsProcessing || IsBenchmarking || IsModelBusy) return;
         IsProcessing = true;
         _jobCancellation = new();
-        try { var job = await pipeline.RunAsync(SelectedJob, _jobCancellation.Token); if (job.State == JobState.Complete) await OpenReviewAsync(); }
+        try { using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing"); var job = await pipeline.RunAsync(SelectedJob, _jobCancellation.Token); if (job.State == JobState.Complete) await OpenReviewAsync(); }
         catch (OperationCanceledException) { Status = "Operation cancelled."; }
         catch (Exception error) { ReportError("Operation failed", error.Message); }
         finally { _jobCancellation.Dispose(); _jobCancellation = null; IsProcessing = false; }

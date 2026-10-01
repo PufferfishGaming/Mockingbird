@@ -9,12 +9,26 @@ internal sealed class WorkerOwnership : IDisposable
 {
     private readonly SafeFileHandle _job;
     private WorkerOwnership(SafeFileHandle job) => _job = job;
-    public static WorkerOwnership? TryAttach(Process process)
+    /// <param name="priority">
+    /// When set, every process in the worker's job (including children it starts) runs at this priority class.
+    /// The interactive terminal passes nothing, so commands you type yourself keep normal priority.
+    /// </param>
+    public static WorkerOwnership? TryAttach(Process process, ProcessPriorityClass? priority = null)
     {
         if (!OperatingSystem.IsWindows()) return null;
         var job = CreateJobObject(IntPtr.Zero, null);
         if (job.IsInvalid) throw new System.ComponentModel.Win32Exception();
         var limits = new ExtendedLimits { Basic = new BasicLimits { LimitFlags = 0x2000 } };
+        if (priority is { } requested)
+        {
+            limits.Basic.LimitFlags |= 0x20; // JOB_OBJECT_LIMIT_PRIORITY_CLASS
+            limits.Basic.PriorityClass = requested switch
+            {
+                ProcessPriorityClass.Idle => 0x40, ProcessPriorityClass.BelowNormal => 0x4000, ProcessPriorityClass.Normal => 0x20,
+                ProcessPriorityClass.AboveNormal => 0x8000, ProcessPriorityClass.High => 0x80,
+                _ => throw new ArgumentOutOfRangeException(nameof(priority), "Unsupported priority class.")
+            };
+        }
         if (!SetInformationJobObject(job, 9, ref limits, (uint)Marshal.SizeOf<ExtendedLimits>()) || !AssignProcessToJobObject(job, process.Handle))
         {
             var error = Marshal.GetLastWin32Error();

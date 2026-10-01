@@ -37,6 +37,7 @@ public partial class App : System.Windows.Application
         builder.Services.AddSingleton<LocalOptimizer>();
         builder.Services.AddSingleton<HardwareProfiler>();
         builder.Services.AddSingleton<SettingsStore>();
+        builder.Services.AddSingleton<ResourceGovernor>();
         builder.Services.AddSingleton(UpdateOptions.FromEnvironment());
         builder.Services.AddSingleton(services => new UpdateService(services.GetRequiredService<UpdateOptions>()));
         builder.Services.AddSingleton<ThemeManager>();
