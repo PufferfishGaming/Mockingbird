@@ -2,11 +2,21 @@
 
 A local transcription workstation for Windows x64, using Whisper and Canary to recognize speech independently and help you review uncertain wording.
 
+Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
+
 **Version 0.1.13 — release candidate**
+
+<div align="center">
+
+[![Download for Windows](https://img.shields.io/badge/Windows-Download_the_installer-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Install-Mockingbird.cmd)
+
+One click, one file. It verifies the MSI checksum, installs Mockingbird Studio for your Windows user and launches it. Re-run it to update or repair.
+
+</div>
 
 ## Install
 
-Download the Windows MSI from GitHub Releases and double-click it. Alternatively, extract the Windows setup ZIP and run `Install-Mockingbird.cmd`. Installation is per user; the .NET runtime is included. Download models inside the app.
+Download the Windows MSI from GitHub Releases and double-click it. Alternatively, download `install-mockingbird.cmd` from the `Installer` release and double-click it. Installation is per user; the .NET runtime is included. Download models inside the app.
 
 Native Linux support is pending; there is currently no native Linux build.
 
@@ -47,7 +57,7 @@ Legacy `TriAsr.*` names, storage paths and `TRIASR_*` environment variables rema
 
 ## License and release status
 
-Original source is **GPL-3.0-or-later**; see [LICENSE](LICENSE). Dependencies retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Copyright © 2026 PufferfishGaming. Original source is **GPL-3.0-or-later**; see [LICENSE](LICENSE). Dependencies retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 This candidate is unsigned. Before public binary distribution, complete third-party license/source requirements, clean-machine installation tests and remaining accuracy/accessibility acceptance checks.
 
