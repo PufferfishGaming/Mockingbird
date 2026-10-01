@@ -31,6 +31,15 @@ $setup = Join-Path $package 'Mockingbird-Studio-Setup.exe'
 $sums = Join-Path $package 'SHA256SUMS.txt'
 $setupHash = if (Test-Path -LiteralPath $setup) { (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash } else { '' }
 Check 'Setup wizard built and checksummed' ($setupHash -ne '' -and (Test-Path -LiteralPath $sums) -and (Get-Content -LiteralPath $sums -Raw).Contains($setupHash)) "Mockingbird-Studio-Setup.exe $setupHash"
+$latestPath = Join-Path $package 'latest.json'
+$latestOk = $false; $latestDetail = 'latest.json missing'
+if (Test-Path -LiteralPath $latestPath) {
+    $latest = Get-Content -LiteralPath $latestPath -Raw | ConvertFrom-Json
+    $latestOk = $latest.schema -eq 1 -and $latest.version -eq $version -and $latest.sha256 -eq $setupHash -and $latest.bytes -eq (Get-Item -LiteralPath $setup).Length `
+        -and ([Uri]$latest.url).Scheme -eq 'https' -and ([Uri]$latest.url).Host -eq 'github.com' -and ([Uri]$latest.url).AbsolutePath.EndsWith('/Mockingbird-Studio-Setup.exe')
+    $latestDetail = "latest.json $($latest.version) $($latest.bytes) bytes"
+}
+Check 'Update manifest matches the Setup.exe' $latestOk $latestDetail
 $pending = @(
     'Complete third-party notices and exact FFmpeg GPL corresponding-source/build bundle',
     'Clean-machine install/download/offline/upgrade/uninstall acceptance',

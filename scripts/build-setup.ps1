@@ -1,4 +1,4 @@
-param([string]$Version = '')
+param([string]$Version = '', [string]$Notes = 'Adds in-app update checks with a verified one-click update.')
 . "$PSScriptRoot/common.ps1"
 $releaseVersion = ([xml](Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if (-not $Version) { $Version = $releaseVersion }
@@ -46,4 +46,15 @@ if (Test-Path -LiteralPath $setup) { Remove-Item -LiteralPath $setup -Force }
 if ($LASTEXITCODE -ne 0) { throw 'Setup build failed.' }
 $hash = Get-FileHash -LiteralPath $setup -Algorithm SHA256
 "$($hash.Hash)  Mockingbird-Studio-Setup.exe" | Set-Content -LiteralPath (Join-Path $packageRoot 'SHA256SUMS.txt') -Encoding ascii
+# latest.json is what installed apps read to learn about this release. Upload it AFTER Mockingbird-Studio-Setup.exe so
+# no app is told about a version whose installer is not yet available. Written without a byte-order mark.
+$manifest = [ordered]@{
+    schema = 1
+    version = $Version
+    url = 'https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Studio-Setup.exe'
+    sha256 = $hash.Hash
+    bytes = (Get-Item -LiteralPath $setup).Length
+    notes = $Notes
+}
+[IO.File]::WriteAllText((Join-Path $packageRoot 'latest.json'), ($manifest | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
 $hash

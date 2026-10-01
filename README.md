@@ -4,7 +4,7 @@ A local transcription workstation for Windows x64, using Whisper and Canary to r
 
 Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
 
-**Version 0.1.15 — release candidate**
+**Version 0.1.16 — release candidate**
 
 <div align="center">
 
@@ -22,6 +22,10 @@ The installer is unsigned, so Windows SmartScreen may show "Windows protected yo
 
 To remove the app, use **Settings → Apps → Installed apps → Mockingbird Studio**. Uninstalling keeps your projects, settings and models.
 
+### Updates
+
+From version 0.1.16 the app checks GitHub for a newer release when it starts (at most every 12 hours) and shows a banner with **Update now**, **Later** and **Skip this version**. Updating downloads the new `Mockingbird-Studio-Setup.exe`, checks its SHA256 against the published `latest.json`, closes the app, installs it and reopens it. It never updates in the middle of a transcription, model download or benchmark, and your projects, settings and models are kept. Turn the automatic check off, or check manually, in **Settings → Updates**. Each update downloads the full installer; there are no partial updates yet. Earlier versions must be updated once by hand.
+
 Native Linux support is pending; there is currently no native Linux build.
 
 ## Features
@@ -32,12 +36,13 @@ Native Linux support is pending; there is currently no native Linux build.
 - TXT, Markdown, JSON, CSV, SRT, VTT and DOCX export.
 - Persistent model downloads, CPU/Vulkan backends, optional compatible CUDA/ROCm runtimes and measured auto-tuning.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.
+- In-app update checks with a verified one-click update.
 
 Recognition can be wrong, particularly with music, noise or silence. Review important transcripts. Readable export normalizes spacing without rewriting wording.
 
 ## Privacy
 
-Transcription runs locally. Requested model/runtime downloads contact their providers. Terminal commands can access the network. Projects and logs can contain private information. See [PRIVACY.md](PRIVACY.md), also available in Settings.
+Transcription runs locally. Requested model/runtime downloads and the update check (which can be turned off) contact their providers. Terminal commands can access the network. Projects and logs can contain private information. See [PRIVACY.md](PRIVACY.md), also available in Settings.
 
 ## Build
 

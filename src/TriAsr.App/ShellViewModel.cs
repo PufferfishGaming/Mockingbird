@@ -18,7 +18,7 @@ public sealed record NavigationItem(string Name, string Title, string Descriptio
 public sealed partial class ShellViewModel(SettingsStore store, ThemeManager themes, ILogger<ShellViewModel> logger,
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
-    ActivityFeed activity, InteractiveTerminal terminal) : ObservableObject
+    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
@@ -107,6 +107,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         SelectedTheme = settings.Theme;
         SelectedDensity = settings.Density;
         AnimateErrors = settings.AnimateErrors;
+        RestoreUpdateSettings(settings);
         if (store.LastLoadError is not null) ReportError("Preferences could not be restored", "Defaults were loaded. " + store.LastLoadError);
         if (runtimes.StorageLoadError is not null) ReportError("Saved folders could not be restored", "Existing model files have not been removed. Select your previous model repository in Settings. " + runtimes.StorageLoadError);
         SelectedPage = Navigation[0];
@@ -141,6 +142,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         pipeline.JobChanged += UpdateJob;
         pipeline.ProgressChanged += (_, update) => System.Windows.Application.Current.Dispatcher.Invoke(() => ApplyTranscriptionProgress(update));
         stages.IssueOccurred += (_, issue) => System.Windows.Application.Current.Dispatcher.Invoke(() => ReportError(issue.Title, issue.Message));
+        await ReadUpdateResultAsync();
         _initialized = true;
     }
     public void ApplyTranscriptionProgress(TranscriptionProgress update)
@@ -180,7 +182,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     }
     private async void Persist()
     {
-        try { var settings = new AppSettings(SelectedTheme, SelectedDensity, AnimateErrors: AnimateErrors); await store.SaveAsync(settings); await records.SaveAsync(new("settings", "appearance", JsonSerializer.Serialize(settings))); Status = "Preferences saved locally"; }
+        try { var settings = CurrentSettings(); await store.SaveAsync(settings); await records.SaveAsync(new("settings", "appearance", JsonSerializer.Serialize(settings))); Status = "Preferences saved locally"; }
         catch (Exception error)
         {
             ReportError("Preferences could not be saved", "Check access to the data folder.");

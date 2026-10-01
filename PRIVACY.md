@@ -15,6 +15,9 @@ When you request model or runtime downloads, the app connects to Hugging Face or
 - https://huggingface.co/privacy
 - https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
 
+### Update checks
+Unless you turn it off in Settings, the app asks GitHub for a small version file (latest.json) when it starts, at most every 12 hours, and whenever you choose Check for updates now. GitHub receives normal connection information such as your IP address, and the request carries the app's name and version. No recordings, transcripts, project data, hardware details or identifiers are sent. The app never installs an update by itself: you choose Update now, and the downloaded installer is checked against its published SHA256 checksum before it runs.
+
 The local correction server communicates over the loopback interface (127.0.0.1); it is not cloud inference. GitHub installation downloads also contact GitHub. After the needed models and runtimes are installed, transcription can work offline.
 
 ## Terminal, exports and support

@@ -17,7 +17,7 @@ public partial class App : System.Windows.Application
 {
     private IHost? _host;
 
-    public static IHost CreateHost(string dataRoot)
+    public static IHost CreateHost(string dataRoot, Action<IServiceCollection>? configure = null)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { DisableDefaults = true });
         builder.Services.AddInfrastructure(dataRoot);
@@ -37,11 +37,14 @@ public partial class App : System.Windows.Application
         builder.Services.AddSingleton<LocalOptimizer>();
         builder.Services.AddSingleton<HardwareProfiler>();
         builder.Services.AddSingleton<SettingsStore>();
+        builder.Services.AddSingleton(UpdateOptions.FromEnvironment());
+        builder.Services.AddSingleton(services => new UpdateService(services.GetRequiredService<UpdateOptions>()));
         builder.Services.AddSingleton<ThemeManager>();
         builder.Services.AddSingleton<ShellViewModel>();
         builder.Services.AddSingleton<BootstrapViewModel>();
         builder.Services.AddSingleton<BootstrapWindow>();
         builder.Services.AddSingleton<MainWindow>();
+        configure?.Invoke(builder.Services);
         return builder.Build();
     }
 
@@ -266,6 +269,36 @@ public partial class App : System.Windows.Application
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "benchmark-results.png"), 1220, 1000, 1);
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "benchmark-smoke.json"), JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true }));
                 }
+                if (e.Args.Contains("--update-smoke"))
+                {
+                    if (!shell.CanSelfUpdate) throw new InvalidOperationException("Update smoke needs a loopback source in TRIASR_UPDATE_MANIFEST.");
+                    await shell.RunUpdateCheckAsync(manual: true);
+                    if (shell.AvailableUpdate is null || !shell.UpdateBannerVisible)
+                        throw new InvalidOperationException("The update banner did not appear for a newer release: " + shell.UpdateStatusText);
+                    foreach (var theme in new[] { "Light", "Dark" })
+                    {
+                        shell.SelectedTheme = theme; window.Width = 1220;
+                        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                        ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", $"update-banner-{theme}.png"), 1220, 700, 1);
+                    }
+                    shell.SelectedPage = shell.Navigation.First(page => page.Name == "Settings");
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    window.ContentScroll.ScrollToEnd();
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "update-settings.png"), 1220, 1100, 1);
+                    shell.SelectedPage = shell.Navigation[0];
+                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "update-smoke.json"),
+                        JsonSerializer.Serialize(new { offered = shell.AvailableUpdate.VersionText, bannerShown = true, sha256 = shell.AvailableUpdate.Sha256 }));
+                    if (e.Args.Contains("--update-install"))
+                    {
+                        shell.UpdateRelaunchArguments = "--smoke-test";
+                        await shell.InstallUpdateCommand.ExecuteAsync(null);
+                        if (shell.HasError) throw new InvalidOperationException(shell.ErrorTitle + ": " + shell.ErrorMessage);
+                        await StopHostAsync();
+                        Shutdown(0);
+                        return;
+                    }
+                }
                 await using var connection = await _host.Services.GetRequiredService<SqliteConnectionFactory>().OpenAsync();
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT sqlite_version();";
@@ -281,6 +314,7 @@ public partial class App : System.Windows.Application
                 return;
             }
             window.Show();
+            _ = shell.RunUpdateCheckAsync(manual: false);
         }
         catch (Exception exception)
         {

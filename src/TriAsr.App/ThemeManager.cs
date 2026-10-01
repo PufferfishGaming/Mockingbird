@@ -16,6 +16,7 @@ public sealed class ThemeManager : IDisposable
         RequestedTheme = requested is "System" or "Light" or "Dark" ? requested : "System";
         ActualTheme = RequestedTheme == "System" ? ReadSystemTheme() : RequestedTheme;
         var app = System.Windows.Application.Current;
+        if (app is null) return; // No WPF application (a unit-test host): the choice is remembered, there is nothing to restyle.
         app.Dispatcher.VerifyAccess();
         var next = new ResourceDictionary
         {
