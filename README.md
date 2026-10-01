@@ -8,7 +8,7 @@ Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishG
 
 <div align="center">
 
-[![Download for Windows](https://img.shields.io/badge/Windows-Download_the_installer-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/Installer/install-mockingbird.cmd)
+[![Download for Windows](https://img.shields.io/badge/Windows-Download_the_installer-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/install-mockingbird.cmd)
 
 One click, one file. Windows requests permission, creates `C:\Mockingbird Studio Installer`, downloads all four release files there, verifies the MSI checksum and runs the local installer. Your browser downloads the `.cmd`; double-click that file to start it.
 
