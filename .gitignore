@@ -34,9 +34,18 @@ Config/
 *.wixpdb
 outputs/
 work/
-docs/
 *.txt
 *.md
 !/README.md
 !/PRIVACY.md
 !/THIRD_PARTY_NOTICES.md
+
+# Versioned documentation: the decision log, the release process, the Claude Code project guide and its commands.
+# Everything else under docs/ (status, per-release results, notes) is a local working record.
+docs/*
+!docs/decisions/
+!docs/decisions/*.md
+!docs/RELEASE_PROCESS.md
+!/CLAUDE.md
+!.claude/skills/*/SKILL.md
+.claude/settings.local.json
