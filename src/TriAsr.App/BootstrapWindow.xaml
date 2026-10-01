@@ -1,0 +1,10 @@
+<Window x:Class="TriAsr.App.BootstrapWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Title}" Width="580" Height="320" MinWidth="400" MinHeight="240"
+        WindowStartupLocation="CenterScreen">
+  <Grid Margin="32">
+    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="18"
+               AutomationProperties.Name="Repository bootstrap status" />
+  </Grid>
+</Window>

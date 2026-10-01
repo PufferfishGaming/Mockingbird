@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TriAsr.Persistence\TriAsr.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\TriAsr.Infrastructure\TriAsr.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

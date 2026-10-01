@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TriAsr.Engine.Whisper\TriAsr.Engine.Whisper.csproj" />
+    <ProjectReference Include="..\..\src\TriAsr.Engine.Canary\TriAsr.Engine.Canary.csproj" />
+    <ProjectReference Include="..\..\src\TriAsr.Engine.Llm\TriAsr.Engine.Llm.csproj" />
+  </ItemGroup>
+</Project>

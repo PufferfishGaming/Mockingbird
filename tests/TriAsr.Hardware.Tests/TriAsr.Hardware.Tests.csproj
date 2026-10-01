@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TriAsr.Hardware\TriAsr.Hardware.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,52 @@
+using System.IO;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using TriAsr.Application;
+
+namespace TriAsr.App;
+
+public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = 1, bool AnimateErrors = true);
+
+public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)
+{
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    public string FilePath => Path.Combine(paths.Root, "Config", "settings.json");
+    public string? LastLoadError { get; private set; }
+
+    public async Task<AppSettings> LoadAsync()
+    {
+        LastLoadError = null;
+        try
+        {
+            if (!File.Exists(FilePath)) return new();
+            await using var stream = File.OpenRead(FilePath);
+            var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, _json) ?? new();
+            return settings with
+            {
+                Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System",
+                Density = settings.Density is "Comfortable" or "Compact" ? settings.Density : "Comfortable"
+            };
+        }
+        catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Preferences could not be read: {ErrorType}", error.GetType().Name);
+            LastLoadError = error.Message;
+            return new();
+        }
+    }
+
+    public async Task SaveAsync(AppSettings settings)
+    {
+        await _gate.WaitAsync();
+        var temporary = FilePath + ".tmp";
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(settings, _json));
+            if (File.Exists(FilePath)) File.Replace(temporary, FilePath, FilePath + ".bak");
+            else File.Move(temporary, FilePath);
+        }
+        finally { _gate.Release(); }
+    }
+}

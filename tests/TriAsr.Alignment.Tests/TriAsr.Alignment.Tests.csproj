@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TriAsr.Alignment\TriAsr.Alignment.csproj" />
+  </ItemGroup>
+</Project>

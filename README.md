@@ -8,15 +8,19 @@ Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishG
 
 <div align="center">
 
-[![Download for Windows](https://img.shields.io/badge/Windows-Download_the_installer-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/install-mockingbird.cmd)
+[![Download for Windows](https://img.shields.io/badge/Windows-Download_the_installer-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Studio-Setup.exe)
 
-One click, one file. Windows requests permission, creates `C:\Mockingbird Studio Installer`, downloads all four release files there, verifies the MSI checksum and runs the local installer. Your browser downloads the `.cmd`; double-click that file to start it.
+One file. Download `Mockingbird-Studio-Setup.exe`, double-click it, accept the license and click **Install**. No administrator permission is needed.
 
 </div>
 
 ## Install
 
-Download the Windows MSI from GitHub Releases and double-click it. Alternatively, download `install-mockingbird.cmd` from the `download` release and double-click it. Installation is per user; the .NET runtime is included. Download models inside the app.
+Download `Mockingbird-Studio-Setup.exe` from the `download` release and double-click it. The setup wizard installs for your user only and includes the .NET runtime, so nothing else is required. Download models inside the app after installing.
+
+The installer is unsigned, so Windows SmartScreen may show "Windows protected your PC". Choose **More info**, then **Run anyway**. To check the download first, compare `SHA256SUMS.txt` from the same release with `Get-FileHash .\Mockingbird-Studio-Setup.exe`.
+
+To remove the app, use **Settings → Apps → Installed apps → Mockingbird Studio**. Uninstalling keeps your projects, settings and models.
 
 Native Linux support is pending; there is currently no native Linux build.
 
@@ -49,7 +53,10 @@ For complete app smoke checks, supply the Windows native runtimes under `Runtime
 ```powershell
 ./scripts/package.ps1
 ./scripts/build-msi.ps1
+./scripts/build-setup.ps1
 ```
+
+`build-setup.ps1` wraps the MSI in the setup wizard and needs the WiX bootstrapper extension (`WixToolset.BootstrapperApplications.wixext` 6.0.2) placed under `.tools/wix-extensions`; the script prints the exact path if it is missing.
 
 Version metadata comes from `Directory.Build.props`. Preserve both normal and publish package lock files. Native runtime binaries and model weights are external prerequisites and are excluded from Git.
 

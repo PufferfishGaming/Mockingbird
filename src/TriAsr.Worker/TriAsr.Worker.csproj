@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><RuntimeIdentifier>win-x64</RuntimeIdentifier></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../TriAsr.Engine.Canary/TriAsr.Engine.Canary.csproj" /><ProjectReference Include="../TriAsr.Audio/TriAsr.Audio.csproj" /></ItemGroup>
+</Project>

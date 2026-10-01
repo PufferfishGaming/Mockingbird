@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><OutputType>WinExe</OutputType><RuntimeIdentifier>win-x64</RuntimeIdentifier><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/TriASR.ico</ApplicationIcon></PropertyGroup>
+  <ItemGroup><Content Include="Assets/TriASR.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /><EmbeddedResource Include="../../PRIVACY.md" LogicalName="Mockingbird.Privacy.md" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TriAsr.Application/TriAsr.Application.csproj" /><ProjectReference Include="../TriAsr.Infrastructure/TriAsr.Infrastructure.csproj" /><ProjectReference Include="../TriAsr.Persistence/TriAsr.Persistence.csproj" />
+    <ProjectReference Include="../TriAsr.Audio/TriAsr.Audio.csproj" /><ProjectReference Include="../TriAsr.Engine.Whisper/TriAsr.Engine.Whisper.csproj" /><ProjectReference Include="../TriAsr.Engine.Canary/TriAsr.Engine.Canary.csproj" /><ProjectReference Include="../TriAsr.Engine.Llm/TriAsr.Engine.Llm.csproj" />
+    <ProjectReference Include="../TriAsr.Alignment/TriAsr.Alignment.csproj" /><ProjectReference Include="../TriAsr.Fusion/TriAsr.Fusion.csproj" /><ProjectReference Include="../TriAsr.Hardware/TriAsr.Hardware.csproj" /><ProjectReference Include="../TriAsr.Benchmark/TriAsr.Benchmark.csproj" /><ProjectReference Include="../TriAsr.Export/TriAsr.Export.csproj" />
+    <ProjectReference Include="../TriAsr.Worker/TriAsr.Worker.csproj" ReferenceOutputAssembly="false" />
+    <PackageReference Include="CommunityToolkit.Mvvm" /><PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <Target Name="CopyCanaryWorker" AfterTargets="Build">
+    <ItemGroup><WorkerFiles Include="../TriAsr.Worker/bin/x64/$(Configuration)/net10.0/win-x64/*" /></ItemGroup>
+    <Copy SourceFiles="@(WorkerFiles)" DestinationFolder="$(OutputPath)Workers/Canary" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
