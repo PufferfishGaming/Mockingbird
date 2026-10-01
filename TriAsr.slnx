@@ -1,0 +1,32 @@
+<Solution>
+  <Configurations><Platform Name="x64" /></Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/TriAsr.Alignment/TriAsr.Alignment.csproj" />
+    <Project Path="src/TriAsr.App/TriAsr.App.csproj" />
+    <Project Path="src/TriAsr.Application/TriAsr.Application.csproj" />
+    <Project Path="src/TriAsr.Audio/TriAsr.Audio.csproj" />
+    <Project Path="src/TriAsr.Benchmark/TriAsr.Benchmark.csproj" />
+    <Project Path="src/TriAsr.Domain/TriAsr.Domain.csproj" />
+    <Project Path="src/TriAsr.Engine.Canary/TriAsr.Engine.Canary.csproj" />
+    <Project Path="src/TriAsr.Engine.Llm/TriAsr.Engine.Llm.csproj" />
+    <Project Path="src/TriAsr.Engine.Whisper/TriAsr.Engine.Whisper.csproj" />
+    <Project Path="src/TriAsr.Export/TriAsr.Export.csproj" />
+    <Project Path="src/TriAsr.Fusion/TriAsr.Fusion.csproj" />
+    <Project Path="src/TriAsr.Hardware/TriAsr.Hardware.csproj" />
+    <Project Path="src/TriAsr.Infrastructure/TriAsr.Infrastructure.csproj" />
+    <Project Path="src/TriAsr.Persistence/TriAsr.Persistence.csproj" />
+    <Project Path="src/TriAsr.Worker/TriAsr.Worker.csproj">
+      <Platform Project="x64" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TriAsr.Alignment.Tests/TriAsr.Alignment.Tests.csproj" />
+    <Project Path="tests/TriAsr.Audio.Tests/TriAsr.Audio.Tests.csproj" />
+    <Project Path="tests/TriAsr.Domain.Tests/TriAsr.Domain.Tests.csproj" />
+    <Project Path="tests/TriAsr.Engine.Tests/TriAsr.Engine.Tests.csproj" />
+    <Project Path="tests/TriAsr.Fusion.Tests/TriAsr.Fusion.Tests.csproj" />
+    <Project Path="tests/TriAsr.Hardware.Tests/TriAsr.Hardware.Tests.csproj" />
+    <Project Path="tests/TriAsr.Persistence.Tests/TriAsr.Persistence.Tests.csproj" />
+    <Project Path="tests/TriAsr.Ui.SmokeTests/TriAsr.Ui.SmokeTests.csproj" />
+  </Folder>
+</Solution>
