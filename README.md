@@ -4,7 +4,7 @@ A local transcription workstation for Windows x64, using Whisper and Canary to r
 
 Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
 
-**Version 0.1.16 — release candidate**
+**Version 0.1.17 — release candidate**
 
 <div align="center">
 

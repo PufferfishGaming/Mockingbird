@@ -1,4 +1,4 @@
-param([string]$Version = '', [string]$Notes = 'Adds in-app update checks with a verified one-click update.')
+param([string]$Version = '', [string]$Notes = '')   # Notes appear in the update banner; pass a short plain-language summary of the release.
 . "$PSScriptRoot/common.ps1"
 $releaseVersion = ([xml](Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if (-not $Version) { $Version = $releaseVersion }
