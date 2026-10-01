@@ -29,7 +29,8 @@ public sealed class AudioJobQueue(IJobRepository repository, IJobWorkspace works
         {
             job = job with { State = JobState.Preprocessing, Error = null };
             await UpdateAsync(job, cancellationToken);
-            await audio.NormalizeAsync(job.SourcePath, System.IO.Path.Combine(workspace.DirectoryFor(job.Id), "normalized.wav"), cancellationToken);
+            var directory = workspace.DirectoryFor(job.Id);
+            await AudioPreparation.NormalizeAsync(audio, job.SourcePath, System.IO.Path.Combine(directory, "normalized.wav"), System.IO.Path.Combine(directory, "playback.m4a"), cancellationToken);
             job = job with { State = JobState.Queued, Checkpoint = "normalized" };
             await UpdateAsync(job, cancellationToken);
         }

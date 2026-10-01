@@ -10,7 +10,15 @@ public sealed record AudioInfo(int SampleRate, int Channels, int BitsPerSample, 
 {
     public double DurationSeconds => (double)SampleCount / SampleRate;
 }
-public interface IAudioNormalizer { Task<AudioInfo> NormalizeAsync(string source, string destination, CancellationToken cancellationToken); }
+public interface IAudioNormalizer
+{
+    Task<AudioInfo> NormalizeAsync(string source, string destination, CancellationToken cancellationToken);
+    /// <summary>
+    /// Makes a higher-quality copy for the review player (the speech engines only ever use the 16 kHz file).
+    /// Optional and best effort: when it cannot be made the player falls back to the 16 kHz file.
+    /// </summary>
+    Task CreatePlaybackCopyAsync(string source, string destination, CancellationToken cancellationToken) => Task.CompletedTask;
+}
 public interface IJobRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);

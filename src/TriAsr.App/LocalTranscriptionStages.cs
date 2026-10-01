@@ -77,7 +77,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 if (previous != config) throw new InvalidDataException("Runtime, model or hardware configuration changed. Create a new job before processing again.");
             }
             else await Write(job.Id, "configuration.json", config, token);
-            await audio.NormalizeAsync(job.SourcePath, normalized, token);
+            await AudioPreparation.NormalizeAsync(audio, job.SourcePath, normalized, FileFor(job.Id, "playback.m4a"), token);
             return;
         }
         var configuration = await Read<Configuration>(job.Id, "configuration.json", token);

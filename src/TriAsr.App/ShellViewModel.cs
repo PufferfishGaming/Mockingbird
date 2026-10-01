@@ -277,7 +277,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             Regions.Clear(); for (var i = 0; i < _review.Regions.Count; i++) Regions.Add(new(_review.Regions[i], machine.Regions[i].FinalText));
             SelectedRegion = Regions.FirstOrDefault();
             NormalizedAudioPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "normalized.wav");
-            AudioSource = new Uri(NormalizedAudioPath);
+            var listeningCopy = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "playback.m4a");
+            AudioSource = new Uri(System.IO.File.Exists(listeningCopy) ? listeningCopy : NormalizedAudioPath);
             ReviewSummary = $"{_review.Language.ToUpperInvariant()} · {Regions.Count} regions · {Regions.Count(region => region.IsUncertain)} need listening";
             var loopRegions = Regions.Where(region => region.Original.Warnings?.Contains(TriAsr.Fusion.TranscriptQuality.RepetitionWarning) == true).ToArray();
             if (loopRegions.Length > 0)

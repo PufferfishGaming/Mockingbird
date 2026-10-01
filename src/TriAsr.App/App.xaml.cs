@@ -197,6 +197,9 @@ public partial class App : System.Windows.Application
                     if (result.Regions.Any(region => region.CanaryText.Length == 0 && region.WhisperText.Length > 0 && region.Source == "agreement"))
                         throw new InvalidOperationException("One-sided text must enter Review.");
                     shell.SelectedJob = job; await shell.OpenReviewCommand.ExecuteAsync(null);
+                    var listeningCopy = Path.Combine(_host.Services.GetRequiredService<IJobWorkspace>().DirectoryFor(job.Id), "playback.m4a");
+                    if (!File.Exists(listeningCopy)) throw new InvalidOperationException("The 48 kHz listening copy was not created.");
+                    if (!string.Equals(shell.AudioSource?.LocalPath, listeningCopy, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Review is not playing the listening copy.");
                     await window.VerifyAudioPlaybackAsync();
                     foreach (var theme in new[] { "Light", "Dark" })
                     {
@@ -216,7 +219,7 @@ public partial class App : System.Windows.Application
                     job = await pipeline.RunAsync(job with { State = TriAsr.Domain.JobState.Cancelled });
                     if (job.State != TriAsr.Domain.JobState.Complete || original != File.GetLastWriteTimeUtc(Path.Combine(jobDirectory, "whisper.json")))
                         throw new InvalidOperationException("Resume overwrote completed Whisper evidence.");
-                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "pipeline-smoke.json"), JsonSerializer.Serialize(new { job, result, checkpointReused = true }));
+                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "pipeline-smoke.json"), JsonSerializer.Serialize(new { job, result, checkpointReused = true, listeningCopyBytes = new FileInfo(listeningCopy).Length }));
                 }
                 if (e.Args.Contains("--setup-smoke"))
                 {

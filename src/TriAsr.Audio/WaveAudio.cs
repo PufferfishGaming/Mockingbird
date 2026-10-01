@@ -90,6 +90,26 @@ public static class WaveAudio
 
 public sealed class FfmpegNormalizer(IProcessRunner runner, string executable) : IAudioNormalizer
 {
+    /// <summary>48 kHz AAC, mono stays mono and anything wider becomes stereo; two threads so it never starves the computer.</summary>
+    public static string[] PlaybackArguments(string source, string destination) =>
+        ["-nostdin", "-hide_banner", "-v", "error", "-n", "-threads", "2", "-i", source, "-map", "0:a:0", "-vn",
+         "-af", "aformat=channel_layouts=mono|stereo", "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", destination];
+
+    public async Task CreatePlaybackCopyAsync(string source, string destination, CancellationToken cancellationToken)
+    {
+        source = Path.GetFullPath(source); destination = Path.GetFullPath(destination);
+        if (File.Exists(destination) || !File.Exists(source) || string.Equals(source, destination, StringComparison.OrdinalIgnoreCase)) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".m4a";
+        try
+        {
+            var result = await runner.RunAsync(new(executable, PlaybackArguments(source, temporary), Path.GetDirectoryName(destination)!, TimeSpan.FromHours(6)), cancellationToken);
+            if (result.ExitCode != 0 || !File.Exists(temporary) || new FileInfo(temporary).Length == 0) return; // best effort
+            File.Move(temporary, destination);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
     public async Task<AudioInfo> NormalizeAsync(string source, string destination, CancellationToken cancellationToken)
     {
         source = Path.GetFullPath(source); destination = Path.GetFullPath(destination);
