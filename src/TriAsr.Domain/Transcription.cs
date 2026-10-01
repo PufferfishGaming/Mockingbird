@@ -6,7 +6,7 @@ public sealed record TranscriptionJob(Guid Id, string SourcePath, string Languag
 public sealed record TranscriptSegment(long StartMs, long EndMs, string Text);
 public sealed record EngineTranscript(string Engine, string Model, string RuntimeVersion, string RequestedBackend,
     string ActualBackend, string Device, string Language, double AudioSeconds, double InferenceSeconds,
-    IReadOnlyList<TranscriptSegment> Segments, string Text, bool NativeTimestamps, double? LoadSeconds = null, long? PeakRamBytes = null)
+    IReadOnlyList<TranscriptSegment> Segments, string Text, bool NativeTimestamps, double? LoadSeconds = null, long? PeakRamBytes = null, double? CpuSeconds = null)
 {
     public double RealTimeFactor => AudioSeconds > 0 ? InferenceSeconds / AudioSeconds : 0;
 }

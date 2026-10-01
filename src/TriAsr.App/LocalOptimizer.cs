@@ -54,7 +54,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         {
             var result = await new WhisperEngine(runner, paths.WhisperFor(backend), paths.WhisperModel, threads).TranscribeAsync(sample, seconds, language.Language,
                 Path.Combine(directory, $"whisper-{Interlocked.Increment(ref runId)}"), backend, ct);
-            return new(result.InferenceSeconds, result.LoadSeconds, result.PeakRamBytes);
+            return new(result.InferenceSeconds, result.LoadSeconds, result.PeakRamBytes, CpuSeconds: result.CpuSeconds);
         }
         async Task<Measurement> Canary(string backend, int threads, CancellationToken ct)
         {
@@ -66,7 +66,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
             if (run.ExitCode != 0) throw new InvalidOperationException("Canary benchmark failed: " + run.StandardError[^Math.Min(run.StandardError.Length, 500)..]);
             var native = JsonSerializer.Deserialize<CanaryNative.Result>(await File.ReadAllTextAsync(output, ct))!;
             if (native.Transcript.ActualBackend != backend) throw new InvalidDataException("Canary benchmark backend mismatch.");
-            return new(run.Seconds, native.Transcript.LoadSeconds, run.PeakRamBytes);
+            return new(run.Seconds, native.Transcript.LoadSeconds, run.PeakRamBytes, CpuSeconds: run.CpuSeconds);
         }
         foreach (var backend in backends)
         {

@@ -62,7 +62,7 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
         double? loadSeconds = timing.Success ? double.Parse(timing.Groups[1].Value, CultureInfo.InvariantCulture) / 1000 : null;
         return new("Whisper", Path.GetFileName(model), $"whisper.cpp binary {version}", backend, actual, device,
             document.RootElement.GetProperty("result").GetProperty("language").GetString()!, audioSeconds, result.Seconds,
-            segments, string.Join(" ", segments.Select(segment => segment.Text)), true, loadSeconds, result.PeakRamBytes);
+            segments, string.Join(" ", segments.Select(segment => segment.Text)), true, loadSeconds, result.PeakRamBytes, result.CpuSeconds);
     }
     public static IReadOnlyList<TranscriptSegment> ParseSegments(JsonElement root)
     {

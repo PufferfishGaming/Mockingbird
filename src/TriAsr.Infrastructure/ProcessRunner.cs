@@ -52,8 +52,11 @@ public sealed class ProcessRunner(ActivityFeed? activity = null) : IProcessRunne
             throw new TimeoutException($"Worker exceeded {request.Timeout.TotalSeconds:0} seconds.");
         }
         finally { sampling.Cancel(); await memorySampling.ConfigureAwait(false); }
-        var result = new ProcessResult(process.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false), stopwatch.Elapsed.TotalSeconds, peakRam > 0 ? peakRam : null);
-        activity?.Append("exit", $"{name} · code {result.ExitCode} · {result.Seconds:0.00}s");
+        double? cpuSeconds = null;
+        try { cpuSeconds = process.TotalProcessorTime.TotalSeconds; }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException) { }
+        var result = new ProcessResult(process.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false), stopwatch.Elapsed.TotalSeconds, peakRam > 0 ? peakRam : null, cpuSeconds);
+        activity?.Append("exit", $"{name} · code {result.ExitCode} · {result.Seconds:0.00}s" + (result.CpuSeconds is { } cpu ? $" · CPU {cpu:0.00}s" : "") + (result.PeakRamBytes is { } peak ? $" · peak {peak / 1048576d:0} MB" : ""));
         return result;
     }
 
