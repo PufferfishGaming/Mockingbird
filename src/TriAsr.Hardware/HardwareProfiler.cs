@@ -11,53 +11,76 @@ namespace TriAsr.Hardware;
 
 public sealed record GpuInfo(string Name, uint VendorId, ulong DedicatedBytes, string DriverVersion);
 public sealed record CpuTopology(int PhysicalCores, int LogicalProcessors, int? PerformanceCores, int? EfficiencyCores);
+/// <summary>
+/// What was found about this computer. The last five members were added after the first release and have defaults,
+/// so profiles saved by older versions still load. <see cref="ProbeErrors"/> lists probes that failed, which is not
+/// the same as hardware being absent.
+/// </summary>
 public sealed record HardwareProfile(string Cpu, string CpuVendor, CpuTopology Topology, ulong RamBytes,
     bool Avx, bool Avx2, bool Fma, bool F16c, IReadOnlyList<GpuInfo> Gpus, IReadOnlyList<string> VulkanDevices,
-    string RocmStatus, IReadOnlyList<string> NpuDevices, string WindowsVersion, long FreeDiskBytes, string Fingerprint);
+    string RocmStatus, IReadOnlyList<string> NpuDevices, string WindowsVersion, long FreeDiskBytes, string Fingerprint,
+    string OsArchitecture = "unknown", string ProcessArchitecture = "unknown", string PowerSource = "unknown",
+    IReadOnlyList<ProbeError>? ProbeErrors = null, IReadOnlyList<string>? Issues = null);
 
 [SupportedOSPlatform("windows")]
 public sealed class HardwareProfiler(IProcessRunner runner)
 {
     public async Task<HardwareProfile> DetectAsync(string dataRoot, string whisperExecutable, CancellationToken token = default)
     {
-        var cpu = "Unknown CPU";
-        using (var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0"))
-            cpu = key?.GetValue("ProcessorNameString")?.ToString()?.Trim() ?? cpu;
-        var topology = ReadTopology();
+        var probes = new ProbeRunner();
+        var cpu = probes.Run("cpu-name", ReadCpuName) ?? "Unknown CPU";
+        var topology = probes.Run("cpu-topology", ReadTopology) ?? new(Environment.ProcessorCount, Environment.ProcessorCount, null, null);
+        // Memory and the graphics adapter list are essential: without them no safe recommendation exists, so they still fail loudly.
         var memory = new MemoryStatus { Length = (uint)Marshal.SizeOf<MemoryStatus>() };
         if (!GlobalMemoryStatusEx(ref memory)) throw new System.ComponentModel.Win32Exception();
-        const string query = "$ErrorActionPreference='Stop'; @{gpu=@(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion); npu=@(Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'Neural|\\bNPU\\b|AI Boost' } | Select-Object -ExpandProperty Name)} | ConvertTo-Json -Depth 5 -Compress";
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(query));
-        var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
-        var probe = await runner.RunAsync(new(powershell, ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], dataRoot, TimeSpan.FromSeconds(30)), token);
         var drivers = new Dictionary<string, string>();
         var npu = new List<string>();
-        if (probe.ExitCode == 0)
+        await probes.RunAsync("gpu-driver-and-npu-query", async () =>
         {
+            const string query = "$ErrorActionPreference='Stop'; @{gpu=@(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion); npu=@(Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'Neural|\\bNPU\\b|AI Boost' } | Select-Object -ExpandProperty Name)} | ConvertTo-Json -Depth 5 -Compress";
+            var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(query));
+            var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
+            var probe = await runner.RunAsync(new(powershell, ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded], dataRoot, TimeSpan.FromSeconds(30)), token);
+            if (probe.ExitCode != 0) throw new InvalidOperationException($"The Windows device query exited with code {probe.ExitCode}.");
             using var document = JsonDocument.Parse(probe.StandardOutput);
             foreach (var gpu in document.RootElement.GetProperty("gpu").EnumerateArray())
                 drivers[gpu.GetProperty("Name").GetString() ?? ""] = gpu.GetProperty("DriverVersion").GetString() ?? "Unknown";
             foreach (var device in document.RootElement.GetProperty("npu").EnumerateArray()) npu.Add(device.GetString() ?? "Unknown");
-        }
-        else npu.Add("Probe unavailable");
+            return true;
+        });
         var gpus = ReadGpus().Select(gpu => gpu with { DriverVersion = drivers.GetValueOrDefault(gpu.Name, "Unknown") }).ToArray();
-        var vulkan = new List<string>();
-        if (File.Exists(whisperExecutable))
+        var vulkan = await probes.RunAsync("vulkan-devices", async () =>
         {
+            var devices = new List<string>();
+            if (!File.Exists(whisperExecutable)) return devices;
             var result = await runner.RunAsync(new(whisperExecutable, ["--help"], Path.GetDirectoryName(whisperExecutable)!, TimeSpan.FromSeconds(30)), token);
             foreach (var line in result.StandardError.Split('\n'))
-                if (line.StartsWith("ggml_vulkan:") && line.Contains(" = ")) vulkan.Add(line.Trim());
-        }
-        using var os = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
-        var product = os?.GetValue("ProductName")?.ToString() ?? "Windows";
-        if (int.TryParse(os?.GetValue("CurrentBuild")?.ToString(), out var build) && build >= 22000) product = product.Replace("Windows 10", "Windows 11", StringComparison.Ordinal);
-        var version = $"{product} build {build}.{os?.GetValue("UBR")}";
+                if (line.StartsWith("ggml_vulkan:") && line.Contains(" = ")) devices.Add(line.Trim());
+            return devices;
+        }) ?? [];
+        var version = probes.Run("windows-version", ReadWindowsVersion) ?? "Windows";
+        var os = RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant();
+        var process = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+        // The fingerprint deliberately ignores the newer members so saved tuning stays valid after an upgrade.
         var fingerprintInput = JsonSerializer.Serialize(new { cpu, memory.TotalPhysical, gpus, vulkan, Rocm = "Unvalidated", AppVersion = typeof(HardwareProfiler).Assembly.GetName().Version?.ToString() });
-        return new(cpu, ReadCpuVendor(), topology, memory.TotalPhysical, Avx.IsSupported, Avx2.IsSupported, Fma.IsSupported,
+        return new(cpu, probes.Run("cpu-vendor", ReadCpuVendor) ?? "Unknown", topology, memory.TotalPhysical, Avx.IsSupported, Avx2.IsSupported, Fma.IsSupported,
             X86Base.IsSupported && (X86Base.CpuId(1, 0).Ecx & (1 << 29)) != 0, gpus, vulkan,
             "Not validated by an installed inference runtime", npu, version,
             new DriveInfo(Path.GetPathRoot(Path.GetFullPath(dataRoot))!).AvailableFreeSpace,
-            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprintInput))));
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprintInput))),
+            os, process, TriAsr.Hardware.PowerSource.Read(), probes.Errors, HardwareIssues.Evaluate(os, process, probes.Errors));
+    }
+    private static string? ReadCpuName()
+    {
+        using var key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+        return key?.GetValue("ProcessorNameString")?.ToString()?.Trim();
+    }
+    private static string ReadWindowsVersion()
+    {
+        using var os = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+        var product = os?.GetValue("ProductName")?.ToString() ?? "Windows";
+        if (int.TryParse(os?.GetValue("CurrentBuild")?.ToString(), out var build) && build >= 22000) product = product.Replace("Windows 10", "Windows 11", StringComparison.Ordinal);
+        return $"{product} build {build}.{os?.GetValue("UBR")}";
     }
     private static string ReadCpuVendor()
     {

@@ -1,0 +1,33 @@
+{
+  "Cpu": "Intel(R) Core(TM) Ultra 7 270K Plus",
+  "CpuVendor": "GenuineIntel",
+  "Topology": {
+    "PhysicalCores": 24,
+    "LogicalProcessors": 24,
+    "PerformanceCores": 8,
+    "EfficiencyCores": 16
+  },
+  "RamBytes": 68317642752,
+  "Avx": true,
+  "Avx2": true,
+  "Fma": true,
+  "F16c": true,
+  "Gpus": [
+    {
+      "Name": "AMD Radeon RX 7900 XT",
+      "VendorId": 4098,
+      "DedicatedBytes": 21412773888,
+      "DriverVersion": "32.0.32015.2008"
+    }
+  ],
+  "VulkanDevices": [
+    "ggml_vulkan: 0 = AMD Radeon RX 7900 XT (AMD proprietary driver) | uma: 0 | fp16: 1 | bf16: 1 | warp size: 64 | shared memory: 32768 | int dot: 1 | matrix cores: KHR_coopmat"
+  ],
+  "RocmStatus": "Not validated by an installed inference runtime",
+  "NpuDevices": [
+    "Intel(R) AI Boost"
+  ],
+  "WindowsVersion": "Windows 11 Pro build 26200.9550",
+  "FreeDiskBytes": 447008669696,
+  "Fingerprint": "AB2B653E832C9721E238325331FFE7902AB863F30BC066665F2629F4691FAE7E"
+}
