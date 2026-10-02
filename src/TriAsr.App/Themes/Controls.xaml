@@ -16,6 +16,15 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" /><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="Padding" Value="24,13" /><Setter Property="FontSize" Value="15" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Cursor" Value="Hand" /><Setter Property="FocusVisualStyle" Value="{StaticResource FocusIndicator}" />
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Body" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"><ContentPresenter.Resources><Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" /></Style></ContentPresenter.Resources></ContentPresenter></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Body" Property="Opacity" Value="0.88" /></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="Body" Property="Opacity" Value="0.75" /></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Body" Property="Opacity" Value="0.55" /></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
+  <!-- The small Delete button on a project row (Studio, the Server window): shown only for a project that is finished, has failed or was cancelled. -->
+  <Style x:Key="ProjectDeleteButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Setter Property="Padding" Value="12,6" /><Setter Property="VerticalAlignment" Value="Center" /><Setter Property="Visibility" Value="Collapsed" />
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding State}" Value="Complete"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+      <DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+      <DataTrigger Binding="{Binding State}" Value="Cancelled"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+    </Style.Triggers>
+  </Style>
   <Style TargetType="ListBox"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /><Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" /></Style>
   <Style TargetType="ListBoxItem">
     <Setter Property="Padding" Value="12,13" /><Setter Property="Margin" Value="0,3" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" /><Setter Property="FocusVisualStyle" Value="{StaticResource FocusIndicator}" />

@@ -534,4 +534,83 @@ public sealed class RemoteTests
         }
         finally { Loc.Instance.SetLanguage(before); TestCleanup.Delete(root); }
     }
+    // ---- the history of recordings on a server: open on a click, delete (ADR-0019) -----------------------------------------------------
+
+    [Fact]
+    public Task AFinishedRecordingOpensInReviewWhenItIsClickedAndCanBeDeletedFromTheServer() => UiThread.RunAsync(async () =>
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync();
+        var errors = new List<(string, string)>();
+        var (workspace, browser) = await ConnectedAsync(root, api, errors);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var recording = Path.Combine(root, "meeting.wav");
+            await File.WriteAllBytesAsync(recording, new byte[50_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            var row = Assert.Single(workspace.Jobs);
+            await EventuallyAsync(() => row.CanOpen ? row : null, "the recording is transcribed");
+            Assert.True(row.CanDelete);
+            var uploaded = api.Repository.Jobs[row.Id].SourcePath;
+            Assert.True(File.Exists(uploaded));
+
+            workspace.SelectedTab = "Projects";
+            await workspace.OpenJobCommand.ExecuteAsync(row);                                   // a click on the row
+            Assert.Equal("Review", workspace.SelectedTab);
+            Assert.True(workspace.HasReview);
+            Assert.Equal("meeting.wav", workspace.ReviewName);
+            Assert.Same(row, workspace.SelectedJob);
+
+            await workspace.DeleteJobCommand.ExecuteAsync(row);
+            Assert.Empty(workspace.Jobs);
+            Assert.True(workspace.HasNoJobs);
+            Assert.False(workspace.HasReview);                                                  // the review of a deleted recording is closed...
+            Assert.Empty(workspace.Regions);
+            Assert.Equal("Projects", workspace.SelectedTab);                                    // ...and the page is back at the list
+            Assert.Null(workspace.SelectedJob);
+            Assert.Empty(api.Repository.Jobs);
+            Assert.False(File.Exists(uploaded));                                                // the server's copy of the recording is gone too
+            Assert.Empty(errors);
+            Assert.Empty(await workspace.Client!.ListAsync(default));
+        }
+        finally { TestCleanup.Delete(root); }
+    });
+
+    [Fact]
+    public Task ARecordingThatIsBeingWorkedOnIsOnlySelectedWhenClickedAndCannotBeDeleted() => UiThread.RunAsync(async () =>
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync(h => h.Stages.Hold = new TaskCompletionSource());
+        var errors = new List<(string, string)>();
+        var (workspace, browser) = await ConnectedAsync(root, api, errors);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var recording = Path.Combine(root, "long.wav");
+            await File.WriteAllBytesAsync(recording, new byte[50_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            var row = Assert.Single(workspace.Jobs);
+            await EventuallyAsync(() => row.Job.State == "running" ? row : null, "it starts");
+            Assert.False(row.CanDelete);
+            Assert.False(row.CanOpen);
+
+            workspace.SelectedTab = "Projects";
+            await workspace.OpenJobCommand.ExecuteAsync(row);
+            Assert.Equal("Projects", workspace.SelectedTab);                                    // nothing to open yet
+            Assert.Same(row, workspace.SelectedJob);                                            // but it is selected, so that Cancel applies
+
+            await workspace.DeleteJobCommand.ExecuteAsync(row);
+            var (title, message) = Assert.Single(errors);
+            Assert.Equal("Could not delete the project", title);
+            Assert.Equal("A project that is still being worked on cannot be deleted. Cancel it first.", message);
+            Assert.Single(workspace.Jobs);
+            Assert.Single(api.Repository.Jobs);
+        }
+        finally { TestCleanup.Delete(root); }
+    });
 }

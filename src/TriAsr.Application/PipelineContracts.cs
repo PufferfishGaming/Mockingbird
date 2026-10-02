@@ -24,4 +24,6 @@ public interface IJobRepository
     Task InitializeAsync(CancellationToken cancellationToken = default);
     Task SaveAsync(TranscriptionJob job, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TranscriptionJob>> ListAsync(CancellationToken cancellationToken = default);
+    /// <summary>Forgets a project: the job, its history of states and everything stored for it (transcript, edits and their revisions). Nothing happens when there is no such job.</summary>
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

@@ -21,6 +21,8 @@ public sealed partial class RemoteJobRow(RemoteJob job) : ObservableObject
     public bool IsFinished => Job.IsFinished;
     public bool CanOpen => Job.State == "complete";
     public bool CanCancel => !Job.IsFinished;
+    /// <summary>A recording can be deleted once it is finished, has failed or was cancelled.</summary>
+    public bool CanDelete => Job.IsFinished;
     public string Created => Job.CreatedUtc.ToLocalTime().ToString("g");
     public string ErrorText => Job.Error is { } error ? Loc.Describe(error) : "";
     public bool HasError => Job.Error is not null;
@@ -34,7 +36,7 @@ public sealed partial class RemoteJobRow(RemoteJob job) : ObservableObject
     public void Update(RemoteJob job)
     {
         Job = job;
-        foreach (var property in new[] { nameof(Name), nameof(Percent), nameof(IsRunning), nameof(IsFinished), nameof(CanOpen), nameof(CanCancel), nameof(StateText), nameof(ErrorText), nameof(HasError), nameof(Created) })
+        foreach (var property in new[] { nameof(Name), nameof(Percent), nameof(IsRunning), nameof(IsFinished), nameof(CanOpen), nameof(CanCancel), nameof(CanDelete), nameof(StateText), nameof(ErrorText), nameof(HasError), nameof(Created) })
             OnPropertyChanged(property);
     }
 
@@ -63,6 +65,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     /// <summary>Shows a recording the server took (a link it is fetching) in the project list.</summary>
     internal void ShowSent(RemoteJob job)
     {
+        Interlocked.Increment(ref _localChanges);
         Merge([job]);
         SelectedJob = Jobs.FirstOrDefault(row => row.Id == job.Id);
         SelectedTab = "Projects";
@@ -194,6 +197,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         try
         {
             var job = await connection.Client.UploadAsync(SourcePath, SelectedLanguage, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), CancellationToken.None);
+            Interlocked.Increment(ref _localChanges);
             Merge([job]);
             SelectedJob = Jobs.FirstOrDefault(row => row.Id == job.Id);
             SendStatus = Loc.T("Sent. The server is working on it.");
@@ -233,15 +237,20 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         OpenSelectedCommand.NotifyCanExecuteChanged(); CancelSelectedCommand.NotifyCanExecuteChanged();
     }
 
+    // Counts what this window itself added to or removed from the list. An answer that was asked for before such a change is out of date and must not undo it
+    // (a refresh that started just before a recording was sent would otherwise take the new row away, or bring a deleted one back).
+    private int _localChanges;
+
     private async Task PollAsync(RemoteConnection connection, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
             try
             {
+                var asked = Volatile.Read(ref _localChanges);
                 var list = await connection.Client.ListAsync(token);
                 var info = await connection.Client.InfoAsync(token);
-                _onUi(() => { if (ReferenceEquals(_connection?.Client, connection.Client)) { Merge(list, replace: true); if (!ReferenceEquals(_connection.Info, info)) { _connection = _connection with { Info = info }; RefreshServerNote(info); } } });
+                _onUi(() => { if (ReferenceEquals(_connection?.Client, connection.Client)) { if (asked == _localChanges) Merge(list, replace: true); if (!ReferenceEquals(_connection.Info, info)) { _connection = _connection with { Info = info }; RefreshServerNote(info); } } });
                 await Task.Delay(list.Any(job => !job.IsFinished) ? TimeSpan.FromMilliseconds(1200) : TimeSpan.FromSeconds(6), token);
             }
             catch (OperationCanceledException) { return; }
@@ -271,6 +280,69 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     }
 
     private bool CanCancelSelected() => SelectedJob?.CanCancel == true;
+
+    /// <summary>A click on a recording of the list: a finished one opens in Review, any other is only selected (so that Cancel applies to it).</summary>
+    [RelayCommand]
+    private async Task OpenJobAsync(RemoteJobRow? row)
+    {
+        if (row is null) return;
+        SelectedJob = row;
+        if (row.CanOpen) await OpenReviewAsync(row.Id);
+    }
+
+    /// <summary>Deletes a finished recording on the server (the window has asked first), and lets go of its review if that is open (ADR-0019).</summary>
+    [RelayCommand]
+    private async Task DeleteJobAsync(RemoteJobRow? row)
+    {
+        row ??= SelectedJob;
+        if (row is null || _connection is not { } connection) return;
+        if (!row.CanDelete) { _reportError(Loc.T("Could not delete the project"), Loc.T("A project that is still being worked on cannot be deleted. Cancel it first.")); return; }
+        try
+        {
+            await connection.Client.DeleteAsync(row.Id, CancellationToken.None);
+            Interlocked.Increment(ref _localChanges);
+            if (_reviewJob == row.Id) ClearReview();
+            Jobs.Remove(row);
+            if (SelectedJob == row) SelectedJob = null;
+            OnPropertyChanged(nameof(HasNoJobs));
+            ForgetDownloadedAudio(row.Id);
+        }
+        catch (RemoteException error) when (error.Code == "still_running")
+        {
+            _reportError(Loc.T("Could not delete the project"), Loc.T("A project that is still being worked on cannot be deleted. Cancel it first."));
+        }
+        catch (RemoteException error)
+        {
+            _reportError(Loc.T("Could not delete the project"), Loc.Describe(error.Message));
+            if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message);
+        }
+    }
+
+    /// <summary>The open review is gone (its recording was deleted): the page goes back to the list.</summary>
+    private void ClearReview()
+    {
+        _audio?.Cancel();
+        Regions.Clear(); SelectedRegion = null;
+        _reviewJob = Guid.Empty; _rawCanaryNote = null;
+        ReviewName = ""; ReviewSummary = ""; RawWhisper = ""; RawCanary = ""; AudioStatus = "";
+        AudioSource = null; NormalizedAudioPath = "";
+        OnPropertyChanged(nameof(HasReview)); OnPropertyChanged(nameof(NoReview)); OnPropertyChanged(nameof(ShowPlayer));
+        if (SelectedTab == "Review") SelectedTab = "Projects";
+    }
+
+    /// <summary>The audio that was fetched for the review of a deleted recording is removed from this computer too, as soon as the player lets go of it.</summary>
+    private void ForgetDownloadedAudio(Guid id)
+    {
+        var folder = Path.Combine(_tempRoot, id.ToString("N"));
+        _ = Task.Run(async () =>
+        {
+            for (var attempt = 0; attempt < 5 && Directory.Exists(folder); attempt++)
+            {
+                try { Directory.Delete(folder, true); }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { await Task.Delay(300); }
+            }
+        });
+    }
 
     // ---- reviewing ---------------------------------------------------------------------------------------------------------------------
 

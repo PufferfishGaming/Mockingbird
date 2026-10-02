@@ -43,6 +43,34 @@ public partial class RemoteWorkspaceView : UserControl
         if (args.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } paths) Model.SourcePath = paths[0];
     }
 
+    /// <summary>A click on a recording opens a finished one in Review; a click on its Delete button is not a click on the recording.</summary>
+    private async void ProjectClick(object sender, MouseButtonEventArgs args)
+    {
+        var list = (ListBox)sender;
+        if (args.OriginalSource is not DependencyObject source || list.ContainerFromElement(source) is not ListBoxItem item) return;
+        if (ProjectDialogs.IsInsideButton(source, item) || item.DataContext is not RemoteJobRow row) return;
+        await Model.OpenJobCommand.ExecuteAsync(row);
+    }
+
+    /// <summary>Enter opens the selected recording, Delete deletes it (after asking).</summary>
+    private async void ProjectKeyDown(object sender, KeyEventArgs args)
+    {
+        if (args.OriginalSource is System.Windows.Controls.Primitives.ButtonBase || Model.SelectedJob is not { } row) return;
+        if (args.Key == Key.Enter) { args.Handled = true; await Model.OpenJobCommand.ExecuteAsync(row); }
+        else if (args.Key == Key.Delete && row.CanDelete) { args.Handled = true; await DeleteAsync(row); }
+    }
+
+    private async void DeleteProjectClick(object sender, RoutedEventArgs args)
+    {
+        if (((FrameworkElement)sender).DataContext is RemoteJobRow row) await DeleteAsync(row);
+    }
+
+    private async Task DeleteAsync(RemoteJobRow row)
+    {
+        if (!ProjectDialogs.ConfirmDelete(Window.GetWindow(this), row.Name, onServer: true)) return;
+        await Model.DeleteJobCommand.ExecuteAsync(row);
+    }
+
     private async void ExportClick(object sender, RoutedEventArgs args)
     {
         var picker = new SaveFileDialog { FileName = "transcript", Filter = Loc.T("Text") + "|*.txt|" + Loc.T("SubRip subtitles") + "|*.srt|WebVTT|*.vtt|Markdown|*.md|" + Loc.T("JSON with provenance") + "|*.json|" + Loc.T("CSV comparison") + "|*.csv|" + Loc.T("Word document") + "|*.docx" };

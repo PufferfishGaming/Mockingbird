@@ -21,6 +21,7 @@ public sealed class PlaybackCopyTests
         public Task InitializeAsync(CancellationToken token = default) => Task.CompletedTask;
         public Task SaveAsync(TranscriptionJob job, CancellationToken token = default) { lock (Saved) Saved.Add(job); return Task.CompletedTask; }
         public Task<IReadOnlyList<TranscriptionJob>> ListAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<TranscriptionJob>>(Saved.ToArray());
+        public Task DeleteAsync(Guid id, CancellationToken token = default) => Task.CompletedTask;
     }
     private sealed class FakeAudio(Func<string, string, Task>? normalize = null, Func<string, string, CancellationToken, Task>? playback = null) : IAudioNormalizer
     {

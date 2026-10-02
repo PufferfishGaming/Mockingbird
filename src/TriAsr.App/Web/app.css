@@ -58,6 +58,8 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .job { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 14px 0; border-top: 1px solid var(--border); }
 .job:first-child { border-top: 0; }
 .job .name { font-weight: 600; overflow-wrap: anywhere; }
+.job .info.open { cursor: pointer; border-radius: 6px; }
+.job .info.open:hover .name { color: var(--accent); text-decoration: underline; }
 .job .state { color: var(--accent); font-size: 13px; }
 .job .state.failed { color: var(--error); }
 .job .when { color: var(--muted); font-size: 12px; }

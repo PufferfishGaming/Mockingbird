@@ -42,6 +42,7 @@ public sealed class PipelineRecoveryTests
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SaveAsync(TranscriptionJob job, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<TranscriptionJob>> ListAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<TranscriptionJob>>([]);
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
     private sealed class FailingStages(bool parallel, JobState failure, bool cancel = false) : ITranscriptionStages
     {

@@ -125,6 +125,12 @@ public sealed class RemoteServerClient : IDisposable
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }
 
+    /// <summary>Deletes a finished recording on the server with its transcript, edits and the copy of the recording it holds (ADR-0019). One that is still being worked on is refused (<c>still_running</c>).</summary>
+    public async Task DeleteAsync(Guid id, CancellationToken token)
+    {
+        using var response = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/v1/transcriptions/{id}"), 60, token);
+    }
+
     /// <summary>Sends a recording. The file goes from disk to the connection in pieces, with the count of bytes sent reported as it goes.</summary>
     public async Task<RemoteJob> UploadAsync(string path, string language, IProgress<long>? progress, CancellationToken token)
     {

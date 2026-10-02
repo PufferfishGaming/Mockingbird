@@ -20,7 +20,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
     ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor, IProcessRunner processes,
-    ILinkFetcher links, ILinkTool linkTool) : ObservableObject
+    ILinkFetcher links, ILinkTool linkTool, ProjectRemoval removal) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
@@ -173,6 +173,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         });
         _updateJob = job => UpdateJob(null, job);
         Host.JobChangedByApi += (_, job) => _updateJob?.Invoke(job);
+        Host.JobDeletedByApi += (_, id) => OnUi(() => ForgetProject(id));
         queue.JobChanged += UpdateJob;
         pipeline.JobChanged += UpdateJob;
         pipeline.ProgressChanged += (_, update) => System.Windows.Application.Current.Dispatcher.Invoke(() => ApplyTranscriptionProgress(update));

@@ -65,6 +65,12 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Raised when the API itself changes a job (cancelling one that never started), so that lists in the window can follow.</summary>
     public event EventHandler<TranscriptionJob>? JobChangedByApi;
 
+    /// <summary>A client deleted a recording through the API (ADR-0019); the window drops it from its list.</summary>
+    public event EventHandler<Guid>? JobDeletedByApi;
+
+    /// <summary>The window deleted a project: the API stops listing it.</summary>
+    public void Forget(Guid id) => _service?.Forget(id);
+
     public int Port => int.TryParse(PortText, out var port) && port is >= 1024 and <= 65535 ? port : 0;
     public bool HasPassword => Password.Length > 0;
     public string DisplayName => Name.Trim().Length > 0 ? Name.Trim() : Environment.MachineName;
@@ -186,6 +192,7 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
             {
                 _service = _createService(this);
                 _service.JobChangedByApi += (_, job) => JobChangedByApi?.Invoke(this, job);
+                _service.JobDeletedByApi += (_, id) => JobDeletedByApi?.Invoke(this, id);
                 await _service.StartAsync();
             }
             var address = AllowNetwork ? (Socket.OSSupportsIPv6 ? IPAddress.IPv6Any : IPAddress.Any) : IPAddress.Loopback;

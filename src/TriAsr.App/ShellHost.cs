@@ -58,7 +58,8 @@ public sealed partial class ShellViewModel
         language => { var missing = Array.Empty<string>(); OnUi(() => missing = MissingRequiredModelsFor(language)); return missing; },
         () => !IsModelBusy && !IsBenchmarking && !SetupRunning && !IsCheckingSystem,
         busy => OnUi(() => host.IsBusy = busy),
-        () => host.DisplayName, Edition.Label, LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor, links));
+        () => host.DisplayName, Edition.Label, LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor, links,
+        (job, token) => removal.DeleteAsync(job, token)));
 
     private bool IsApiJob(TranscriptionJob job) => job.SourcePath.StartsWith(IncomingFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 

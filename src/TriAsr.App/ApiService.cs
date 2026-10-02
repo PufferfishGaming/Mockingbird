@@ -23,11 +23,12 @@ namespace TriAsr.App;
 /// <param name="CanRun">False while the program is busy with something that must not overlap (model download, tuning, setup).</param>
 /// <param name="BusyChanged">Told when the API starts and stops working on a job.</param>
 /// <param name="Links">Fetches the sound of a web address for <c>POST /v1/links</c> (ADR-0018). Null: this server does not fetch links.</param>
+/// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c> (ADR-0019). Null: this server does not delete recordings.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
-    Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null);
+    Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null);
 
 /// <summary>Everything the remote review page needs about a finished job.</summary>
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
@@ -65,6 +66,12 @@ public sealed class ApiService : IAsyncDisposable
 
     /// <summary>Raised when the API itself changes a job (cancelling one that never started), so that the window's lists can follow.</summary>
     public event EventHandler<TranscriptionJob>? JobChangedByApi;
+
+    /// <summary>Raised when a client deleted a recording through the API, so that the window's list drops it too.</summary>
+    public event EventHandler<Guid>? JobDeletedByApi;
+
+    /// <summary>The window deleted a project: the API stops listing it.</summary>
+    public void Forget(Guid id) => _jobs.TryRemove(id, out _);
 
     public ApiService(ApiServiceDependencies dependencies)
     {
@@ -160,7 +167,7 @@ public sealed class ApiService : IAsyncDisposable
             case ["v1", "links"]:
                 return request.Method == "POST" ? await LinkAsync(request, token) : MethodNotAllowed("POST");
             case ["v1", "transcriptions", var id]:
-                return request.Method == "GET" ? await StatusAsync(id, request, token) : MethodNotAllowed("GET");
+                return request.Method switch { "GET" => await StatusAsync(id, request, token), "DELETE" => await DeleteRecordingAsync(id, token), _ => MethodNotAllowed("GET, DELETE") };
             case ["v1", "transcriptions", var id, "transcript"]:
                 return request.Method == "GET" ? await TranscriptAsync(id, request, token) : MethodNotAllowed("GET");
             case ["v1", "transcriptions", var id, "cancel"]:
@@ -180,7 +187,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- who the request is for -------------------------------------------------------------------------------------------------------
 
@@ -553,6 +560,22 @@ public sealed class ApiService : IAsyncDisposable
             while (entry.Job.State is not (JobState.Complete or JobState.Failed or JobState.Cancelled) && DateTime.UtcNow < until) await Task.Delay(200, token);
         }
         return HttpResponse.Json(200, Describe(entry));
+    }
+
+    /// <summary>
+    /// <c>DELETE /v1/transcriptions/{id}</c>: removes a finished recording with its transcript, edits and working files, and the copy of the recording that was
+    /// uploaded (ADR-0019). One that is still being worked on is refused; it has to be cancelled first.
+    /// </summary>
+    private async Task<HttpResponse> DeleteRecordingAsync(string id, CancellationToken token)
+    {
+        if (_deps.DeleteJob is not { } delete) return HttpResponse.Error(501, "delete_unavailable", "This server does not delete recordings.");
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        if (entry.Fetching || entry.Running is not null || !ProjectRemoval.CanDelete(entry.Job.State))
+            return HttpResponse.Error(409, "still_running", "The recording is still being worked on. Cancel it first.");
+        await delete(entry.Job, token);
+        _jobs.TryRemove(entry.Id, out _);
+        JobDeletedByApi?.Invoke(this, entry.Id);
+        return HttpResponse.Json(200, new { deleted = entry.Id });
     }
 
     private async Task<HttpResponse> CancelAsync(string id)

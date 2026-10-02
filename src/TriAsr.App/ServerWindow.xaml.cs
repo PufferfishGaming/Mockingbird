@@ -24,6 +24,14 @@ public partial class ServerWindow : Window
         if (dialog.ShowDialog(this) == true) ((ShellViewModel)DataContext).SetStorageLocation(dialog.FolderName, forModels);
     }
 
+    /// <summary>Deletes a recording of the list (after asking): its transcript, edits and working files, and the copy that was uploaded.</summary>
+    private async void DeleteProjectClick(object sender, RoutedEventArgs args)
+    {
+        if (((FrameworkElement)sender).DataContext is not TriAsr.Domain.TranscriptionJob job) return;
+        if (!ProjectDialogs.ConfirmDelete(this, System.IO.Path.GetFileName(job.SourcePath), onServer: false)) return;
+        await ((ShellViewModel)DataContext).DeleteProjectCommand.ExecuteAsync(job);
+    }
+
     /// <summary>Closing the window stops the server. A recording that is being transcribed is only cancelled after the user has been asked.</summary>
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs args)
     {

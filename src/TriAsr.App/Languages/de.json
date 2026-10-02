@@ -904,5 +904,15 @@
  "The link could not be downloaded.": "Der Link konnte nicht heruntergeladen werden.",
  "The link helper could not be downloaded.": "Der Link-Helfer konnte nicht heruntergeladen werden.",
  "The link helper failed its checksum and was not installed.": "Der Link-Helfer hat die Prüfsummenprüfung nicht bestanden und wurde nicht installiert.",
- "The link helper is in use. Wait until the download that uses it has finished, then try again.": "Der Link-Helfer wird gerade verwendet. Warten Sie, bis der Download, der ihn verwendet, abgeschlossen ist, und versuchen Sie es dann erneut."
+ "The link helper is in use. Wait until the download that uses it has finished, then try again.": "Der Link-Helfer wird gerade verwendet. Warten Sie, bis der Download, der ihn verwendet, abgeschlossen ist, und versuchen Sie es dann erneut.",
+ "Click a finished project to open its transcript.": "Klicken Sie auf ein fertiges Projekt, um sein Transkript zu öffnen.",
+ "Delete": "Löschen",
+ "Delete project": "Projekt löschen",
+ "Delete this project and its transcript": "Dieses Projekt und sein Transkript löschen",
+ "Delete \"{0}\"? Its transcript, your edits and the working files are removed from this computer, and so is a copy of the recording that was uploaded or fetched from a link. A recording file you chose yourself is not deleted. This cannot be undone.": "„{0}“ löschen? Das Transkript, Ihre Änderungen und die Arbeitsdateien werden von diesem Computer entfernt, ebenso eine Kopie der Aufnahme, die hochgeladen oder über einen Link geholt wurde. Eine Aufnahmedatei, die Sie selbst gewählt haben, wird nicht gelöscht. Das kann nicht rückgängig gemacht werden.",
+ "Delete \"{0}\" from the server? Its transcript, the edits and the recording the server holds are removed. This cannot be undone.": "„{0}“ vom Server löschen? Das Transkript, die Änderungen und die Aufnahme, die der Server aufbewahrt, werden entfernt. Das kann nicht rückgängig gemacht werden.",
+ "A project that is still being worked on cannot be deleted. Cancel it first.": "Ein Projekt, an dem noch gearbeitet wird, kann nicht gelöscht werden. Brechen Sie es zuerst ab.",
+ "Project deleted: {0}": "Projekt gelöscht: {0}",
+ "The project was deleted, but some files could not be removed: {0}": "Das Projekt wurde gelöscht, aber einige Dateien konnten nicht entfernt werden: {0}",
+ "Could not delete the project": "Das Projekt konnte nicht gelöscht werden"
 }

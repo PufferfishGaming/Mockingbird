@@ -70,7 +70,22 @@
           </Border>
         </StackPanel>
         <StackPanel Grid.Row="3" Margin="0,30,0,0" Visibility="{Binding IsJobsPage, Converter={StaticResource BoolVisibility}}">
-          <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" MinHeight="200" AutomationProperties.Name="{local:T 'Saved transcription jobs'}"><ListBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding SourcePath}" TextWrapping="Wrap" FontWeight="SemiBold" /><TextBlock Text="{local:Tr State}" Foreground="{DynamicResource AccentBrush}" Margin="0,5,0,0" /><TextBlock Text="{local:Tr Checkpoint, Kind=Checkpoint}" Foreground="{DynamicResource TextMutedBrush}" /><TextBlock Text="{local:Tr Error}" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" /></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+          <TextBlock Text="{local:T 'Click a finished project to open its transcript.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+          <ListBox x:Name="ProjectList" ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" MinHeight="200" PreviewMouseLeftButtonUp="ProjectClick" PreviewKeyDown="ProjectKeyDown" AutomationProperties.Name="{local:T 'Saved transcription jobs'}">
+            <ListBox.ItemTemplate><DataTemplate>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="{Binding SourcePath, Converter={x:Static local:FileNameConverter.Instance}}" ToolTip="{Binding SourcePath}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                  <StackPanel Orientation="Horizontal" Margin="0,5,0,0"><TextBlock Text="{Binding CreatedUtc, Converter={x:Static local:LocalTimeConverter.Instance}}" Foreground="{DynamicResource TextMutedBrush}" /><TextBlock Text="{local:Tr State}" Foreground="{DynamicResource AccentBrush}" Margin="14,0,0,0" /></StackPanel>
+                  <!-- How far an unfinished project got (so that Resume makes sense); a finished one needs no such line. -->
+                  <TextBlock Text="{local:Tr Checkpoint, Kind=Checkpoint}" Foreground="{DynamicResource TextMutedBrush}"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Complete"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                  <TextBlock Text="{local:Tr Error}" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" Style="{StaticResource ProjectDeleteButton}" Content="{local:T 'Delete'}" Click="DeleteProjectClick" ToolTip="{local:T 'Delete this project and its transcript'}" AutomationProperties.Name="{local:T 'Delete project'}" />
+              </Grid>
+            </DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
           <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,16,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Jobs.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
           <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Resume'}" Command="{Binding ResumeAudioCommand}" /><Button Content="{local:T 'Open transcript'}" Command="{Binding OpenReviewCommand}" Margin="12,0,0,0" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelCommand}" Margin="12,0,0,0" /></WrapPanel>
         </StackPanel>

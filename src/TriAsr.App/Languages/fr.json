@@ -904,5 +904,15 @@
  "The link could not be downloaded.": "Le lien n'a pas pu être téléchargé.",
  "The link helper could not be downloaded.": "L'assistant de liens n'a pas pu être téléchargé.",
  "The link helper failed its checksum and was not installed.": "L'assistant de liens a échoué à la vérification de la somme de contrôle et n'a pas été installé.",
- "The link helper is in use. Wait until the download that uses it has finished, then try again.": "L'assistant de liens est en cours d'utilisation. Attendez la fin du téléchargement qui l'utilise, puis réessayez."
+ "The link helper is in use. Wait until the download that uses it has finished, then try again.": "L'assistant de liens est en cours d'utilisation. Attendez la fin du téléchargement qui l'utilise, puis réessayez.",
+ "Click a finished project to open its transcript.": "Cliquez sur un projet terminé pour ouvrir sa transcription.",
+ "Delete": "Supprimer",
+ "Delete project": "Supprimer le projet",
+ "Delete this project and its transcript": "Supprimer ce projet et sa transcription",
+ "Delete \"{0}\"? Its transcript, your edits and the working files are removed from this computer, and so is a copy of the recording that was uploaded or fetched from a link. A recording file you chose yourself is not deleted. This cannot be undone.": "Supprimer « {0} » ? Sa transcription, vos modifications et les fichiers de travail sont retirés de cet ordinateur, ainsi que la copie de l'enregistrement qui a été envoyée ou récupérée depuis un lien. Le fichier d'enregistrement que vous avez choisi vous-même n'est pas supprimé. Cette action est irréversible.",
+ "Delete \"{0}\" from the server? Its transcript, the edits and the recording the server holds are removed. This cannot be undone.": "Supprimer « {0} » du serveur ? Sa transcription, les modifications et l'enregistrement conservé par le serveur sont retirés. Cette action est irréversible.",
+ "A project that is still being worked on cannot be deleted. Cancel it first.": "Un projet en cours de traitement ne peut pas être supprimé. Annulez-le d'abord.",
+ "Project deleted: {0}": "Projet supprimé : {0}",
+ "The project was deleted, but some files could not be removed: {0}": "Le projet a été supprimé, mais certains fichiers n'ont pas pu être retirés : {0}",
+ "Could not delete the project": "Le projet n'a pas pu être supprimé"
 }

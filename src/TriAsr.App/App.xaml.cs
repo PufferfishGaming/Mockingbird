@@ -62,6 +62,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILinkFetcher, LinkFetcher>();
         services.AddSingleton<IJobWorkspace, JobWorkspace>();
         services.AddSingleton<IJobRepository, JobRepository>();
+        services.AddSingleton<ProjectRemoval>();
         services.AddSingleton<IRecordRepository, RecordRepository>();
         services.AddSingleton<IAudioNormalizer>(provider => new FfmpegNormalizer(provider.GetRequiredService<IProcessRunner>(), runtimes.Ffmpeg));
         services.AddSingleton<AudioJobQueue>();
@@ -454,6 +455,24 @@ public partial class App : System.Windows.Application
                     window.ContentScroll.ScrollToVerticalOffset(520);
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "new-link.png"), 1220, 1100, 1);
+                    // The history (ADR-0019): the Projects page lists what was sent. A client deletes one through the API (here from the remote pages): the window's list follows,
+                    // and the working files and the uploaded copy are gone from disk.
+                    shell.SelectedPage = shell.Navigation.First(page => page.Name == "Projects");
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "projects.png"), 1220, 900, 1);
+                    var doomed = shell.Jobs.First(item => item.Id == third.Id);
+                    var uploadedCopy = Path.GetDirectoryName(doomed.SourcePath)!;
+                    var workingFolder = _host.Services.GetRequiredService<IJobWorkspace>().DirectoryFor(third.Id);
+                    if (!Directory.Exists(uploadedCopy) || !Directory.Exists(workingFolder)) throw new InvalidOperationException("The cancelled recording has no files to delete.");
+                    var row = shell.Remote.Jobs.First(item => item.Id == third.Id);
+                    await shell.Remote.DeleteJobCommand.ExecuteAsync(row);
+                    for (var wait = 0; wait < 100 && shell.Jobs.Count != 2; wait++) await Task.Delay(50);
+                    if (shell.Jobs.Count != 2 || shell.Jobs.Any(item => item.Id == third.Id)) throw new InvalidOperationException("The window's list did not follow the deletion.");
+                    if (shell.Remote.Jobs.Count != 2) throw new InvalidOperationException("The remote list did not follow the deletion.");
+                    if (Directory.Exists(uploadedCopy) || Directory.Exists(workingFolder)) throw new InvalidOperationException("The deleted recording left files behind.");
+                    if ((await _host.Services.GetRequiredService<IJobRepository>().ListAsync()).Any(item => item.Id == third.Id)) throw new InvalidOperationException("The deleted recording is still stored.");
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "projects-after-delete.png"), 1220, 900, 1);
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "api-smoke.json"), JsonSerializer.Serialize(new
                     { seconds, uploadedBytes = sent, states, highestPercent = highest, transcript = text.Trim(), openAiStyle = compatibleText.Trim(), projects = shell.Jobs.Count, status = shell.Host.Status, fingerprint = shell.Host.Fingerprint }, new JsonSerializerOptions { WriteIndented = true }));
                     shell.Host.StopForExit();

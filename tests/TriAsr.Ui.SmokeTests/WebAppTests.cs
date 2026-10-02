@@ -202,4 +202,39 @@ public sealed class WebAppTests
             foreach (var text in new[] { "Link", "Web address", "Send link to server", "The link could not be sent: {0}" }) Assert.True(table.ContainsKey(text), $"{code}: {text}");
         }
     }
+    [Fact]
+    public void ThePageOpensAFinishedRecordingWhenItIsClickedAndDeletesOneOnlyAfterAskingAndNeverWhileItIsBeingWorkedOn()
+    {
+        var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
+        Assert.Contains("onClick: () => openReview(job.id), onKeydown: (event) => { if (event.key === \"Enter\") openReview(job.id); }", script);   // a click or Enter on a finished one
+        Assert.Contains("job.state === \"complete\"\n          ? { class: \"info open\"", script.Replace("\r\n", "\n"));
+        Assert.Contains("(job.state === \"complete\" || job.state === \"failed\" || job.state === \"cancelled\") && h(\"button\"", script);   // the button only where deleting is possible
+        Assert.Contains("window.confirm(t(\"Delete \\\"{0}\\\" from the server?", script);                                                        // after asking
+        Assert.Contains("api(\"/v1/transcriptions/\" + job.id, { method: \"DELETE\" })", script);
+        Assert.Contains("error.code === \"still_running\"", script);
+        Assert.Contains("if (state.review && state.review.id === job.id) closeReview();", script);                                              // an open review of it is closed
+        Assert.Contains("URL.revokeObjectURL(state.review.audio)", script);
+        Assert.Contains("t(\"Click a finished project to open its transcript.\")", script);
+    }
+
+    [Fact]
+    public async Task ThePagesTranslationsIncludeTheTextsOfTheHistory()
+    {
+        await using var api = await Harness.StartAsync();
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        foreach (var code in new[] { "hu", "de", "es", "fr" })
+        {
+            var table = JsonSerializer.Deserialize<Dictionary<string, string>>(await anonymous.GetStringAsync("/ui/strings.json?lang=" + code))!;
+            foreach (var text in new[]
+            {
+                "Click a finished project to open its transcript.", "Delete", "Delete project", "Delete this project and its transcript", "Could not delete the project",
+                "A project that is still being worked on cannot be deleted. Cancel it first.",
+                "Delete \"{0}\" from the server? Its transcript, the edits and the recording the server holds are removed. This cannot be undone."
+            })
+            {
+                Assert.True(table.ContainsKey(text), $"{code}: {text}");
+                Assert.NotEqual(text, table[text]);
+            }
+        }
+    }
 }

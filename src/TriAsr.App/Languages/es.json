@@ -904,5 +904,15 @@
  "The link could not be downloaded.": "No se pudo descargar el enlace.",
  "The link helper could not be downloaded.": "No se pudo descargar el asistente de enlaces.",
  "The link helper failed its checksum and was not installed.": "El asistente de enlaces no superó la suma de verificación y no se instaló.",
- "The link helper is in use. Wait until the download that uses it has finished, then try again.": "El asistente de enlaces está en uso. Espere a que termine la descarga que lo usa e inténtelo de nuevo."
+ "The link helper is in use. Wait until the download that uses it has finished, then try again.": "El asistente de enlaces está en uso. Espere a que termine la descarga que lo usa e inténtelo de nuevo.",
+ "Click a finished project to open its transcript.": "Haga clic en un proyecto terminado para abrir su transcripción.",
+ "Delete": "Eliminar",
+ "Delete project": "Eliminar proyecto",
+ "Delete this project and its transcript": "Eliminar este proyecto y su transcripción",
+ "Delete \"{0}\"? Its transcript, your edits and the working files are removed from this computer, and so is a copy of the recording that was uploaded or fetched from a link. A recording file you chose yourself is not deleted. This cannot be undone.": "¿Eliminar «{0}»? Su transcripción, sus ediciones y los archivos de trabajo se quitan de este equipo, igual que la copia de la grabación que se subió o se obtuvo desde un enlace. El archivo de grabación que usted eligió no se elimina. Esto no se puede deshacer.",
+ "Delete \"{0}\" from the server? Its transcript, the edits and the recording the server holds are removed. This cannot be undone.": "¿Eliminar «{0}» del servidor? Se quitan su transcripción, las ediciones y la grabación que guarda el servidor. Esto no se puede deshacer.",
+ "A project that is still being worked on cannot be deleted. Cancel it first.": "No se puede eliminar un proyecto que aún se está procesando. Cancélelo primero.",
+ "Project deleted: {0}": "Proyecto eliminado: {0}",
+ "The project was deleted, but some files could not be removed: {0}": "El proyecto se eliminó, pero no se pudieron quitar algunos archivos: {0}",
+ "Could not delete the project": "No se pudo eliminar el proyecto"
 }

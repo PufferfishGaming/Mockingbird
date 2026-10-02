@@ -69,6 +69,7 @@ public sealed class RecoveryAndExportTests
         public Task InitializeAsync(CancellationToken token = default) => Task.CompletedTask;
         public Task SaveAsync(TranscriptionJob job, CancellationToken token = default) { Events.Add(job); return Task.CompletedTask; }
         public Task<IReadOnlyList<TranscriptionJob>> ListAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<TranscriptionJob>>(Events);
+        public Task DeleteAsync(Guid id, CancellationToken token = default) => Task.CompletedTask;
     }
     private sealed class Stages : ITranscriptionStages
     {

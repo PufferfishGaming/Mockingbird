@@ -51,6 +51,22 @@ public sealed class JobRepository(SqliteConnectionFactory connections) : IJobRep
         await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connections.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        // The rows that point at the job go first (foreign keys are on); the settings and models records belong to no job and stay.
+        command.CommandText = """
+            DELETE FROM job_events WHERE job_id=$id;
+            DELETE FROM workspace_records WHERE job_id=$id;
+            DELETE FROM jobs WHERE id=$id;
+            """;
+        command.Parameters.AddWithValue("$id", id.ToString());
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
     public async Task<IReadOnlyList<TranscriptionJob>> ListAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await connections.OpenAsync(cancellationToken);

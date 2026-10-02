@@ -904,5 +904,15 @@
   "The link could not be downloaded.": "A hivatkozás nem tölthető le.",
   "The link helper could not be downloaded.": "A hivatkozássegéd nem tölthető le.",
   "The link helper failed its checksum and was not installed.": "A hivatkozássegéd nem felelt meg az ellenőrző összegnek, ezért nem lett telepítve.",
-  "The link helper is in use. Wait until the download that uses it has finished, then try again.": "A hivatkozássegéd használatban van. Várja meg, amíg az azt használó letöltés befejeződik, majd próbálja újra."
+  "The link helper is in use. Wait until the download that uses it has finished, then try again.": "A hivatkozássegéd használatban van. Várja meg, amíg az azt használó letöltés befejeződik, majd próbálja újra.",
+  "Click a finished project to open its transcript.": "Kattintson egy befejezett projektre az átirata megnyitásához.",
+  "Delete": "Törlés",
+  "Delete project": "Projekt törlése",
+  "Delete this project and its transcript": "A projekt és az átirata törlése",
+  "Delete \"{0}\"? Its transcript, your edits and the working files are removed from this computer, and so is a copy of the recording that was uploaded or fetched from a link. A recording file you chose yourself is not deleted. This cannot be undone.": "Törli a következőt: „{0}”? Az átirata, a szerkesztései és a munkafájljai törlődnek erről a számítógépről, és törlődik a feltöltött vagy hivatkozásból letöltött felvétel másolata is. Az Ön által kiválasztott felvételfájl nem törlődik. Ez nem vonható vissza.",
+  "Delete \"{0}\" from the server? Its transcript, the edits and the recording the server holds are removed. This cannot be undone.": "Törli a következőt a szerverről: „{0}”? Az átirata, a szerkesztések és a szerveren tárolt felvétel törlődik. Ez nem vonható vissza.",
+  "A project that is still being worked on cannot be deleted. Cancel it first.": "A még feldolgozás alatt álló projekt nem törölhető. Előbb szakítsa meg.",
+  "Project deleted: {0}": "Projekt törölve: {0}",
+  "The project was deleted, but some files could not be removed: {0}": "A projekt törölve lett, de néhány fájlt nem sikerült eltávolítani: {0}",
+  "Could not delete the project": "A projekt nem törölhető"
 }

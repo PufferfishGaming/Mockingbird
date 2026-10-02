@@ -75,6 +75,36 @@ public partial class MainWindow : Window
         if (args.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } paths)
             ((ShellViewModel)DataContext).SourcePath = paths[0];
     }
+    /// <summary>A click on a project opens a finished one in Review; a click on its Delete button is not a click on the project.</summary>
+    private async void ProjectClick(object sender, System.Windows.Input.MouseButtonEventArgs args)
+    {
+        var list = (System.Windows.Controls.ListBox)sender;
+        if (args.OriginalSource is not DependencyObject source || list.ContainerFromElement(source) is not System.Windows.Controls.ListBoxItem item) return;
+        if (ProjectDialogs.IsInsideButton(source, item) || item.DataContext is not TriAsr.Domain.TranscriptionJob job) return;
+        await ((ShellViewModel)DataContext).OpenProjectCommand.ExecuteAsync(job);
+    }
+
+    /// <summary>Enter opens the selected project, Delete deletes it (after asking).</summary>
+    private async void ProjectKeyDown(object sender, System.Windows.Input.KeyEventArgs args)
+    {
+        if (args.OriginalSource is System.Windows.Controls.Primitives.ButtonBase) return;     // a focused button does its own thing on Enter
+        var model = (ShellViewModel)DataContext;
+        if (model.SelectedJob is not { } job) return;
+        if (args.Key == System.Windows.Input.Key.Enter) { args.Handled = true; await model.OpenProjectCommand.ExecuteAsync(job); }
+        else if (args.Key == System.Windows.Input.Key.Delete) { args.Handled = true; await DeleteProjectAsync(job); }
+    }
+
+    private async void DeleteProjectClick(object sender, RoutedEventArgs args)
+    {
+        if (((FrameworkElement)sender).DataContext is TriAsr.Domain.TranscriptionJob job) await DeleteProjectAsync(job);
+    }
+
+    private async Task DeleteProjectAsync(TriAsr.Domain.TranscriptionJob job)
+    {
+        if (!ProjectDialogs.ConfirmDelete(this, System.IO.Path.GetFileName(job.SourcePath), onServer: false)) return;
+        await ((ShellViewModel)DataContext).DeleteProjectCommand.ExecuteAsync(job);
+    }
+
     private async void ExportClick(object sender, RoutedEventArgs args)
     {
         var picker = new SaveFileDialog { FileName = "transcript", Filter = Loc.T("Text") + "|*.txt|" + Loc.T("SubRip subtitles") + "|*.srt|WebVTT|*.vtt|Markdown|*.md|" + Loc.T("JSON with provenance") + "|*.json|" + Loc.T("CSV comparison") + "|*.csv|" + Loc.T("Word document") + "|*.docx" };

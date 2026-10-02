@@ -500,7 +500,10 @@
   function renderProjects() {
     const list = h("ul", { class: "jobs", "aria-label": t("Recordings on the server") },
       state.jobs.map((job) => h("li", { class: "job" },
-        h("div", null,
+        // A finished recording opens in the review when its name is clicked (or Enter is pressed on it).
+        h("div", job.state === "complete"
+          ? { class: "info open", tabindex: "0", role: "link", "aria-label": t("Open transcript") + ": " + job.name, title: t("Open transcript"), onClick: () => openReview(job.id), onKeydown: (event) => { if (event.key === "Enter") openReview(job.id); } }
+          : { class: "info" },
           h("div", { class: "name" }, job.name),
           h("div", { class: "state" + (job.state === "failed" ? " failed" : "") }, stateLabel(job)),
           job.state === "running" && h("progress", { max: "100", value: String(job.percent), "aria-label": stateLabel(job) }),
@@ -508,9 +511,32 @@
           job.error && h("div", { class: "state failed" }, t(job.error))),
         h("div", { class: "row" },
           job.state === "complete" && h("button", { class: "btn", type: "button", onClick: () => openReview(job.id) }, t("Open transcript")),
-          (job.state === "queued" || job.state === "running") && h("button", { class: "btn", type: "button", onClick: () => cancelJob(job.id) }, t("Cancel"))))));
+          (job.state === "queued" || job.state === "running") && h("button", { class: "btn", type: "button", onClick: () => cancelJob(job.id) }, t("Cancel")),
+          (job.state === "complete" || job.state === "failed" || job.state === "cancelled") && h("button", { class: "btn", type: "button", "aria-label": t("Delete project") + ": " + job.name, title: t("Delete this project and its transcript"), onClick: () => deleteJob(job) }, t("Delete"))))));
     ui.projectsView.replaceChildren(h("h1", null, t("Projects")),
-      h("div", { class: "card" }, state.jobs.length ? list : h("p", { class: "muted" }, t("Nothing here yet. Finished transcriptions are listed here."))));
+      h("div", { class: "card" }, state.jobs.length ? [h("p", { class: "muted" }, t("Click a finished project to open its transcript.")), list] : h("p", { class: "muted" }, t("Nothing here yet. Finished transcriptions are listed here."))));
+  }
+
+  /** Deletes a finished recording on the server after asking: its transcript, edits and the copy of the recording the server holds. */
+  async function deleteJob(job) {
+    if (!window.confirm(t("Delete \"{0}\" from the server? Its transcript, the edits and the recording the server holds are removed. This cannot be undone.", job.name))) return;
+    await guard(async () => {
+      try { await api("/v1/transcriptions/" + job.id, { method: "DELETE" }); }
+      catch (error) {
+        if (error instanceof ApiError && error.code === "still_running") { notice("error", t("Could not delete the project") + ": " + t("A project that is still being worked on cannot be deleted. Cancel it first.")); return; }
+        throw error;
+      }
+      if (state.review && state.review.id === job.id) closeReview();
+      await refreshJobs();
+    }, (message) => t("Could not delete the project") + ": " + message);
+  }
+
+  /** The review that was open belongs to a recording that has been deleted: the audio is let go of and the page goes back to the list. */
+  function closeReview() {
+    if (state.review && state.review.audio) URL.revokeObjectURL(state.review.audio);
+    state.review = null; state.dirty = false;
+    if (ui.player) { ui.player.pause(); ui.player.removeAttribute("src"); ui.player.load(); }
+    if (state.tab === "review") selectTab("projects");
   }
 
   async function cancelJob(id) {
