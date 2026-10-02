@@ -40,7 +40,7 @@ Tests use temporary data folders (`TRIASR_DATA_ROOT`). Never point a test, scrip
 
 ## Working agreements
 
-- Add or update tests with every behaviour change. Baseline: 420 tests, all passing. Tests that need local runtimes (FFmpeg, the speech detector) skip on a machine without them.
+- Add or update tests with every behaviour change. Baseline: 443 tests, all passing. Tests that need local runtimes (FFmpeg, the speech detector) skip on a machine without them.
 - Source files are UTF-8 without BOM with LF endings. Windows PowerShell 5.1 `Get-Content` / `Set-Content` use the ANSI code page and corrupt non-ASCII text: edit with the editor tools or `[IO.File]::ReadAllText(path, [Text.Encoding]::UTF8)` and `WriteAllText` with `UTF8Encoding($false)`.
 - Make exact-match edits and check the match count; do not rewrite files wholesale to change a line.
 - One logical change per commit, message explains why. No `Co-Authored-By` or "Generated with" lines.

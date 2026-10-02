@@ -251,6 +251,63 @@ public partial class App : System.Windows.Application
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "setup-smoke.json"), JsonSerializer.Serialize(new
                     { savedModels = recommended.Select(card => card.Entry.Id), restartRestored = true, languageSetupRestored = true, networkDownloadNeeded = false }));
                 }
+                if (e.Args.Contains("--watch-smoke"))
+                {
+                    // Real engines and models: drops recordings into a watched folder the way a file copy would and waits for the transcripts to appear beside them.
+                    var runner = _host.Services.GetRequiredService<IProcessRunner>();
+                    var sample = await TestSpeech.CreateAsync(runner, Path.Combine(dataRoot, "Setup"), CancellationToken.None) ?? throw new InvalidOperationException("This computer has no Windows voice to make a test recording.");
+                    var watched = Path.Combine(dataRoot, "watched");
+                    Directory.CreateDirectory(watched);
+                    File.Copy(sample, Path.Combine(watched, "old.wav"));
+                    shell.SetWatchFolder(watched);
+                    for (var wait = 0; wait < 100 && !shell.WatchStatus.StartsWith("Watching"); wait++) await Task.Delay(100);
+                    if (!shell.WatchStatus.StartsWith("Watching")) throw new InvalidOperationException("Watching did not start: " + shell.WatchStatus);
+                    async Task<bool> AppearsAsync(string name, int seconds)
+                    {
+                        for (var wait = 0; wait < seconds * 5; wait++) { if (File.Exists(Path.Combine(watched, name))) return true; await Task.Delay(200); }
+                        return false;
+                    }
+                    async Task CopyInPiecesAsync(string name)
+                    {
+                        var bytes = await File.ReadAllBytesAsync(sample);
+                        await using var output = new FileStream(Path.Combine(watched, name), FileMode.Create, FileAccess.Write, FileShare.Read);
+                        for (var offset = 0; offset < bytes.Length; offset += 64 * 1024) { await output.WriteAsync(bytes.AsMemory(offset, Math.Min(64 * 1024, bytes.Length - offset))); await output.FlushAsync(); await Task.Delay(600); }
+                    }
+                    var copyStarted = DateTime.UtcNow;
+                    await CopyInPiecesAsync("new-meeting.wav");
+                    var copySeconds = (DateTime.UtcNow - copyStarted).TotalSeconds;
+                    if (!await AppearsAsync("new-meeting.txt", 300)) throw new InvalidOperationException("No transcript appeared next to the new recording. Status: " + shell.WatchStatus + " · " + shell.ErrorMessage);
+                    var text = await File.ReadAllTextAsync(Path.Combine(watched, "new-meeting.txt"));
+                    if (text.Trim().Length < 40) throw new InvalidOperationException("The transcript is nearly empty: " + text);
+                    if (File.Exists(Path.Combine(watched, "old.txt"))) throw new InvalidOperationException("A file that was already there was transcribed.");
+                    var firstJobs = shell.Jobs.Count;
+                    if (firstJobs != 1 || shell.Jobs[0].State != TriAsr.Domain.JobState.Complete) throw new InvalidOperationException($"Expected one completed project, found {firstJobs}.");
+                    if (shell.SelectedJob is not null && shell.SelectedJob.Id != shell.Jobs[0].Id) throw new InvalidOperationException("The selection moved.");
+                    // A second recording as subtitles, with a text file dropped in between that must be ignored.
+                    shell.WatchOutput = ShellViewModel.WatchAsSubtitles;
+                    File.WriteAllText(Path.Combine(watched, "notes.txt"), "not a recording");
+                    File.Copy(sample, Path.Combine(watched, "second.wav"));
+                    if (!await AppearsAsync("second.srt", 300)) throw new InvalidOperationException("No subtitles appeared for the second recording. Status: " + shell.WatchStatus);
+                    if (shell.Jobs.Count != 2) throw new InvalidOperationException($"Expected two projects, found {shell.Jobs.Count}.");
+                    // Switched off: a recording added now waits; switching on again picks it up without transcribing anything twice.
+                    shell.WatchEnabled = false;
+                    for (var wait = 0; wait < 100 && shell.WatchStatus != "Off"; wait++) await Task.Delay(100);
+                    File.Copy(sample, Path.Combine(watched, "while-off.wav"));
+                    await Task.Delay(8000);
+                    if (File.Exists(Path.Combine(watched, "while-off.srt"))) throw new InvalidOperationException("A recording was transcribed while watching was off.");
+                    shell.WatchEnabled = true;
+                    if (!await AppearsAsync("while-off.srt", 300)) throw new InvalidOperationException("The recording added while watching was off was not picked up. Status: " + shell.WatchStatus);
+                    await Task.Delay(6000);
+                    if (shell.Jobs.Count != 3) throw new InvalidOperationException($"Expected three projects, found {shell.Jobs.Count}: something was transcribed twice or missed.");
+                    window.Width = 1220;
+                    shell.SelectedPage = shell.Navigation[0];
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    window.ContentScroll.ScrollToVerticalOffset(600);
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "watch-folder.png"), 1220, 1100, 1);
+                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "watch-smoke.json"), JsonSerializer.Serialize(new
+                    { copySeconds, transcript = text.Trim(), files = Directory.GetFiles(watched).Select(Path.GetFileName).Order(), projects = shell.Jobs.Count, status = shell.WatchStatus }, new JsonSerializerOptions { WriteIndented = true }));
+                }
                 if (e.Args.Contains("--first-run-download-smoke"))
                 {
                     // Needs TRIASR_MODEL_ROOT to point at an empty folder: starts the real download, watches the banner follow it, cancels, and checks the partial file is kept.

@@ -126,6 +126,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RestoreResourceSettings(settings);
         RestoreSpeechDetectionSettings(settings);
         RestoreSetupSettings(settings);
+        RestoreWatchSettings(settings);
         if (store.LastLoadError is not null) ReportError("Preferences could not be restored", "Defaults were loaded. " + store.LastLoadError);
         if (runtimes.StorageLoadError is not null) ReportError("Saved folders could not be restored", "Existing model files have not been removed. Select your previous model repository in Settings. " + runtimes.StorageLoadError);
         SelectedPage = Navigation[0];
@@ -151,7 +152,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             var existing = Jobs.FirstOrDefault(item => item.Id == job.Id);
             var index = existing is null ? -1 : Jobs.IndexOf(existing);
             if (index >= 0) Jobs[index] = job; else Jobs.Insert(0, job);
-            SelectedJob = job;
+            if (!IsWatchBusy || IsProcessing) SelectedJob = job; // a watched recording must not move the user's selection
             Status = job.Error ?? job.State.ToString();
             activity.Append("job", $"{job.Id:N} · {job.State}" + (job.Error is null ? "" : " · " + job.Error));
             if (job.Error is not null) ReportError("Transcription needs attention", job.Error);
@@ -163,6 +164,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         await ReadUpdateResultAsync();
         RefreshSetupOffer();
         _initialized = true;
+        if (WatchEnabled) _ = RestartWatchAsync();
     }
     public void ApplyTranscriptionProgress(TranscriptionProgress update)
     {

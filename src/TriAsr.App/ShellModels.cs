@@ -98,7 +98,7 @@ public sealed partial class ShellViewModel
     }
     private bool SetupBusy()
     {
-        if (!IsProcessing && !IsModelBusy && !IsBenchmarking && !IsCheckingSystem && !SetupRunning) return false;
+        if (!IsProcessing && !IsModelBusy && !IsBenchmarking && !IsCheckingSystem && !SetupRunning && !IsWatchBusy) return false;
         ReportError("Setup is busy", "Finish or cancel the current operation before changing models or tuning."); return true;
     }
     [RelayCommand]
@@ -216,8 +216,9 @@ public sealed partial class ShellViewModel
         try { await PersistSelectionAsync(); Status = "Preset saved. Download any missing models on Models."; }
         catch (Exception error) { ReportError("Could not save model preset", error.Message); }
     }
-    private string[] MissingRequiredModels() => ModelCards.Where(card => card.Selected &&
-        (card.Entry.Family == "Whisper" || TriAsr.Domain.LanguageCatalog.CanaryCodes.Contains(SelectedLanguage)))
+    private string[] MissingRequiredModels() => MissingRequiredModelsFor(SelectedLanguage);
+    private string[] MissingRequiredModelsFor(string language) => ModelCards.Where(card => card.Selected &&
+        (card.Entry.Family == "Whisper" || TriAsr.Domain.LanguageCatalog.CanaryCodes.Contains(language)))
         .Where(card => { var status = models.Inspect(card.Entry); return !status.Installed || status.WrongSize; }).Select(card => card.Title).ToArray();
     [RelayCommand]
     private async Task InstallSelectedModelsAsync()

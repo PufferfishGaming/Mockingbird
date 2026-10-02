@@ -114,6 +114,13 @@ public partial class MainWindow : Window
         var vm = (ShellViewModel)DataContext;
         if (vm.IsProcessing) vm.CancelCommand.Execute(null);
         vm.CancelModelCommand.Execute(null); vm.CancelBenchmarkCommand.Execute(null);
+        vm.StopWatchingForExit();
+    }
+    private void ChooseWatchFolderClick(object sender, RoutedEventArgs args)
+    {
+        var vm = (ShellViewModel)DataContext;
+        var dialog = new OpenFolderDialog { Title = "Choose the folder to watch for new recordings", InitialDirectory = System.IO.Directory.Exists(vm.WatchFolder) ? vm.WatchFolder : null };
+        if (dialog.ShowDialog(this) == true) vm.SetWatchFolder(dialog.FolderName);
     }
     private void WaveformSeek(object sender, System.Windows.Input.MouseButtonEventArgs args)
     {

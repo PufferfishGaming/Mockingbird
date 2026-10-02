@@ -45,7 +45,8 @@ public sealed partial class ShellViewModel
 
     private AppSettings CurrentSettings() => new(SelectedTheme, SelectedDensity, AnimateErrors: AnimateErrors,
         CheckForUpdates: AutoCheckUpdates, SkippedUpdateVersion: _skippedUpdateVersion, LastUpdateCheckUtc: _lastUpdateCheck, ResourceProfile: SelectedResourceProfile,
-        SkipNonSpeech: SkipNonSpeech, UseCorrectionModel: UseCorrectionModel, SetupState: _setupState);
+        SkipNonSpeech: SkipNonSpeech, UseCorrectionModel: UseCorrectionModel, SetupState: _setupState,
+        WatchFolder: WatchFolder, WatchEnabled: WatchEnabled, WatchLanguage: WatchLanguage, WatchOutput: WatchOutput);
 
     private void RestoreUpdateSettings(AppSettings settings)
     {
