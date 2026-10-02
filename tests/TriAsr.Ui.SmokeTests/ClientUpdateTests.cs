@@ -31,10 +31,24 @@ public sealed class ClientUpdateTests
 
         public Fixture() => Edition.Current = AppEdition.Client;
 
+        private UpdateOptions _options = UpdateOptions.ForEdition("Client");
+        public void UseOptions(UpdateOptions options) => _options = options;
+
+        public ShellViewModel Shell()
+        {
+            _host?.Dispose();
+            _host = App.App.CreateHost(Root, services => services.AddSingleton(new UpdateService(_options, new HttpClient(new Handler(request =>
+            {
+                Requests.Add(request.RequestUri!);
+                return Respond(request);
+            })))));
+            return _host.Services.GetRequiredService<ShellViewModel>();
+        }
+
         public ClientViewModel Client()
         {
             _host?.Dispose();
-            _host = App.App.CreateHost(Root, services => services.AddSingleton(new UpdateService(UpdateOptions.ForEdition("Client"), new HttpClient(new Handler(request =>
+            _host = App.App.CreateHost(Root, services => services.AddSingleton(new UpdateService(_options, new HttpClient(new Handler(request =>
             {
                 Requests.Add(request.RequestUri!);
                 return Respond(request);
@@ -64,6 +78,23 @@ public sealed class ClientUpdateTests
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline) { if (await condition()) return; await Task.Delay(30); }
         throw new TimeoutException("Not reached.");
+    }
+
+    [Fact]
+    public async Task TheServerEditionChecksForItsOwnUpdatesToo()
+    {
+        using var fixture = new Fixture();
+        Edition.Current = AppEdition.Server;
+        fixture.Respond = _ => Json(Manifest("99.0.0").Replace("Mockingbird-Client-Setup.exe", "Mockingbird-Server-Setup.exe"));
+        fixture.UseOptions(UpdateOptions.ForEdition("Server"));
+        var shell = fixture.Shell();
+        await shell.InitializeAsync();
+        await shell.RunUpdateCheckAsync(manual: false);
+        Assert.EndsWith("/releases/download/download/latest-server.json", Assert.Single(fixture.Requests).AbsolutePath);
+        Assert.True(shell.UpdateBannerVisible);
+        Assert.Equal("Version 99.0.0 is available", shell.UpdateTitle);
+        Assert.Contains("Mockingbird Server", shell.SetupTitle);     // the texts name the edition that is running
+        await shell.Host.DisposeAsync();
     }
 
     [Fact]

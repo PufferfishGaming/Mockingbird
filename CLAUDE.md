@@ -40,9 +40,20 @@ Tests use temporary data folders (`TRIASR_DATA_ROOT`). Never point a test, scrip
 - Speech detection (`chunks.json`, ADR-0005): the Silero tool and model are bundled in `Runtimes`. `whisper-vad-speech-segments.exe` exits with 0 even when it rejects an option, prints times in hundredths of a second, and its built-in defaults differ from its help text; always pass every threshold with the long option names (`VadSegmenter.Thresholds`). "Skip silence and music" is off by default because singing counts as non-speech and songs lose almost all their lyrics.
 - Be kind to the computer: engines run at below-normal priority, thread counts follow the resource profile, FFmpeg gets two threads, and Windows is asked not to sleep during jobs. Do not use CPU-rate hard caps on ggml workers (they degrade badly); limit threads instead.
 
+## Every feature reaches every edition (do this before calling a task done)
+
+Studio is the Server and the Client in one window, so a change made for Studio is only finished when the edition it belongs to has it too. Ask of every change, and say in the final answer which of these got it and which did not (and why):
+
+- **Server side** (transcribing, models, languages, backends, engine and performance settings, correction model, hosting, the API, updating): the code is shared, because the Server edition runs the same services (`ShellViewModel`, the pipeline, `ApiService`, `HostViewModel`). The windows are not shared. Anything the user can see or press must also be put in `ServerWindow.xaml` (it shows a subset on purpose: keep it small, but a server owner must be able to reach every setting that changes what the server does). A new model or language that a server needs must be downloadable from the Server window, not only from Studio's Models page.
+- **Client side** (sending a recording, the projects list, review and editing, export, the servers list and connecting, Settings that are about the window): the same thing exists in up to **four** places and all of them change together: Studio's own pages (`MainWindow.xaml`, `ShellViewModel`), the remote workspace (`RemoteWorkspaceView.xaml`, `RemoteWorkspaceViewModel`, used by the Client edition and by Studio's *Remote server* page), the web page (`Web/app.js`, `Web/app.css`, ADR-0015) and, if the server must tell the client something new, the API (`ApiService`, `RemoteContracts.cs`, `RemoteServerClient`, the table in `README.md`, ADR-0013/0014).
+- **Words**: every text is in the four translation tables (`t("...")` in the web page counts); a text that names the program says "Mockingbird Studio" and the running edition's name is put in (`Loc`).
+- **Updating**: all three editions check their own manifest and install their own installer (`latest.json`, `latest-server.json`, `latest-client.json`); an update never starts while a recording is being worked on, including one another computer sent. A change to the update flow is made in `ShellUpdates.cs` (Studio, Server) **and** `ClientUpdates.cs` (Client).
+- **Packaging**: new files belong to every edition's payload unless they are speech programs or models (those are left out of the Client). `scripts/install.ps1`, the README buttons and `docs/RELEASE_PROCESS.md` name the installers; keep them in step.
+- **Check**: run `scripts/edition-smoke.ps1` (starts all three), `scripts/api-smoke.ps1` (the Client's pages with real rows) and, for the web page, open it in a browser against a running server.
+
 ## Working agreements
 
-- Add or update tests with every behaviour change. Baseline: 643 tests, all passing. Tests that need local runtimes (FFmpeg, the speech detector) skip on a machine without them.
+- Add or update tests with every behaviour change. Baseline: 645 tests, all passing. Tests that need local runtimes (FFmpeg, the speech detector) skip on a machine without them.
 - Source files are UTF-8 without BOM with LF endings. Windows PowerShell 5.1 `Get-Content` / `Set-Content` use the ANSI code page and corrupt non-ASCII text: edit with the editor tools or `[IO.File]::ReadAllText(path, [Text.Encoding]::UTF8)` and `WriteAllText` with `UTF8Encoding($false)`.
 - Make exact-match edits and check the match count; do not rewrite files wholesale to change a line.
 - One logical change per commit, message explains why. No `Co-Authored-By` or "Generated with" lines.

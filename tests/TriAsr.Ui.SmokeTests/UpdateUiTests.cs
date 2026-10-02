@@ -195,6 +195,24 @@ public sealed class UpdateUiTests
     }
 
     [Fact]
+    public async Task AServerDoesNotUpdateWhileItTranscribesARecordingAnotherComputerSent()
+    {
+        using var fixture = new Fixture();
+        fixture.Respond = request => request.RequestUri!.AbsolutePath.EndsWith("latest.json", StringComparison.Ordinal)
+            ? Json(Manifest("99.0.0")) : throw new InvalidOperationException("The installer must not be downloaded during a job.");
+        var shell = fixture.Shell(testSource: true);
+        await shell.InitializeAsync();
+        await shell.RunUpdateCheckAsync(manual: true);
+        shell.Host.IsBusy = true;                      // the API is working on an uploaded recording
+        var requestsBefore = fixture.Requests;
+        await shell.InstallUpdateCommand.ExecuteAsync(null);
+        Assert.Equal(requestsBefore, fixture.Requests);
+        Assert.Contains("Finish the running", shell.UpdateDetail);
+        Assert.False(shell.IsUpdateBusy);
+        await shell.Host.DisposeAsync();
+    }
+
+    [Fact]
     public async Task OnlyTheInstalledCopyCanReplaceItself()
     {
         using var fixture = new Fixture();

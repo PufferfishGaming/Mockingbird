@@ -55,6 +55,6 @@ With fresh URLs (add a cache-busting query), check that the asset names, sizes a
 
 ## 5. Try the update
 
-On a computer with the previous version installed: Settings, Updates, Check for updates now, then Update now. The app downloads and verifies the installer, closes, installs, and reopens. Afterwards confirm the installed version and that projects, settings and models are untouched. The automatic check only runs at startup and at most every 12 hours, so use the button when testing.
+On a computer with the previous version installed (do it for each edition you released: Studio, Server and Client each find their own manifest): Settings, Updates, Check for updates now, then Update now. The app downloads and verifies the installer, closes, installs, and reopens. Afterwards confirm the installed version and that projects, settings and models are untouched. The automatic check only runs at startup and at most every 12 hours, so use the button when testing.
 
 Versions before 0.1.16 have no updater and need one manual install.
