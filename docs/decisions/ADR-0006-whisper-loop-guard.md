@@ -1,4 +1,4 @@
-# ADR-0006: Remove runaway repetition from Whisper's output
+# ADR-0006: Remove runaway repetition from Whisper's output (loop guard and speech-rate guard)
 
 Status: accepted (after 0.1.18)
 
@@ -18,7 +18,9 @@ Correction: an earlier version of this record, and the message of commit `99566e
 ## Decision
 `LoopGuard` (pure, in Fusion) removes the repeats and keeps the first copy of each run. The rule is narrow on purpose: at least 8 copies in a row of a pattern of 1 to 4 segments (the same text, or the same few texts in the same order; case and punctuation ignored), every segment starting within 1 s of the end of the one before, covering at least 12 s. A chorus sung 3 or 4 times, a chant with breaths, or alternating lines with pauses are left alone. Measured on every Whisper output available, a run of even three identical segments in a row only ever occurred in the broken runs.
 
-It runs in the Whisper stage, before anything else sees the transcript:
+`RateGuard` (also pure, in Fusion) handles what the pattern rule cannot: at the end of a song Whisper lost its timestamps and wrote lines of five to seven words into segments of exactly one second, a block of about seven lines repeated four times. Nobody sings five words in one second. A cluster qualifies only when it has at least 8 segments of 5 or more words at 4.5 words per second or faster, each starting within 6 s of the end of the previous one, and at least 75% of them share one length (to a tenth of a second); in a qualifying cluster each distinct line is kept once and its exact repeats are removed. Lines that occur once are kept, because the words may be genuine even when their timestamps are not. Measured first on the song, offline: keeping each line once gave 18.3% word error rate, dropping the whole cluster gave 28.6% (it throws away real lyrics with the repeats). On every other Whisper output available (a German clip, skipping-mode transcripts, the Hungarian video) the fastest ordinary segment was 3.9 words per second and no cluster qualified.
+
+Both guards run in the Whisper stage, before anything else sees the transcript:
 - `Whisper/raw.json` (Whisper's own output) is never touched, so the evidence is complete.
 - `Whisper/loops.json` lists the removed runs (period, segments, times).
 - `whisper.json`, which the later stages read, has the repeats removed.
@@ -34,11 +36,14 @@ It runs in the Whisper stage, before anything else sees the transcript:
 | Earlier build (1 Oct), final | 173.4% | 27 | 5 | 471 |
 | Single-phrase guard only, final | 173.1% | 29 | 3 | 470 |
 | Extended guard (patterns up to 4), final | 33.4% | 30 | 4 | 63 |
+| With the speech-rate guard, Whisper alone | 18.3% | 20 | 33 | 0 |
+| **With the speech-rate guard, final** | **14.8%** | 25 | 17 | 1 |
 | Canary alone | 15.5% | 28 | 7 | 10 |
 | Skipping on, final | 87.9% | 10 | 245 | 0 |
 
 ## Limits and what is next
-- The song's final transcript is still worse than Canary alone (33% against 15.5%). 63 words are extra, mostly one 30 s stretch (about 180 to 210 s) where Whisper wrote 1 s segments of 5 to 7 words, a block of about 7 lines repeated 4 times. That is a longer pattern with fewer copies than the rule allows. A speech-rate check (more than about 5 words per second held across a segment run is not singing or speech) is a candidate; it has not been built or measured.
-- The final text follows Whisper; the correction model only chooses at disagreements, so Canary's better recall on this song is not used. A different weighting is a separate decision.
+- The rate guard removes exact repeats inside a collapsed cluster, so a line sung twice in that stretch appears once (17 words are missing from the song, against 5 before). That is the price of removing 62 extra words; the song's own repeats elsewhere are untouched.
+- The final text follows Whisper; the correction model only chooses at disagreements. On the song the final transcript (14.8%) is now better than either engine alone (18.3% and 15.5%).
+- Only one reference transcript exists (this song). The guards were chosen on it and checked for harm on the other recordings by agreement, not by a second reference; a clip of speech with a correct transcript would be a better test.
 - A chant said 8 or more times back to back for 12 s or more, each copy its own segment, would be reduced to one copy. None was found in the recordings measured; the copies stay in `Whisper/raw.json` and `loops.json`.
 - It removes the garbage; it cannot recover speech the loop displaced.

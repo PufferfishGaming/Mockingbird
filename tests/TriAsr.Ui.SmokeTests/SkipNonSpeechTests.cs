@@ -180,7 +180,7 @@ public sealed class SkipNonSpeechTests : IDisposable
         using var loops = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "loops.json")));
         Assert.Equal(39, loops.RootElement.GetProperty("Removed").GetInt32());
         var issue = Assert.Single(_issues, item => item.Title == "Repeated text removed");
-        Assert.Contains("40 segments", issue.Message);
+        Assert.Contains("39 segments were removed", issue.Message);
         Assert.Equal(suggestsSkipping, issue.Message.Contains("Skip silence and music"));
     }
 
@@ -194,6 +194,27 @@ public sealed class SkipNonSpeechTests : IDisposable
         Assert.Equal(30, saved.Segments.Count);
         Assert.False(File.Exists(Path.Combine(Directory, "Whisper", "loops.json")));
         Assert.Empty(_issues);
+    }
+
+    [Fact]
+    public async Task ACollapsedSongEndingIsCleanedAndListedWithoutTouchingTheRawOutput()
+    {
+        Configure(skip: false);
+        // Eight normal lines, then seven lines written four times each at six words per second (1 s segments), as measured on a real song.
+        var output = Enumerable.Range(0, 8).Select(i => (i * 15_000, i * 15_000 + 12_000, $"Das ist die normale Zeile Nummer {i} hier."))
+            .Concat(Enumerable.Range(0, 28).Select(i => (130_000 + i * 3_000, 131_000 + i * 3_000, $"Erfundene Zeile {i % 7} vom Ende des Liedes")));
+        var runner = new Runner { WhisperOutput = WhisperJson(output) };
+        await Stages(runner).ExecuteAsync(_jobRecord, JobState.RunningWhisper, default);
+
+        var saved = JsonSerializer.Deserialize<EngineTranscript>(await File.ReadAllTextAsync(Path.Combine(Directory, "whisper.json")))!;
+        Assert.Equal(8 + 7, saved.Segments.Count);
+        using var raw = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "raw.json")));
+        Assert.Equal(36, raw.RootElement.GetProperty("transcription").GetArrayLength());
+        using var loops = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "loops.json")));
+        Assert.Equal(21, loops.RootElement.GetProperty("Removed").GetInt32());
+        Assert.Equal(1, loops.RootElement.GetProperty("FastRuns").GetArrayLength());
+        Assert.Equal(0, loops.RootElement.GetProperty("Runs").GetArrayLength());
+        Assert.Contains("21 segments were removed", Assert.Single(_issues, item => item.Title == "Repeated text removed").Message);
     }
 
     // ---- Canary ---------------------------------------------------------------------------------------------------------------

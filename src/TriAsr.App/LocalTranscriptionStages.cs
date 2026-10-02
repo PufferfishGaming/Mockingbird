@@ -267,27 +267,29 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
         }
     }
     /// <summary>
-    /// Whisper sometimes writes one phrase hundreds of times over a stretch without speech. The repeats are taken out before the other
-    /// stages see them (they would only be compared and sent to the correction model); the first copy stays, and Whisper's own output
-    /// (Whisper/raw.json) is untouched. What was removed is listed in Whisper/loops.json.
+    /// Whisper sometimes repeats itself: one phrase hundreds of times over a stretch without speech, or the same lines again and again
+    /// at an impossible speaking speed at the end of a song. The repeats are taken out before the other stages see them (they would only
+    /// be compared and sent to the correction model); the first copy stays, and Whisper's own output (Whisper/raw.json) is untouched.
+    /// What was removed is listed in Whisper/loops.json.
     /// </summary>
     private async Task<EngineTranscript> RemoveLoopsAsync(Guid id, EngineTranscript transcript, bool alreadySkipping, CancellationToken token)
     {
-        var (kept, runs) = LoopGuard.Remove(transcript.Segments);
-        if (runs.Count == 0) return transcript;
-        var removed = runs.Sum(run => run.Removed);
-        var minutes = runs.Sum(run => run.EndMs - run.StartMs) / 60000d;
+        var (afterLoops, runs) = LoopGuard.Remove(transcript.Segments);
+        var (kept, fastRuns) = RateGuard.Remove(afterLoops);
+        if (runs.Count == 0 && fastRuns.Count == 0) return transcript;
+        var removed = runs.Sum(run => run.Removed) + fastRuns.Sum(run => run.Removed);
+        var minutes = (runs.Sum(run => run.EndMs - run.StartMs) + fastRuns.Sum(run => run.EndMs - run.StartMs)) / 60000d;
         await Write(id, "Whisper/loops.json", new
         {
-            Reason = "The same segment, or the same few segments in the same order, were written again and again, back to back (see LoopGuard). The first copy of each run is kept.",
-            Removed = removed, Runs = runs, RawOutput = "Whisper/raw.json"
+            Reason = "Whisper repeated itself. Runs: the same segment, or the same few segments in the same order, written again and again back to back (LoopGuard). "
+                + "FastRuns: lines written again at an impossible speaking speed, all with the same collapsed length (RateGuard). The first copy of each line is kept.",
+            Removed = removed, Runs = runs, FastRuns = fastRuns, RawOutput = "Whisper/raw.json"
         }, token);
-        Issue("Repeated text removed", $"Whisper kept repeating the same text: {runs.Sum(run => run.Segments)} segments in a row over {minutes:0.#} minutes of the recording, a known failure over stretches without speech or at the end of a song. "
+        Issue("Repeated text removed", $"Whisper repeated itself: {removed} segments were removed over {minutes:0.#} minutes of the recording, a known failure over stretches without speech or at the end of a song. "
             + "The repeats were removed and Whisper's raw output is kept in the project folder, but speech inside that stretch may be missing from the transcript."
             + (alreadySkipping ? "" : " Turning on \"Skip silence and music\" in Settings usually avoids this and finds that speech."));
         return transcript with { Segments = kept, Text = string.Join(" ", kept.Select(segment => segment.Text)) };
-    }
-    private async Task<ChunkPlan?> TryReadPlanAsync(Guid id, CancellationToken token)
+    }    private async Task<ChunkPlan?> TryReadPlanAsync(Guid id, CancellationToken token)
     {
         if (!File.Exists(FileFor(id, "chunks.json"))) return null;
         try { return await Read<ChunkPlan>(id, "chunks.json", token); }
