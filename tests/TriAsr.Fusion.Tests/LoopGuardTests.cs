@@ -61,7 +61,7 @@ public sealed class LoopGuardTests
     {
         // Seven back-to-back alternations: fewer than the eight copies a loop needs.
         var segments = new List<TranscriptSegment>();
-        for (var i = 0; i < 14; i++) segments.Add(S(i * 3, i * 3 + 3, i % 2 == 0 ? "I found a love for me" : "Darling, just dive right in"));
+        for (var i = 0; i < 14; i++) segments.Add(S(i * 3, i * 3 + 3, i % 2 == 0 ? "first line of the verse" : "second line of the verse"));
         Assert.Empty(LoopGuard.Find(segments));
         Assert.Same(segments, LoopGuard.Remove(segments).Kept); // nothing found: the very same list comes back
     }
