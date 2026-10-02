@@ -64,6 +64,9 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        // The language question on the first start is a window of its own. While it is the only window, closing it must not end the program: the main
+        // window does not exist yet. The program ends with the main window once that is shown.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         var smoke = e.Args.Contains("--smoke-test", StringComparer.Ordinal);
         try
         {
@@ -544,6 +547,7 @@ public partial class App : System.Windows.Application
                 return;
             }
             window.Show();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             _ = shell.RunUpdateCheckAsync(manual: false);
         }
         catch (Exception exception)
@@ -581,6 +585,7 @@ public partial class App : System.Windows.Application
             return;
         }
         window.Show();
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
         _ = client.RunUpdateCheckAsync(manual: false);
     }
 
@@ -602,6 +607,7 @@ public partial class App : System.Windows.Application
             return;
         }
         window.Show();
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
         _ = shell.RunUpdateCheckAsync(manual: false);
     }
 
