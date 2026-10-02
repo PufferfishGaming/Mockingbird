@@ -14,6 +14,7 @@ public static class ShellSmoke
             throw new InvalidOperationException("Application version is missing.");
         if (!AppInfo.PrivacyPolicy.Contains("## Terminal, exports and support"))
             throw new InvalidOperationException("Bundled privacy policy is incomplete.");
+        await CheckAdvancedPagesAsync(window, shell);
         var output = Path.Combine(root, "renders");
         Directory.CreateDirectory(output);
         var count = 0;
@@ -61,6 +62,30 @@ public static class ShellSmoke
         shell.DismissErrorCommand.Execute(null);
         if (shell.HasError) throw new InvalidOperationException("Error alert did not dismiss.");
         return count + 2;
+    }
+
+    /// <summary>The sidebar lists only the main pages until "Advanced" is opened, but never hides the page that is open.</summary>
+    private static async Task CheckAdvancedPagesAsync(MainWindow window, ShellViewModel shell)
+    {
+        async Task<bool> ListedAsync(NavigationItem page)
+        {
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            var container = (UIElement?)window.NavigationList.ItemContainerGenerator.ContainerFromItem(page)
+                ?? throw new InvalidOperationException($"No sidebar entry for {page.Name}.");
+            return container.Visibility == Visibility.Visible;
+        }
+        var advanced = shell.Navigation.Where(page => page.Advanced).ToArray();
+        shell.ShowAdvanced = false;
+        shell.SelectedPage = shell.Navigation[0];
+        foreach (var page in shell.Navigation)
+            if (await ListedAsync(page) == page.Advanced) throw new InvalidOperationException($"Sidebar entry {page.Name} has the wrong visibility while Advanced is closed.");
+        shell.SelectedPage = advanced[0];
+        if (!await ListedAsync(advanced[0])) throw new InvalidOperationException("The open advanced page disappeared from the sidebar.");
+        shell.SelectedPage = shell.Navigation[0];
+        shell.ShowAdvanced = true;
+        foreach (var page in shell.Navigation)
+            if (!await ListedAsync(page)) throw new InvalidOperationException($"Sidebar entry {page.Name} is hidden while Advanced is open.");
+        shell.ShowAdvanced = false;
     }
 
     private static System.Windows.Controls.TextBlock? FindText(DependencyObject root, string text)

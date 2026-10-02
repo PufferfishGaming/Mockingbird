@@ -76,7 +76,6 @@ public partial class MainWindow : Window
     {
         IsNavigationCompact = ActualWidth < 980;
         NavigationColumn.Width = new GridLength(IsNavigationCompact ? 72 : 230);
-        SidebarFooter.Visibility = IsNavigationCompact ? Visibility.Collapsed : Visibility.Visible;
     }
     private void SelectFileClick(object sender, RoutedEventArgs args)
     {

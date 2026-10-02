@@ -50,7 +50,7 @@ public sealed partial class ShellViewModel
         _restoringPreset = true;
         try { SelectedPreset = PresetFor(new(canary.Entry.Id, correction.Entry.Id, whisper.Entry.Id)); }
         finally { _restoringPreset = false; }
-        OnPropertyChanged(nameof(Readiness)); RefreshBenchmarkApplicability();
+        RefreshReadiness(); RefreshBenchmarkApplicability();
     }
     private static string PresetFor(Selection selection) => selection switch
     {
@@ -163,7 +163,7 @@ public sealed partial class ShellViewModel
         try { await models.DownloadAsync(card.Entry, progress, token); }
         finally { acceptingProgress = false; }
         card.Refresh(models.Inspect(card.Entry)); ModelDownloadPercent = 100;
-        OnPropertyChanged(nameof(Readiness)); RefreshDownloadSummary();
+        RefreshReadiness(); RefreshDownloadSummary();
     }
     [RelayCommand]
     private async Task InstallModelAsync()
@@ -189,7 +189,7 @@ public sealed partial class ShellViewModel
         {
             foreach (var card in cards) card.Refresh(models.Inspect(card.Entry));
             _modelCancellation.Dispose(); _modelCancellation = null; IsModelBusy = false;
-            RefreshDownloadSummary(); OnPropertyChanged(nameof(Readiness));
+            RefreshDownloadSummary(); RefreshReadiness();
         }
     }
     [RelayCommand] private void CancelModel() => _modelCancellation?.Cancel();

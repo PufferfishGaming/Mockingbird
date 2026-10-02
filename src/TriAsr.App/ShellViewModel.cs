@@ -10,7 +10,8 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.App;
 
-public sealed record NavigationItem(string Name, string Title, string Description, string Icon, string EmptyTitle, string EmptyDescription)
+/// <summary>One sidebar page. Advanced pages stay hidden until the user opens "Advanced" (or navigates to one).</summary>
+public sealed record NavigationItem(string Name, string Title, string Icon, bool Advanced = false)
 {
     public bool IsSettings => Name == "Settings";
 }
@@ -22,18 +23,20 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
-        new("New Transcription", "New transcription", "Import audio or video and choose your recognition settings.", "M12,3 L12,21 M3,12 L21,12", "Your next recording starts here", "Choose a recording to begin."),
-        new("Projects", "Your projects", "Recordings, transcripts and their original evidence, in one place.", "M3,6 L10,6 L12,8 L21,8 L21,20 L3,20 Z", "A clean workspace", "Your saved transcription projects will appear here."),
-        new("Queue", "Processing queue", "Track each recording from preprocessing to final transcript.", "M4,5 L20,5 M4,12 L20,12 M4,19 L20,19", "No active jobs", "New recordings will join the local processing queue."),
-        new("Review", "Review transcript", "Listen, compare alternatives and resolve uncertain wording.", "M3,12 L9,18 L21,5", "Nothing to review yet", "Disagreements between speech engines will appear here."),
-        new("Models", "Your local engines", "Manage speech and correction models on this computer.", "M12,2 L22,7 L22,17 L12,22 L2,17 L2,7 Z M2,7 L12,12 L22,7 M12,12 L12,22", "Models will be managed here", "Download or select a local model."),
-        new("Languages", "More languages, locally", "Download shared multilingual models and see language coverage.", "M2,12 A10,10 0 1 0 22,12 A10,10 0 1 0 2,12 M2,12 L22,12 M12,2 C6,8 6,16 12,22 C18,16 18,8 12,2", "", ""),
-        new("Backends", "Choose how your engines run", "Manage CPU, Vulkan, CUDA and ROCm runtimes and execution settings.", "M5,5 L19,5 L19,19 L5,19 Z M8,2 L8,5 M16,2 L16,5 M8,19 L8,22 M16,19 L16,22 M2,8 L5,8 M19,8 L22,8 M2,16 L5,16 M19,16 L22,16", "", ""),
-        new("Terminal", "Terminal", "Live app activity and an interactive PowerShell session.", "M3,5 L21,5 L21,19 L3,19 Z M6,9 L10,12 L6,15 M13,15 L18,15", "", ""),
-        new("Benchmark", "Find your best setup", "Choose settings based on measurements from your computer.", "M4,20 L4,12 M12,20 L12,4 M20,20 L20,8", "No benchmark results", "Optimization will measure warmed inference runs and retain the results."),
-        new("Diagnostics", "Know your workstation", "Hardware, runtime versions and local storage health.", "M2,12 L6,12 L9,4 L14,20 L18,12 L22,12", "Hardware diagnostics", "No hardware or inference backend is assumed to be available."),
-        new("Settings", "Settings", "Appearance and preferences for your local workspace.", "M12,2 L12,6 M12,18 L12,22 M2,12 L6,12 M18,12 L22,12 M5,5 L8,8 M16,16 L19,19 M5,19 L8,16 M16,8 L19,5 M12,7 A5,5 0 1 1 11.99,7", "", "")
+        new("New Transcription", "New transcription", "M12,3 L12,21 M3,12 L21,12"),
+        new("Projects", "Projects", "M3,6 L10,6 L12,8 L21,8 L21,20 L3,20 Z"),
+        new("Review", "Review", "M3,12 L9,18 L21,5"),
+        new("Models", "Models", "M12,2 L22,7 L22,17 L12,22 L2,17 L2,7 Z M2,7 L12,12 L22,7 M12,12 L12,22"),
+        new("Languages", "Languages", "M2,12 A10,10 0 1 0 22,12 A10,10 0 1 0 2,12 M2,12 L22,12 M12,2 C6,8 6,16 12,22 C18,16 18,8 12,2", true),
+        new("Backends", "Backends", "M5,5 L19,5 L19,19 L5,19 Z M8,2 L8,5 M16,2 L16,5 M8,19 L8,22 M16,19 L16,22 M2,8 L5,8 M19,8 L22,8 M2,16 L5,16 M19,16 L22,16", true),
+        new("Benchmark", "Benchmark", "M4,20 L4,12 M12,20 L12,4 M20,20 L20,8", true),
+        new("Diagnostics", "Diagnostics", "M2,12 L6,12 L9,4 L14,20 L18,12 L22,12", true),
+        new("Terminal", "Terminal", "M3,5 L21,5 L21,19 L3,19 Z M6,9 L10,12 L6,15 M13,15 L18,15", true),
+        new("Settings", "Settings", "M12,2 L12,6 M12,18 L12,22 M2,12 L6,12 M18,12 L22,12 M5,5 L8,8 M16,16 L19,19 M5,19 L8,16 M16,8 L19,5 M12,7 A5,5 0 1 1 11.99,7")
     ];
+    /// <summary>Whether the Advanced pages (Languages, Backends, Benchmark, Diagnostics, Terminal) are listed in the sidebar. The open page is always listed.</summary>
+    [ObservableProperty] private bool _showAdvanced;
+    [RelayCommand] private void ToggleAdvanced() => ShowAdvanced = !ShowAdvanced;
     public IReadOnlyList<string> Themes { get; } = ["System", "Light", "Dark"];
     public IReadOnlyList<string> Densities { get; } = ["Comfortable", "Compact"];
     [ObservableProperty] private NavigationItem? _selectedPage;
@@ -43,12 +46,11 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private bool _initialized;
     public bool IsSettings => SelectedPage?.IsSettings == true;
     public bool IsNewPage => SelectedPage?.Name == "New Transcription";
-    public bool IsJobsPage => SelectedPage?.Name is "Projects" or "Queue";
+    public bool IsJobsPage => SelectedPage?.Name == "Projects";
     public bool IsDiagnosticsPage => SelectedPage?.Name == "Diagnostics";
     public bool IsReviewPage => SelectedPage?.Name == "Review";
     public bool IsModelsPage => SelectedPage?.Name == "Models";
     public bool IsBenchmarkPage => SelectedPage?.Name == "Benchmark";
-    public bool IsEmptyPage => !IsSettings && !IsNewPage && !IsJobsPage && !IsDiagnosticsPage && !IsReviewPage && !IsModelsPage && !IsBenchmarkPage && !IsLanguagesPage && !IsBackendsPage && !IsTerminalPage;
     [ObservableProperty] private string _diagnostics = "Detecting hardware…";
     [ObservableProperty] private bool _hardwareChanged;
     public HardwareProfile? Hardware { get; private set; }
@@ -64,12 +66,22 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private Guid? _progressJob;
     [ObservableProperty] private TranscriptionJob? _selectedJob;
     public IReadOnlyList<LanguageOption> Languages { get; } = LanguageCatalog.All.Prepend(new LanguageOption("auto", "Auto-detect language")).ToArray();
-    /// <summary>The files a transcription needs. The correction model and its runtime are optional (Settings, off by default).</summary>
-    public string Readiness => string.Join("\n", new[] {
-        ("Audio", runtimes.Ffmpeg, false), (System.IO.Path.GetFileName(runtimes.WhisperModel), runtimes.WhisperModel, false), (System.IO.Path.GetFileName(runtimes.CanaryModel), runtimes.CanaryModel, false),
-        (System.IO.Path.GetFileName(runtimes.CorrectionModel), runtimes.CorrectionModel, true), ("Whisper runtime", runtimes.Whisper, false),
-        ("Canary worker", runtimes.CanaryWorker, false), ("Correction runtime", runtimes.LlamaServer, true) }
-        .Select(item => $"{item.Item1} · {(System.IO.File.Exists(item.Item2) ? "Ready" : item.Item3 ? "Not installed (optional: only used if the correction model is turned on in Settings)" : "Missing — open Models")}"));
+    /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is optional (Settings, off by default) and never listed.</summary>
+    public string Readiness
+    {
+        get
+        {
+            var missing = new List<string>();
+            foreach (var (name, path) in new[] { ("Audio converter", runtimes.Ffmpeg), ("Whisper runtime", runtimes.Whisper), ("Canary worker", runtimes.CanaryWorker) })
+                if (!System.IO.File.Exists(path)) missing.Add($"{name} is missing. Reinstall Mockingbird Studio.");
+            var models = MissingRequiredModels();
+            if (models.Length > 0) missing.Add("Not downloaded yet: " + string.Join(", ", models));
+            return string.Join("\n", missing);
+        }
+    }
+    public bool HasReadinessIssues => Readiness.Length > 0;
+    private void RefreshReadiness() { OnPropertyChanged(nameof(Readiness)); OnPropertyChanged(nameof(HasReadinessIssues)); }
+    partial void OnSelectedLanguageChanged(string value) => RefreshReadiness();
     public ObservableCollection<ReviewRegion> Regions { get; } = [];
     public System.ComponentModel.ICollectionView ReviewItems { get; private set; } = null!;
     [ObservableProperty] private ReviewRegion? _selectedRegion;
@@ -162,7 +174,6 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     partial void OnSelectedPageChanged(NavigationItem? value)
     {
         OnPropertyChanged(nameof(IsSettings));
-        OnPropertyChanged(nameof(IsEmptyPage));
         OnPropertyChanged(nameof(IsNewPage));
         OnPropertyChanged(nameof(IsJobsPage));
         OnPropertyChanged(nameof(IsDiagnosticsPage));
@@ -202,7 +213,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         if (missing.Length > 0)
         {
             ReportError("Selected models are not downloaded", string.Join("\n", missing) +
-                "\nPress Download selected models, or choose Balanced to reuse the installed models. Selecting a preset does not download its models.");
+                "\nPress Download models first. Choosing a preset does not download its models.");
             return;
         }
         IsProcessing = true;

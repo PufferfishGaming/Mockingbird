@@ -9,8 +9,8 @@ namespace TriAsr.App;
 public sealed partial class ShellViewModel
 {
     public ObservableCollection<BenchmarkRow> BenchmarkResults { get; } = [];
-    [ObservableProperty] private string _benchmarkProgress = "Check your computer, download the highlighted models, then choose a speech recording to tune.";
-    [ObservableProperty] private string _benchmarkSummary = "No measured settings yet. Tuning compares speed on your recording; it does not measure transcription accuracy.";
+    [ObservableProperty] private string _benchmarkProgress = "";
+    [ObservableProperty] private string _benchmarkSummary = "No measured settings yet.";
     [ObservableProperty] private bool _isBenchmarking;
     private ExecutionProfile? _measuredProfile;
     private CancellationTokenSource? _benchmarkCancellation;

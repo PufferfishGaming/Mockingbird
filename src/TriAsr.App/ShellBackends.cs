@@ -13,7 +13,7 @@ public sealed partial class ShellViewModel
     public IReadOnlyList<BackendOption> BackendPackages => BackendRuntimes.Options.Where(option => option.Code is "cuda" or "rocm").ToArray();
     [ObservableProperty] private string _runtimeEngine = "Correction";
     [ObservableProperty] private string _runtimeBackend = "rocm";
-    [ObservableProperty] private string _backendProgress = "CPU and Vulkan are bundled. CUDA requires NVIDIA hardware; ROCm requires a compatible AMD GPU and HIP runtime. Imported Canary builds must use ABI 0.2.4.";
+    [ObservableProperty] private string _backendProgress = "";
     [ObservableProperty] private string _whisperBackendChoice = "cpu";
     [ObservableProperty] private string _canaryBackendChoice = "cpu";
     [ObservableProperty] private string _correctionBackendChoice = "cpu";
