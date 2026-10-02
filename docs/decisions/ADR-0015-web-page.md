@@ -1,9 +1,9 @@
-# ADR-0015: The web page of a server
+# ADR-0015: The web page of a server (Mockingbird Client Webview)
 
 Status: accepted (after 0.1.19, unreleased).
 
 ## Context
-The server already speaks HTTP (ADR-0013, ADR-0014). The owner asked for a web view of the Client: a computer without Mockingbird installed should be able to send a recording to a server, follow it, review the transcript and export it, in a browser.
+The server already speaks HTTP (ADR-0013, ADR-0014). The owner asked for a web view of the Client, named Mockingbird Client Webview: a computer without Mockingbird installed should be able to send a recording to a server, follow it, review the transcript and export it, in a browser.
 
 ## Decision
 - **The server serves the page itself**, at its own address (`GET /` when the request asks for `text/html`; a program that asks for anything else still gets the plain-text overview). Three small files (`index.html`, `app.js`, `app.css`) are embedded in the program (`Web/`) and served by `WebApp` before the API. There is no library, no build step and no address outside the server. Studio and the Server edition serve it; the Client edition hosts nothing.

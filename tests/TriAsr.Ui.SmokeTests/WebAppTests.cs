@@ -24,6 +24,8 @@ public sealed class WebAppTests
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         Assert.Equal("text/html", page.Content.Headers.ContentType!.MediaType);
         var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("<title>Mockingbird Client Webview</title>", html);
+        Assert.Contains("const PRODUCT = \"Mockingbird Client Webview\"", await anonymous.GetStringAsync("/app.js"));
         Assert.Contains("<script src=\"/app.js\"></script>", html);
         Assert.Contains("<link rel=\"stylesheet\" href=\"/app.css\">", html);
         Assert.DoesNotContain("<script>", html);   // nothing inline: the policy below allows only the script that comes from this server

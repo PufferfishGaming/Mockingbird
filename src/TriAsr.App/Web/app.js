@@ -1,8 +1,9 @@
 "use strict";
-// The web page of a Mockingbird server (ADR-0015): send a recording, follow the recordings on the server, review and edit a transcript, export it.
+// Mockingbird Client Webview, the web page of a Mockingbird server (ADR-0015): send a recording, follow the recordings on the server, review and edit a transcript, export it.
 // It talks to the same HTTP API as every other client, from the same address, and the transcripts are only ever put on the page as text (never as markup).
 // Every text is looked up by its English wording: t(text) (the server answers /ui/strings.json with the translations of the ones used here).
 (() => {
+  const PRODUCT = "Mockingbird Client Webview";   // the name of this page, whatever kind of server it comes from
   const LANGUAGES = [["en", "English"], ["hu", "Magyar"], ["de", "Deutsch"], ["es", "Español"], ["fr", "Français"]];
   const app = document.getElementById("app");
   const text = { lang: "en", table: {} };
@@ -115,7 +116,7 @@
     const bar = h("header", { class: "bar" },
       h("div", { class: "brand" },
         h("span", { class: "mark", "aria-hidden": "true" }, svgMark()),
-        h("span", null, "Mockingbird" + (health ? " " + health.edition : "")),
+        h("span", null, PRODUCT),
         health && h("span", { class: "version" }, "v" + health.version)),
       h("span", { class: "spacer" }),
       health && h("span", { class: "pill" }, health.name),
@@ -125,7 +126,7 @@
       health && health.passwordRequired && state.password && h("button", { class: "btn", type: "button", onClick: () => signOut("") }, t("Sign out")));
     ui.header.className = "bar";
     ui.header.replaceChildren(...bar.childNodes);
-    document.title = health ? "Mockingbird " + health.edition + " · " + health.name : "Mockingbird";
+    document.title = health ? PRODUCT + " · " + health.name : PRODUCT;
   }
 
   function svgMark() {
