@@ -17,7 +17,7 @@ public sealed record BenchmarkRow(string Engine, string Model, string Backend, i
             if (Error is not null || Engine == "Dual ASR") return "";
             var parts = new List<string>();
             if (MedianCpuSeconds is { } cpu) parts.Add($"CPU time {cpu:0.0} s");
-            if (PeakRamBytes is { } peak) parts.Add($"peak RAM {peak / 1048576d:N0} MB");
+            if (PeakRamBytes is { } peak) parts.Add($"peak RAM use: {peak / 1048576d:N0} MiB");
             return parts.Count == 0 ? "" : " · " + string.Join(" · ", parts);
         }
     }
@@ -27,7 +27,7 @@ public sealed record BenchmarkRow(string Engine, string Model, string Backend, i
     private string Speed => Error is not null ?"Failed · excluded from tuning"
         : MedianSeconds is not { } seconds ? "Measurement incomplete"
         : Engine == "Correction" ? $"{seconds:0.00} seconds per disagreement · model already loaded"
-        : RealTimeFactor is > 0 ? $"{AudioSeconds:0.0}s audio processed in {seconds:0.00}s · {1 / RealTimeFactor:0.0}× real time"
+        : RealTimeFactor is > 0 ? $"{AudioSeconds:0.0} s of audio processed in {seconds:0.00} s · speed {1 / RealTimeFactor:0.0}× real time"
         : "No timing available";
     public static double Median(IEnumerable<double> values)
     {

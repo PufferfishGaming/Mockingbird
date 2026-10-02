@@ -119,7 +119,7 @@ public sealed partial class ShellViewModel
                 ShowSetupStep(4, Loc.Key("Measuring speed"), true);
                 if (await RunTuningAsync(sample)) await ApplyBestSettingsAsync();
                 else if (token.IsCancellationRequested) throw new OperationCanceledException(token);
-                else { var reason = _tuningError; tuningNote = () => reason is null ? T("Speed tuning did not finish. Safe defaults are used; you can run it again from Benchmark.") : T("Speed tuning did not finish: {0} Safe defaults are used; you can run it again from Benchmark.", reason); }
+                else { var reason = _tuningError; tuningNote = () => reason is null ? T("Speed tuning did not finish. Safe defaults are used; you can run it again from Benchmark.") : T("Speed tuning did not finish. Details: {0}\nSafe defaults are used; you can run it again from Benchmark.", Loc.Describe(reason)); }
             }
 
             _setupState = SetupPlan.Done;
@@ -134,7 +134,7 @@ public sealed partial class ShellViewModel
         catch (Exception error)
         {
             logger.LogWarning(error, "First-run setup failed: {ErrorType}", error.GetType().Name);
-            ShowSetupEnd(SetupStage.Problem, () => (T("Setup could not finish"), T("{0} Downloaded models are kept.", error.Message)));
+            ShowSetupEnd(SetupStage.Problem, () => (T("Setup could not finish"), T("{0}\nDownloaded models are kept.", Loc.Describe(error.Message))));
         }
         finally { _setupCancellation?.Dispose(); _setupCancellation = null; }
     }

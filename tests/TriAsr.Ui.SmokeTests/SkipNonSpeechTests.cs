@@ -180,7 +180,7 @@ public sealed class SkipNonSpeechTests : IDisposable
         using var loops = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "loops.json")));
         Assert.Equal(39, loops.RootElement.GetProperty("Removed").GetInt32());
         var issue = Assert.Single(_issues, item => item.Title == "Repeated text removed");
-        Assert.Contains("39 segments were removed", issue.Message);
+        Assert.Contains("Segments removed: 39.", issue.Message);
         Assert.Equal(suggestsSkipping, issue.Message.Contains("Skip silence and music"));
     }
 
@@ -214,7 +214,7 @@ public sealed class SkipNonSpeechTests : IDisposable
         Assert.Equal(21, loops.RootElement.GetProperty("Removed").GetInt32());
         Assert.Equal(1, loops.RootElement.GetProperty("FastRuns").GetArrayLength());
         Assert.Equal(0, loops.RootElement.GetProperty("Runs").GetArrayLength());
-        Assert.Contains("21 segments were removed", Assert.Single(_issues, item => item.Title == "Repeated text removed").Message);
+        Assert.Contains("Segments removed: 21.", Assert.Single(_issues, item => item.Title == "Repeated text removed").Message);
     }
 
     // ---- text only Whisper wrote, where no speech was detected ----------------------------------------------------------------------

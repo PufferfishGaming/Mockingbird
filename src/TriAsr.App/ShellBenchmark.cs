@@ -46,7 +46,7 @@ public sealed partial class ShellViewModel
         var applied = _activeExecution == new ExecutionSettings(_measuredProfile.WhisperBackend, _measuredProfile.WhisperThreads, _measuredProfile.CanaryBackend, _measuredProfile.CanaryThreads,
             _measuredProfile.CorrectionBackend, _measuredProfile.CorrectionThreads, _measuredProfile.ParallelSpeech, _measuredProfile.Fingerprint);
         BenchmarkSummary = (matches ? applied ? T("Active · new transcriptions use these measured settings.") : T("Best settings ready · press Apply all best settings to use them.") : T("Out of date · rerun tuning for this hardware, app and selected models. Your current valid settings or safe defaults remain in use.")) +
-            "\n" + T("Whisper: {0}, {1} threads · Canary: {2}, {3} threads · {4}", _measuredProfile.WhisperBackend.ToUpperInvariant(), _measuredProfile.WhisperThreads, _measuredProfile.CanaryBackend.ToUpperInvariant(), _measuredProfile.CanaryThreads,
+            "\n" + T("Whisper: {0}, threads: {1} · Canary: {2}, threads: {3} · {4}", _measuredProfile.WhisperBackend.ToUpperInvariant(), _measuredProfile.WhisperThreads, _measuredProfile.CanaryBackend.ToUpperInvariant(), _measuredProfile.CanaryThreads,
                 _measuredProfile.ParallelSpeech ? T("both speech engines run together") : T("speech engines run one after the other")) +
             "\n" + T("Measured {0:g}. Lower times are faster; speed rankings do not establish word accuracy.", _measuredProfile.MeasuredUtc.LocalDateTime);
         var combined = _measuredProfile.Results.FirstOrDefault(row => row.Engine == "Dual ASR" && row.Strategy == (_measuredProfile.ParallelSpeech ? "parallel" : "sequential") && row.Error is null);
@@ -83,7 +83,7 @@ public sealed partial class ShellViewModel
             var updates = new Progress<BenchmarkRow>(row =>
             {
                 if (!BenchmarkResults.Contains(row)) BenchmarkResults.Add(row);
-                if (row.Error is not null) ReportError(T("Tuning candidate failed"), T("{0} · {1} · {2} threads: {3}\nThis candidate is excluded; tuning continues with other settings.", T(row.Engine), BenchmarkText.Backend(row), row.ThreadLabel, row.Error));
+                if (row.Error is not null) ReportError(T("Tuning candidate failed"), T("{0} · {1} · threads: {2} · {3}\nThis candidate is excluded; tuning continues with other settings.", T(row.Engine), BenchmarkText.Backend(row), row.ThreadLabel, Loc.Describe(row.Error)));
             });
             var profile = await optimizer.OptimizeAsync(source, Hardware, new Progress<string>(text => BenchmarkProgress = text), _benchmarkCancellation.Token, updates);
             BenchmarkResults.Clear(); foreach (var row in profile.Results) BenchmarkResults.Add(row);
@@ -94,7 +94,7 @@ public sealed partial class ShellViewModel
             Status = T("Tuning complete. Measured settings saved locally.");
             return true;
         }
-        catch (OperationCanceledException) { BenchmarkProgress = T("Tuning cancelled. Partial results are kept in Benchmarks; the previous saved profile is preserved."); return false; }
+        catch (OperationCanceledException) { BenchmarkProgress = T("Tuning cancelled. Partial results remain on the Benchmark page; your previous tuning profile is preserved."); return false; }
         catch (Exception error) { BenchmarkProgress = T("Tuning stopped. The previous profile is preserved."); ReportError(T("Tuning failed"), error.Message); _tuningError = error.Message; return false; }
         finally { _benchmarkCancellation.Dispose(); _benchmarkCancellation = null; IsBenchmarking = false; }
     }
@@ -114,6 +114,6 @@ public sealed partial class ShellViewModel
             BenchmarkProgress = T("Saved measurements restored. Run tuning again after changing your hardware or models.");
         }
         catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException)
-        { ReportError(T("Could not restore tuning results"), T("Run tuning again. {0}", error.Message)); }
+        { ReportError(T("Could not restore tuning results"), T("Run tuning again. {0}", Loc.Describe(error.Message))); }
     }
 }

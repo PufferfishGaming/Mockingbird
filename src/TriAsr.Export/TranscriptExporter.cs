@@ -45,7 +45,7 @@ public static class TranscriptExporter
                         $"{(region.NativeTimestamps ? region.StartMs.ToString(CultureInfo.InvariantCulture) : "")},{(region.NativeTimestamps ? region.EndMs.ToString(CultureInfo.InvariantCulture) : "")},{Csv(region.FinalText)},{Csv(region.WhisperText)},{Csv(region.CanaryText)},{Csv(region.Source)},{region.Confidence?.ToString(CultureInfo.InvariantCulture)}")),
                     ".srt" => string.Join("\n", transcript.Regions.Where(region => region.FinalText.Length > 0).Select((region, index) => $"{index + 1}\n{Timestamp(region.StartMs, ',')} --> {Timestamp(region.EndMs, ',')}\n{SubtitleText(region.FinalText)}\n")),
                     ".vtt" => "WEBVTT\n\n" + string.Join("\n", transcript.Regions.Where(region => region.FinalText.Length > 0).Select(region => $"{Timestamp(region.StartMs)} --> {Timestamp(region.EndMs)}\n{SubtitleText(region.FinalText)}\n")),
-                    _ => throw new ArgumentException("Supported exports: TXT, MD, JSON, CSV, SRT, VTT, DOCX.")
+                    _ => throw new ArgumentException("Choose a supported export format: TXT, MD, JSON, CSV, SRT, VTT or DOCX.")
                 };
                 await File.WriteAllTextAsync(temporary, text, new UTF8Encoding(false), token);
             }

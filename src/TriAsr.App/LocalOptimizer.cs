@@ -79,7 +79,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
                 foreach (var engine in new[] { "Whisper", "Canary" })
                 {
                     if (!BackendRuntimes.Candidates(paths, hardware, engine).Contains(backend)) continue;
-                    progress?.Report(Loc.T("{0} · {1} · {2} threads · warmup + 3 measurements", Loc.T(engine), backend, count));
+                    progress?.Report(Loc.T("{0} · {1} · threads: {2} · warmup + 3 measurements", Loc.T(engine), backend, count));
                     var row = await BenchmarkSession.MeasureAsync(engine, engine == "Whisper" ? Path.GetFileName(paths.WhisperModel) : Path.GetFileName(paths.CanaryModel), backend, count, "single", seconds,
                         (_, ct) => engine == "Whisper" ? Whisper(backend, count, ct) : Canary(backend, count, ct), token);
                     results.Add(row); measurements?.Report(row); await SaveResults(directory, results, token);

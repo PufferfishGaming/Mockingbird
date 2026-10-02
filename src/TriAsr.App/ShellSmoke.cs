@@ -71,9 +71,23 @@ public static class ShellSmoke
         var count = 0;
         shell.SelectedTheme = "Light";
         window.Width = 1220;
+        // Two regions are open for the whole run, so that a language switch has something already shown to change.
+        var regions = new[]
+        {
+            new ReviewRegion(new TriAsr.Domain.FinalRegion(0, 4000, "Guten Tag", "Guten Tag", "guten Tag", "uncertain", null, 0.5, null, false)),
+            new ReviewRegion(new TriAsr.Domain.FinalRegion(4000, 9000, "Auf Wiedersehen", "Auf Wiedersehen", "Auf Wiedersehen", "llm-arbitrated", "B", 0.93))
+        };
+        foreach (var region in regions) shell.Regions.Add(region);
+        shell.SelectedRegion = regions[0];
         foreach (var language in Loc.Languages)
         {
             shell.Language = language.Code;
+            shell.SelectedPage = shell.Navigation.First(item => item.Name == "Review");
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            foreach (var text in new[] { regions[0].Time, regions[0].Evidence, SourceText.Of("llm-arbitrated") })
+                if (FindText(window, text) is null) throw new InvalidOperationException($"The open review does not show \"{text}\" in {language.Code}.");
+            Capture(window, Path.Combine(output, $"lang-{language.Code}-Review-open.png"), 1220, 1100, 1);
+            count++;
             foreach (var name in new[] { "New Transcription", "Models", "Benchmark", "Backends", "Settings" })
             {
                 var page = shell.Navigation.First(item => item.Name == name);
@@ -86,11 +100,12 @@ public static class ShellSmoke
                 count++;
             }
         }
-        // The window that asks for the language on the first start.
+        foreach (var region in regions) shell.Regions.Remove(region);
+        // The window that asks for the language on the first start, at the height it really takes.
         var chooser = new LanguageChoiceWindow(Loc.Detect()) { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
         chooser.Show();
         await chooser.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        Capture(chooser, Path.Combine(output, "language-choice.png"), 520, 460, 1);
+        Capture(chooser, Path.Combine(output, "language-choice.png"), 520, double.PositiveInfinity, 1);
         chooser.Close();
         count++;
         shell.Language = Loc.English;
@@ -134,12 +149,20 @@ public static class ShellSmoke
     {
         var content = (FrameworkElement)window.Content;
         content.Measure(new Size(width, height));
+        if (double.IsPositiveInfinity(height)) height = content.DesiredSize.Height; // a window that sizes itself to its content: take all of it
         content.Arrange(new Rect(0, 0, width, height));
         content.UpdateLayout();
         width = content.ActualWidth;
         height = content.ActualHeight;
+        // Paint the window's own background first: the content on its own has none (it would be transparent).
+        var picture = new DrawingVisual();
+        using (var drawing = picture.RenderOpen())
+        {
+            drawing.DrawRectangle(window.Background, null, new Rect(0, 0, width, height));
+            drawing.DrawRectangle(new VisualBrush(content), null, new Rect(0, 0, width, height));
+        }
         var bitmap = new RenderTargetBitmap((int)(width * scale), (int)(height * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
-        bitmap.Render(content);
+        bitmap.Render(picture);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = File.Create(path);

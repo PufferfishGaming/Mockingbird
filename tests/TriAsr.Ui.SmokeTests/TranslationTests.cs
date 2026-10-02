@@ -122,15 +122,16 @@ public sealed partial class TranslationTests
     }
 
     [Fact]
-    public void NumbersAndNamesInTheArgumentsAreFilledInAndKnownTextsAreTranslated()
+    public void NumbersAndNamesInTheArgumentsAreFilledInAsTheyAre()
     {
         var before = Loc.Instance.Language;
         try
         {
             Loc.Instance.SetLanguage("de");
-            var text = Loc.T("{0}: {1}", "Cancel", "C:\\Users\\Anna\\Recordings"); // a known text is translated, a path is not
+            var text = Loc.T("{0}: {1}", Loc.T("Cancel"), "C:\\Users\\Anna\\Recordings"); // a label is translated by the caller, a path is left alone
             Assert.StartsWith(Loc.Load("de")["Cancel"] + ": ", text);
             Assert.EndsWith("C:\\Users\\Anna\\Recordings", text);
+            Assert.StartsWith("Cancel: ", Loc.T("{0}: {1}", "Cancel", "x")); // an argument that looks like a label is still a fact
         }
         finally { Loc.Instance.SetLanguage(before); }
     }

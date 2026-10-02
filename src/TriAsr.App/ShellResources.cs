@@ -28,9 +28,9 @@ public sealed partial class ShellViewModel
         var budget = governor.Current();
         var effective = T(budget.Effective.ToString());
         var sentence = budget.Requested == ResourceProfile.Auto
-            ? T("Auto is using the {0} profile because the computer is {1}: at most {2} CPU threads.", effective,
+            ? T("Auto is using the {0} profile because the computer is {1}. CPU thread limit: {2}.", effective,
                 budget.PowerSource switch { PowerSource.Battery => T("running on battery"), PowerSource.Ac => T("plugged in"), _ => T("on an unknown power source") }, budget.Threads)
-            : T("The {0} profile allows at most {1} CPU threads.", effective, budget.Threads);
+            : T("The {0} profile limits CPU threads to {1}.", effective, budget.Threads);
         ResourceSummary = sentence + " " + T("Saved thread counts above this limit are reduced automatically when a job starts.");
     }
 }

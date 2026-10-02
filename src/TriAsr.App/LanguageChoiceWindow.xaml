@@ -7,7 +7,7 @@
   <StackPanel Margin="36,32,36,32">
     <TextBlock Text="Mockingbird Studio" FontSize="26" FontWeight="SemiBold" />
     <TextBlock Text="Choose your language" FontSize="18" Margin="0,22,0,2" />
-    <TextBlock Text="Válaszd ki a nyelvet · Sprache wählen · Elige tu idioma · Choisissez votre langue" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+    <TextBlock Text="Válassza ki a nyelvet · Sprache wählen · Elija su idioma · Choisissez votre langue" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
     <ItemsControl x:Name="Choices" Margin="0,22,0,0">
       <ItemsControl.ItemTemplate>
         <DataTemplate>

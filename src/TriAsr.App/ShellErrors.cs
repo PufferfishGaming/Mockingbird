@@ -17,7 +17,7 @@ public sealed partial class ShellViewModel
     public void ReportError(string title, string message)
     {
         HasError = false;
-        title = Loc.T(title); message = Loc.T(message); // texts from the layers below are English and may have a translation
+        title = Loc.Describe(title); message = Loc.Describe(message); // texts from the layers below are English and may have a translation
         ErrorTitle = title;
         ErrorMessage = message;
         Status = title + ": " + message;

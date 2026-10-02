@@ -13,9 +13,9 @@ namespace TriAsr.App;
 public sealed partial class ShellViewModel
 {
     // Stored in settings and compared as written, so the values stay English; the lists below show them translated.
-    public const string WatchAsText = "Text (.txt)";
-    public const string WatchAsSubtitles = "Subtitles (.srt)";
-    public const string WatchProjectOnly = "Project only";
+    public static readonly string WatchAsText = Loc.Key("Text (.txt)");
+    public static readonly string WatchAsSubtitles = Loc.Key("Subtitles (.srt)");
+    public static readonly string WatchProjectOnly = Loc.Key("Project only");
     public IReadOnlyList<string> WatchOutputs { get; } = [WatchAsText, WatchAsSubtitles, WatchProjectOnly];
     [ObservableProperty] private bool _watchEnabled;
     [ObservableProperty] private string _watchFolder = "";
@@ -78,7 +78,7 @@ public sealed partial class ShellViewModel
         }
         catch (Exception error)
         {
-            WatchStatus = T("Cannot watch this folder: {0}", error.Message);
+            WatchStatus = T("Cannot watch this folder: {0}", Loc.Describe(error.Message));
             logger.LogWarning(error, "Watch folder could not start: {ErrorType}", error.GetType().Name);
         }
         finally { _watchGate.Release(); }
@@ -89,7 +89,7 @@ public sealed partial class ShellViewModel
         if (_watcher is null) return;
         var waiting = _watcher.Waiting;
         WatchStatus = IsWatchBusy
-            ? T("Transcribing {0}", _watchCurrent) + (waiting > 1 ? " · " + T("{0} more waiting", waiting - 1) : "")
+            ? T("Transcribing {0}", _watchCurrent) + (waiting == 2 ? " · " + T("1 more recording waiting") : waiting > 2 ? " · " + T("{0} more recordings waiting", waiting - 1) : "")
             : waiting == 0 ? T("Watching {0}", WatchFolder)
             : waiting == 1 ? T("Watching {0} · 1 recording arriving", WatchFolder)
             : T("Watching {0} · {1} recordings arriving", WatchFolder, waiting);
@@ -128,14 +128,14 @@ public sealed partial class ShellViewModel
             string? saved = null;
             try { saved = await ExportWatchedAsync(job, path); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
-            { OnUi(() => ReportError(T("Could not save the transcript next to the recording"), T("{0}: {1}\nThe transcript is still in Projects.", name, error.Message))); }
+            { OnUi(() => ReportError(T("Could not save the transcript next to the recording"), T("{0}: {1}\nThe transcript is still in Projects.", name, Loc.Describe(error.Message)))); }
             OnUi(() => Status = saved is null ? T("Transcribed {0}", name) : T("Transcribed {0} · saved {1}", name, Path.GetFileName(saved)));
             return WatchOutcome.Done;
         }
         catch (OperationCanceledException) { return WatchOutcome.Retry; }
         catch (Exception error)
         {
-            OnUi(() => ReportError(T("Watched recording failed"), T("{0}: {1}", name, error.Message)));
+            OnUi(() => ReportError(T("Watched recording failed"), T("{0}: {1}", name, Loc.Describe(error.Message))));
             return WatchOutcome.Failed;
         }
         finally { OnUi(() => { IsWatchBusy = false; RefreshWatchStatus(); }); }

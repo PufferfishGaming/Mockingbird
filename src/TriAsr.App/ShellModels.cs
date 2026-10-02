@@ -34,7 +34,7 @@ public sealed partial class ShellViewModel
         {
             try { selection = JsonSerializer.Deserialize<Selection>(await File.ReadAllTextAsync(path)) ?? selection; }
             catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException)
-            { ReportError(T("Could not restore model selection"), T("Balanced defaults restored. {0}", error.Message)); }
+            { ReportError(T("Could not restore model selection"), T("Balanced defaults restored. {0}", Loc.Describe(error.Message))); }
         }
         ApplySelection(selection);
         SelectedModel = ModelCards.First(item => item.Selected);
@@ -72,7 +72,7 @@ public sealed partial class ShellViewModel
         var ordered = ModelCards.OrderByDescending(card => card.Highlighted).ThenBy(card => card.Entry.Family switch { "Whisper" => 0, "Canary" => 1, _ => 2 }).ThenBy(card => card.Entry.Id).ToArray();
         for (var index = 0; index < ordered.Length; index++) ModelCards.Move(ModelCards.IndexOf(ordered[index]), index);
         var gpu = Hardware.Gpus.MaxBy(item => item.DedicatedBytes);
-        SystemSummary = T("{0} CPU cores / {1} threads · {2:0.0} GiB RAM", Hardware.Topology.PhysicalCores, Hardware.Topology.LogicalProcessors, Hardware.RamBytes / 1073741824d) + "\n" +
+        SystemSummary = T("CPU cores: {0} · threads: {1} · RAM: {2:0.0} GiB", Hardware.Topology.PhysicalCores, Hardware.Topology.LogicalProcessors, Hardware.RamBytes / 1073741824d) + "\n" +
             (gpu is null ? T("No dedicated GPU detected") : T("{0} · {1:0.0} GiB VRAM", gpu.Name, gpu.DedicatedBytes / 1073741824d)) +
             " · " + (Hardware.VulkanDevices.Count > 0 ? T("Vulkan available") : T("CPU execution available"));
         Recommendation = T(choice.Reason);
@@ -85,7 +85,7 @@ public sealed partial class ShellViewModel
         if (recommended.Length == 0) return;
         var remaining = recommended.Sum(card => { var state = models.Inspect(card.Entry); return state.Installed && !state.WrongSize ? 0 : Math.Max(0, card.Entry.Bytes - state.PartialBytes); });
         var total = recommended.Sum(card => card.Entry.Bytes);
-        RecommendedDownloadSummary = T("{0}/3 downloaded · {1:0.00} GiB left to download · {2:0.00} GiB total\nSaved permanently in {3}", recommended.Count(card => card.Installed), remaining / 1073741824d, total / 1073741824d, runtimes.ModelRoot);
+        RecommendedDownloadSummary = T("{0}/3 downloaded · {1:0.00} GiB left to download · {2:0.00} GiB total\nStored in {3} and kept when the app is closed or updated", recommended.Count(card => card.Installed), remaining / 1073741824d, total / 1073741824d, runtimes.ModelRoot);
     }
     private async Task PersistSelectionAsync()
     {
@@ -178,7 +178,7 @@ public sealed partial class ShellViewModel
         {
             var remaining = cards.Sum(card => { var state = models.Inspect(card.Entry); return state.Installed ? 0 : Math.Max(0, card.Entry.Bytes - state.PartialBytes); });
             var free = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(runtimes.ModelRoot))!).AvailableFreeSpace;
-            if (remaining > 0 && free < remaining + 128L * 1024 * 1024) throw new IOException(T("Need {0:0.00} GiB plus working space; only {1:0.00} GiB is free in the model drive.", remaining / 1073741824d, free / 1073741824d));
+            if (remaining > 0 && free < remaining + 128L * 1024 * 1024) throw new IOException(T("Need {0:0.00} GiB plus temporary disk space; only {1:0.00} GiB is free on the models drive.", remaining / 1073741824d, free / 1073741824d));
             foreach (var card in cards) { _modelCancellation.Token.ThrowIfCancellationRequested(); await DownloadCardAsync(card, _modelCancellation.Token); }
             ModelProgress = T("Ready offline. These models and their selected settings will remain after restarting or updating Mockingbird Studio.");
             Status = T("Models ready. You can transcribe or run tuning.");

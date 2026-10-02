@@ -57,9 +57,9 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
             if (match.Success && double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var percent)) progress?.Invoke(percent / 100);
         }), token);
         await File.WriteAllTextAsync(Path.Combine(directory, "runtime.stderr.txt"), result.StandardError, token);
-        if (result.ExitCode != 0) throw new InvalidOperationException($"Whisper exited with code {result.ExitCode}; see its saved runtime output.");
+        if (result.ExitCode != 0) throw new InvalidOperationException($"Whisper stopped with exit code {result.ExitCode}. See the saved engine output.");
         var actual = IdentifyBackend(result.StandardError);
-        if (actual != backend) throw new InvalidOperationException($"Whisper requested {backend}, actually used {actual}.");
+        if (actual != backend) throw new InvalidOperationException($"Whisper was set to use {backend}, but used {actual}.");
         var raw = await File.ReadAllTextAsync(output + ".json", token);
         using var document = JsonDocument.Parse(raw);
         var segments = ParseSegments(document.RootElement);
@@ -78,7 +78,7 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
         {
             var offsets = item.GetProperty("offsets");
             var start = offsets.GetProperty("from").GetInt64(); var end = offsets.GetProperty("to").GetInt64();
-            if (start < 0 || end < start) throw new InvalidDataException("Invalid Whisper segment timestamps.");
+            if (start < 0 || end < start) throw new InvalidDataException("Whisper returned invalid timestamps.");
             segments.Add(new(start, end, item.GetProperty("text").GetString()?.Trim() ?? ""));
         }
         return segments;

@@ -10,7 +10,7 @@ public sealed partial class ShellViewModel
     [ObservableProperty] private LanguageOption? _selectedExpansionLanguage = LanguageCatalog.All.First(language => language.Code == "fr");
     [ObservableProperty] private string _languageSearch = "";
     [ObservableProperty] private string _languageSetupStatus = Loc.Key("Choose a language and download its shared multilingual models. Existing models are reused; there is no duplicate download per language.");
-    public IReadOnlyList<LanguageOption> ExpansionLanguages => LanguageCatalog.All.Where(language => string.IsNullOrWhiteSpace(LanguageSearch)
+    public IReadOnlyList<LanguageOption> ExpansionLanguages => LanguageText.InOrder(LanguageCatalog.All).Where(language => string.IsNullOrWhiteSpace(LanguageSearch)
         || language.Display.Contains(LanguageSearch, StringComparison.CurrentCultureIgnoreCase)
         || LanguageText.Of(language).Contains(LanguageSearch, StringComparison.CurrentCultureIgnoreCase)).ToArray();
     public string LanguageCoverage => SelectedExpansionLanguage is { } language ? T(language.Coverage) : T("Select a language");
@@ -53,7 +53,7 @@ public sealed partial class ShellViewModel
             await File.WriteAllTextAsync(path + ".tmp", JsonSerializer.Serialize(codes)); File.Move(path + ".tmp", path, true);
             await LoadLanguageExpansionsAsync();
             SelectedLanguage = language.Code;
-            LanguageSetupStatus = T("{0} is ready offline. The shared Whisper model can auto-detect all 100 listed languages. {1}.", LanguageText.Of(language), T(language.Coverage));
+            LanguageSetupStatus = T("The selected language is ready for offline transcription: {0}. The shared Whisper model can auto-detect all 100 listed languages. {1}.", LanguageText.Of(language), T(language.Coverage));
             Status = T("Language support ready · {0}", LanguageText.Of(language));
         }
         catch (Exception error) { ReportError(T("Language setup failed"), error.Message); }

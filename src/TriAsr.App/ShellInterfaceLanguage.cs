@@ -82,8 +82,10 @@ public sealed partial class ShellViewModel
         _shownLanguage = Language;
         foreach (var (get, set, english) in _translatedDefaults)
             if (get() == Loc.TextIn(previous, english)) set(Loc.T(english));
-        if (Hardware is { } profile && EngineStatus.StartsWith(profile.Topology.LogicalProcessors.ToString()))
-            EngineStatus = T("{0} CPU threads · {1}", profile.Topology.LogicalProcessors, profile.Gpus.FirstOrDefault()?.Name ?? T("CPU only"));
+        if (Hardware is { } profile && EngineStatus == _hardwareStatus) ShowHardwareStatus(profile);
+        if (_rawCanaryNote is { } note) RawCanary = T(note);
+        foreach (var region in Regions) region.NotifyLanguageChanged();
+        _languagesInOrder = null; OnPropertyChanged(nameof(Languages)); // the names, and with them the alphabetical order, are those of the new language
         OnPropertyChanged(nameof(ThemeSummary)); OnPropertyChanged(nameof(StorageSummary)); OnPropertyChanged(nameof(LanguageCoverage)); OnPropertyChanged(nameof(ExpansionLanguages));
         RefreshReadiness();
         if (Hardware is not null) UpdateRecommendation();

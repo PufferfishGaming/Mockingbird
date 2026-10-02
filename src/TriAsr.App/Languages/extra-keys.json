@@ -27,8 +27,6 @@
  "Canary",
  "agreement",
  "uncertain",
- "single-asr-needs-listening",
- "llm-arbitrated",
  "manual",
  "Possible recognition loop: repeated text. Listen to this section; genuine repetitions are preserved.",
  "System",
@@ -159,7 +157,7 @@
  "Maltese",
  "Sanskrit",
  "Luxembourgish",
- "Myanmar",
+ "Burmese",
  "Tibetan",
  "Tagalog",
  "Malagasy",
@@ -171,5 +169,11 @@
  "Bashkir",
  "Javanese",
  "Sundanese",
- "Cantonese"
+ "Cantonese",
+ "The partial download is larger than expected. Remove it before retrying.",
+ "The downloaded model is larger than expected.",
+ "The update version number is not valid.",
+ "The running version number is not valid.",
+ "Choose a supported export format: TXT, MD, JSON, CSV, SRT, VTT or DOCX.",
+ "Whisper returned invalid timestamps."
 ]

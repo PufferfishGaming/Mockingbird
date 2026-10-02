@@ -41,7 +41,7 @@ public static class BackendRuntimes
     public static async Task InstallArchivesAsync(RuntimePaths paths, string engine, string backend, ModelStore store, IProgress<DownloadProgress>? progress, CancellationToken token)
     {
         var assets = DownloadAssets(engine, backend);
-        if (assets.Count == 0) throw new InvalidOperationException(Loc.T("No pinned Windows package is provided for this engine/backend. Import a compatible build instead; Canary requires ABI 0.2.4."));
+        if (assets.Count == 0) throw new InvalidOperationException(Loc.T("No fixed-version Windows package is provided for this engine/backend. Import a compatible build instead; Canary requires ABI 0.2.4."));
         var target = Folder(paths, engine, backend);
         var staging = target + ".install-" + Guid.NewGuid().ToString("N"); Directory.CreateDirectory(staging);
         foreach (var asset in assets)

@@ -91,7 +91,7 @@ public sealed partial class ShellViewModel
         var acceptingProgress = true;
         try
         {
-            BackendProgress = T("Downloading pinned {0} {1} runtime…", T(RuntimeEngine), RuntimeBackend);
+            BackendProgress = T("Downloading the fixed-version {0} {1} runtime…", T(RuntimeEngine), RuntimeBackend);
             await BackendRuntimes.InstallArchivesAsync(runtimes, RuntimeEngine, RuntimeBackend, models,
                 new Progress<TriAsr.Infrastructure.DownloadProgress>(value => { if (acceptingProgress) BackendProgress = T("Runtime download: {0:0} / {1:0} MiB · SHA256 checked before extraction", value.Received / 1048576d, value.Total / 1048576d); }), _modelCancellation.Token);
             acceptingProgress = false;

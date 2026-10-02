@@ -100,7 +100,7 @@ public static class LanguageCatalog
         new("mt", "Maltese"),
         new("sa", "Sanskrit"),
         new("lb", "Luxembourgish"),
-        new("my", "Myanmar"),
+        new("my", "Burmese"),
         new("bo", "Tibetan"),
         new("tl", "Tagalog"),
         new("mg", "Malagasy"),

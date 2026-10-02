@@ -137,7 +137,7 @@ public partial class MainWindow : Window
             case System.Windows.Input.Key.Space: if (_playing) { Player.Pause(); _playing = false; } else { Player.Play(); _playing = true; } break;
             case System.Windows.Input.Key.D1: vm.UseWhisperCommand.Execute(null); break;
             case System.Windows.Input.Key.D2: vm.UseCanaryCommand.Execute(null); break;
-            case System.Windows.Input.Key.D3: vm.UseAiCommand.Execute(null); break;
+            case System.Windows.Input.Key.D3: vm.UseAutomaticCommand.Execute(null); break;
             case System.Windows.Input.Key.E: TranscriptEditor.Focus(); break;
             case System.Windows.Input.Key.J: vm.MoveReview(1); break;
             case System.Windows.Input.Key.K: vm.MoveReview(-1); break;

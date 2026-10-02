@@ -53,11 +53,24 @@ public sealed class Loc : INotifyPropertyChanged
     public static string T(string text) => Instance.Translate(text);
 
     /// <summary>
-    /// Translates a format string and fills it in with the user's regional number and date formats. A text argument that is itself a known text
-    /// (a message from a lower layer, a name from a list) is translated too; anything else, such as a file path or a system message, is left alone.
+    /// Translates a format string and fills it in with the user's regional number and date formats. The arguments are facts and are put in as they
+    /// are: a file name, a path or a program's output is never looked up. An argument that is itself a text to translate (a name from a list) is
+    /// passed through <c>T(...)</c> by the caller, and a message from a layer below the app through <see cref="Describe"/>.
     /// </summary>
     public static string T(string format, params object?[] args) =>
-        string.Format(CultureInfo.CurrentCulture, Instance.Translate(format), args.Select(argument => argument is string text ? Instance.Translate(text) : argument).ToArray());
+        string.Format(CultureInfo.CurrentCulture, Instance.Translate(format), args);
+
+    /// <summary>
+    /// A message that came from a layer below the app. A fixed sentence (listed in extra-keys.json) is translated as it stands; a sentence with a
+    /// number or a name inside is matched with its template (<see cref="LowerLayerMessages"/>) and translated with the same facts. Anything else,
+    /// such as the output of a program, comes back as it was written.
+    /// </summary>
+    public static string Describe(string message)
+    {
+        if (message.Length == 0 || Instance.Language == English) return message;
+        var translated = Instance.Translate(message);
+        return translated != message ? translated : LowerLayerMessages.Translate(message) ?? message;
+    }
 
     /// <summary>Marks a text that is shown later (in a list of choices, say) so that it is translated and checked like the others.</summary>
     public static string Key(string text) => text;

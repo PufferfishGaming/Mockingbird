@@ -65,7 +65,10 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [ObservableProperty] private string _transcriptionProgressSummary = "0% · 0/7 stages finished";
     private Guid? _progressJob;
     [ObservableProperty] private TranscriptionJob? _selectedJob;
-    public IReadOnlyList<LanguageOption> Languages { get; } = LanguageCatalog.All.Prepend(new LanguageOption("auto", Loc.Key("Auto-detect language"))).ToArray();
+    private static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
+    private IReadOnlyList<LanguageOption>? _languagesInOrder;
+    /// <summary>Auto-detect first, then every language in alphabetical order of the names shown in the interface language.</summary>
+    public IReadOnlyList<LanguageOption> Languages => _languagesInOrder ??= LanguageText.InOrder(LanguageCatalog.All).Prepend(AutoDetect).ToArray();
     /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is listed only while Settings ask for it, and it never blocks a transcription.</summary>
     public string Readiness
     {
@@ -157,9 +160,9 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             var index = existing is null ? -1 : Jobs.IndexOf(existing);
             if (index >= 0) Jobs[index] = job; else Jobs.Insert(0, job);
             if (!IsWatchBusy || IsProcessing) SelectedJob = job; // a watched recording must not move the user's selection
-            Status = job.Error is { } failure ? T(failure) : JobText.State(job.State);
+            Status = job.Error is { } failure ? Loc.Describe(failure) : JobText.State(job.State);
             activity.Append("job", $"{job.Id:N} · {job.State}" + (job.Error is null ? "" : " · " + job.Error));
-            if (job.Error is not null) ReportError(T("Transcription needs attention"), T(job.Error));
+            if (job.Error is not null) ReportError(T("Transcription needs attention"), job.Error);
         });
         queue.JobChanged += UpdateJob;
         pipeline.JobChanged += UpdateJob;
@@ -267,7 +270,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             var profile = await hardware.DetectAsync(storage.Root, runtimes.Whisper);
             Hardware = profile;
             UpdateRecommendation();
-            EngineStatus = T("{0} CPU threads · {1}", profile.Topology.LogicalProcessors, profile.Gpus.FirstOrDefault()?.Name ?? T("CPU only"));
+            ShowHardwareStatus(profile);
             var path = System.IO.Path.Combine(storage.Root, "Config", "hardware-profile.json");
             if (System.IO.File.Exists(path))
             {
@@ -285,7 +288,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             await RefreshBackendsAsync();
             if (HardwareChanged) Status = T("Hardware configuration changed. Performance optimization should be rerun.");
         }
-        catch (Exception error) { Hardware = null; SystemSummary = T("System check failed. Retry before downloading or tuning."); Diagnostics = T("Hardware detection failed: {0}", error.Message); ReportError(T("System check failed"), error.Message); logger.LogWarning(error, "Hardware probe failed: {ErrorType}", error.GetType().Name); }
+        catch (Exception error) { Hardware = null; SystemSummary = T("System check failed. Retry before downloading or tuning."); Diagnostics = T("Hardware detection failed: {0}", Loc.Describe(error.Message)); ReportError(T("System check failed"), error.Message); logger.LogWarning(error, "Hardware probe failed: {ErrorType}", error.GetType().Name); }
         finally { IsCheckingSystem = false; }
     }
     [RelayCommand] private void CopyDiagnostics()
@@ -311,30 +314,36 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             ShowReviewSummary();
             var loopRegions = Regions.Where(region => region.Original.Warnings?.Contains(TriAsr.Fusion.TranscriptQuality.RepetitionWarning) == true).ToArray();
             if (loopRegions.Length > 0)
-                ReportError(T("Possible transcription repetition loop"), T("{0} regions contain a long consecutive repeating pattern. Use Needs listening and play those regions before exporting. Repeated text is preserved because it may be genuinely sung or spoken.", loopRegions.Length));
+                ReportError(T("Possible transcription repetition loop"), T("Regions with a long consecutive repeating pattern: {0}. Use Needs listening and play those regions before exporting. Repeated text is preserved because it may be genuinely sung or spoken.", loopRegions.Length));
             SelectedPage = Navigation.First(item => item.Name == "Review");
             var whisperPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "whisper.json");
             var whisper = System.IO.File.Exists(whisperPath) ? JsonSerializer.Deserialize<EngineTranscript>(await System.IO.File.ReadAllTextAsync(whisperPath)) : null;
             RawWhisper = whisper?.Text ?? "";
             var canaryPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "canary.json");
-            RawCanary = System.IO.File.Exists(canaryPath)
-                ? JsonSerializer.Deserialize<TriAsr.Engine.Canary.CanaryNative.Result>(await System.IO.File.ReadAllTextAsync(canaryPath))?.Transcript.Text ?? ""
+            // Without Canary's text the box explains why; the explanation is kept in English and shown again in the new language after a switch.
+            _rawCanaryNote = System.IO.File.Exists(canaryPath) ? null
                 : System.IO.File.Exists(System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "Canary", "skipped-language.json"))
-                    ? T("This language is outside Canary's coverage. Whisper timestamps and text are preserved; all regions require listening.")
-                    : T("Canary did not complete. All regions require listening.");
+                    ? Loc.Key("This language is outside Canary's coverage. Whisper timestamps and text are preserved; all regions require listening.")
+                    : Loc.Key("Canary did not complete. All regions require listening.");
+            RawCanary = _rawCanaryNote is { } note ? T(note)
+                : JsonSerializer.Deserialize<TriAsr.Engine.Canary.CanaryNative.Result>(await System.IO.File.ReadAllTextAsync(canaryPath))?.Transcript.Text ?? "";
             EngineStatus = whisper is null ? T("Canary only · no native timestamps · listening required") : $"Whisper · {whisper.ActualBackend} · {whisper.Device}";
         }
         catch (Exception error) { ReportError(T("Cannot open transcript"), error.Message); }
     }
+    private string? _rawCanaryNote;
+    private string _hardwareStatus = "";
+    private void ShowHardwareStatus(HardwareProfile profile) =>
+        EngineStatus = _hardwareStatus = T("CPU threads: {0} · {1}", profile.Topology.LogicalProcessors, profile.Gpus.FirstOrDefault()?.Name ?? T("CPU only"));
     private void ShowReviewSummary()
     {
         if (_review is null) return;
-        ReviewSummary = T("{0} · {1} regions · {2} need listening", _review.Language.ToUpperInvariant(), Regions.Count, Regions.Count(region => region.IsUncertain));
+        ReviewSummary = T("{0} · regions: {1} · to listen to: {2}", _review.Language.ToUpperInvariant(), Regions.Count, Regions.Count(region => region.IsUncertain));
     }
     public FinalTranscript? CurrentTranscript => _review is null ? null : _review with { Regions = Regions.Select(region => region.Snapshot()).ToArray() };
     [RelayCommand] private void UseWhisper() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.Whisper; }
     [RelayCommand] private void UseCanary() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.Canary; }
-    [RelayCommand] private void UseAi() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.MachineText; }
+    [RelayCommand] private void UseAutomatic() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.MachineText; }
     public void MoveReview(int direction)
     {
         var visible = ReviewItems.Cast<ReviewRegion>().Where(region => region.IsUncertain || region.Source == "llm-arbitrated").ToArray();

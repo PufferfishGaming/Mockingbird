@@ -49,7 +49,7 @@ public sealed class ProcessRunner(ActivityFeed? activity = null) : IProcessRunne
             await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
             activity?.Append("stop", name + (cancellationToken.IsCancellationRequested ? " cancelled" : " timed out"));
             if (cancellationToken.IsCancellationRequested) throw;
-            throw new TimeoutException($"Worker exceeded {request.Timeout.TotalSeconds:0} seconds.");
+            throw new TimeoutException($"The processing task timed out after {request.Timeout.TotalSeconds:0} seconds.");
         }
         finally { sampling.Cancel(); await memorySampling.ConfigureAwait(false); }
         double? cpuSeconds = null;

@@ -24,11 +24,42 @@ internal static partial class TranslationSources
         throw new InvalidOperationException("The repository root was not found.");
     }
 
+    // Folders the build writes into: generated copies of the sources, never shown to anyone.
+    private static bool IsBuildOutput(string path) => path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) || path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar);
+
+    /// <summary>Every XAML file of the app, in nested folders too (themes, controls).</summary>
     public static IEnumerable<string> XamlFiles(bool includeLiteralWindows = false) =>
-        Directory.EnumerateFiles(AppFolder, "*.xaml").Where(path => includeLiteralWindows || !LiteralWindows.Contains(Path.GetFileName(path)));
+        Directory.EnumerateFiles(AppFolder, "*.xaml", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(path) && (includeLiteralWindows || !LiteralWindows.Contains(Path.GetFileName(path))));
 
     public static IEnumerable<string> CodeFiles(bool includeHarness = false) =>
         Directory.EnumerateFiles(AppFolder, "*.cs").Where(path => includeHarness || !HarnessFiles.Contains(Path.GetFileName(path)));
+
+    /// <summary>The source of the layers below the app, where the messages listed in extra-keys.json and in <c>LowerLayerMessages</c> are written.</summary>
+    public static string LowerLayerSource() =>
+        string.Join('\n', Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(path) && !path.StartsWith(AppFolder + Path.DirectorySeparatorChar)).Select(File.ReadAllText));
+
+    /// <summary>
+    /// Properties that XAML shows as they are. Each one holds either a text the view model builds in the interface language (and builds again
+    /// after a language change), the user's own words or a path, or a value that is not words. Showing any other bound property directly is how
+    /// an untranslated message slips through, so a new one has to be added here on purpose or shown through <c>{local:Tr ...}</c>.
+    /// </summary>
+    public static readonly IReadOnlySet<string> ShownAsTheyAre = new HashSet<string>
+    {
+        // built by the view model in the interface language, rebuilt after a language change
+        "ErrorTitle", "ErrorMessage", "UpdateTitle", "UpdateDetail", "UpdateStatusText", "SetupTitle", "SetupDetail", "TranscriptionStage", "TranscriptionProgressSummary",
+        "TerminalStatus", "Readiness", "ModelProgress", "WatchStatus", "ReviewSummary", "SystemSummary", "Recommendation", "RecommendedDownloadSummary",
+        "BenchmarkProgress", "BenchmarkSummary", "SavedLanguageSummary", "LanguageCoverage", "LanguageSetupStatus", "BackendProgress", "ActiveBackendSummary",
+        "ThemeSummary", "ResourceSummary", "StorageSummary", "EngineStatus", "Status", "Title", "Details", "SetupStartLabel", "SetupDismissLabel", "TerminalSendLabel",
+        // a review region's texts, announced again by ReviewRegion.NotifyLanguageChanged
+        "Time", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
+        // the user's own words, program output, paths and numbers
+        "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Location",
+        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend",
+        // the name of a language in that language
+        "NativeName"
+    };
 
     /// <summary>The code files whose assignments and error reports must all go through a lookup.</summary>
     public static IEnumerable<string> ShownTextFiles() => CodeFiles().Where(path => !SmokeCodeFiles.Contains(Path.GetFileName(path)));

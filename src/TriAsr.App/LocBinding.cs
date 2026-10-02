@@ -47,7 +47,7 @@ public sealed class TranslateConverter : IMultiValueConverter
         null => "",
         LanguageOption language => LanguageText.Of(language),
         JobState state => JobText.State(state),
-        string text => Loc.T(text),
+        string text => Loc.Describe(text),
         _ => Loc.T(value.ToString() ?? "")
     };
 }
@@ -56,6 +56,13 @@ public sealed class TranslateConverter : IMultiValueConverter
 public static class LanguageText
 {
     public static string Of(LanguageOption language) => language.Code == "auto" ? Loc.T(language.Name) : $"{Loc.T(language.Name)} ({language.Code})";
+
+    /// <summary>The languages in alphabetical order of the names the interface shows, by the rules of the interface language (the catalog itself keeps Whisper's order).</summary>
+    public static IReadOnlyList<LanguageOption> InOrder(IEnumerable<LanguageOption> languages)
+    {
+        var compare = CultureInfo.GetCultureInfo(Loc.Instance.Language).CompareInfo;
+        return languages.OrderBy(Of, Comparer<string>.Create((first, second) => compare.Compare(first, second, CompareOptions.IgnoreCase))).ToArray();
+    }
 }
 
 /// <summary>Job states and checkpoints in plain words.</summary>
@@ -71,7 +78,26 @@ public static class JobText
     };
 
     /// <summary>A checkpoint is the name of a state, or "normalized" once the audio has been converted.</summary>
-    public static string Checkpoint(string text) => Enum.TryParse<JobState>(text, out var state) ? State(state) : Loc.T(text == "normalized" ? "Audio prepared" : text);
+    public static string Checkpoint(string text) => Enum.TryParse<JobState>(text, out var state) ? State(state) : text == "normalized" ? Loc.T("Audio prepared") : Loc.T(text);
+}
+
+/// <summary>How a transcript region came about, in plain words. The saved identifier stays as it is; only what is shown is a sentence.</summary>
+public static class SourceText
+{
+    public static string Of(string source) => Loc.T(source switch
+    {
+        "single-asr-needs-listening" => Loc.Key("one engine · needs listening"),
+        "llm-arbitrated" => Loc.Key("chosen by the correction model"),
+        _ => source
+    });
+}
+
+/// <summary>The source of a region (see <see cref="SourceText"/>), for use in a MultiBinding with <see cref="Loc.Version"/>.</summary>
+public sealed class SourceConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture) => values.Length > 0 && values[0] is string source ? SourceText.Of(source) : "";
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
 /// <summary>The checkpoint of a job (a stage name or "normalized") translated, for use in a MultiBinding with <see cref="Loc.Version"/>.</summary>
@@ -82,7 +108,7 @@ public sealed class CheckpointConverter : IMultiValueConverter
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
-public enum TrKind { Text, Checkpoint, BenchmarkMeaning, BenchmarkBackend }
+public enum TrKind { Text, Checkpoint, Source, BenchmarkMeaning, BenchmarkBackend }
 
 /// <summary>
 /// <c>{local:Tr Path}</c> in XAML: the bound value shown in the interface language, refreshed when the language changes. The value itself stays
@@ -103,6 +129,7 @@ public sealed class TrExtension : MarkupExtension
         var multi = new MultiBinding { Mode = BindingMode.OneWay, Converter = Kind switch
         {
             TrKind.Checkpoint => new CheckpointConverter(),
+            TrKind.Source => new SourceConverter(),
             TrKind.BenchmarkMeaning => new BenchmarkTextConverter(false),
             TrKind.BenchmarkBackend => new BenchmarkTextConverter(true),
             _ => new TranslateConverter()

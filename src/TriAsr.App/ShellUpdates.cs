@@ -95,7 +95,7 @@ public sealed partial class ShellViewModel
             else if (code is 0 or 3010)
                 SetUpdateStatus(() => T("The installer finished, but you are running {0} instead of v{1}.", AppInfo.VersionLabel, version));
             else
-                ReportError(T("The last update did not finish"), T("The installer returned code {0}, so you are still on {1}. Choose Check for updates in Settings to try again, or download the installer from the project's GitHub release page.", code, AppInfo.VersionLabel));
+                ReportError(T("The last update did not finish"), T("The installer returned code {0}, so you are still on {1}. Choose Check for updates now in Settings to try again, or download the installer from the project's GitHub release page.", code, AppInfo.VersionLabel));
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
         { logger.LogWarning("Update result could not be read: {ErrorType}", error.GetType().Name); }
@@ -149,7 +149,7 @@ public sealed partial class ShellViewModel
     {
         UpdateTitle = T("Version {0} is available", offer.VersionText);
         var notes = string.IsNullOrWhiteSpace(offer.Notes) ? "" : offer.Notes + "\n";
-        UpdateDetail = notes + T("You are running {0}. Download size {1:0} MB, checked against its SHA256 before it runs.", AppInfo.VersionLabel, offer.Bytes / 1048576d)
+        UpdateDetail = notes + T("You are running {0}. Download size {1:0} MiB, checked against its SHA256 before it runs.", AppInfo.VersionLabel, offer.Bytes / 1048576d)
             + (CanSelfUpdate ? "" : " " + T("This copy is not the installed app, so it cannot update itself; use the installer from the release page."));
         UpdatePercent = 0;
         UpdateBannerVisible = true;
@@ -175,7 +175,7 @@ public sealed partial class ShellViewModel
             var progress = new Progress<DownloadProgress>(value =>
             {
                 UpdatePercent = value.Total == 0 ? 0 : value.Received * 100d / value.Total;
-                SetUpdateDetail(() => T("Downloading {0:0} / {1:0} MB · checked against SHA256 before it runs", value.Received / 1048576d, value.Total / 1048576d));
+                SetUpdateDetail(() => T("Downloading {0:0} / {1:0} MiB · checked against SHA256 before it runs", value.Received / 1048576d, value.Total / 1048576d));
             });
             var setup = await updates.DownloadAsync(offer, UpdateDirectory, progress, token);
             token.ThrowIfCancellationRequested();
@@ -211,6 +211,6 @@ public sealed partial class ShellViewModel
     {
         HttpRequestException => T("GitHub could not be reached. Check your internet connection and try again."),
         OperationCanceledException => T("The update server did not respond in time."),
-        _ => T(error.Message)
+        _ => Loc.Describe(error.Message)
     };
 }

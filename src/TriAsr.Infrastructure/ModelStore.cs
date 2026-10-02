@@ -103,7 +103,7 @@ public sealed class ModelStore(string root, HttpClient? http = null) : IDisposab
             }
             var partial = destination + ".partial";
             var offset = File.Exists(partial) ? new FileInfo(partial).Length : 0;
-            if (offset > model.Bytes) throw new InvalidDataException("Partial model is larger than its manifest entry.");
+            if (offset > model.Bytes) throw new InvalidDataException("The partial download is larger than expected. Remove it before retrying.");
             var free = new DriveInfo(Path.GetPathRoot(destination)!).AvailableFreeSpace;
             if (free < model.Bytes - offset + 128L * 1024 * 1024) throw new IOException("Insufficient free space for this model download.");
             if (offset < model.Bytes)
@@ -127,7 +127,7 @@ public sealed class ModelStore(string root, HttpClient? http = null) : IDisposab
                 while ((read = await input.ReadAsync(buffer, token)) > 0)
                 {
                     received += read;
-                    if (received > model.Bytes) throw new InvalidDataException("Model download exceeds manifest size.");
+                    if (received > model.Bytes) throw new InvalidDataException("The downloaded model is larger than expected.");
                     await output.WriteAsync(buffer.AsMemory(0, read), token);
                     if (elapsed.Elapsed - previous > TimeSpan.FromMilliseconds(250))
                     { progress?.Report(new(received, model.Bytes, (received - offset) / Math.Max(.001, elapsed.Elapsed.TotalSeconds))); previous = elapsed.Elapsed; }
