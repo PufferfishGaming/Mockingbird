@@ -7,7 +7,7 @@ namespace TriAsr.App;
 
 public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = 1, bool AnimateErrors = true,
     bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto",
-    bool SkipNonSpeech = false, bool UseCorrectionModel = false);
+    bool SkipNonSpeech = false, bool UseCorrectionModel = false, string SetupState = SetupPlan.Pending);
 
 public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)
 {
@@ -29,7 +29,8 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
             {
                 Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System",
                 Density = settings.Density is "Comfortable" or "Compact" ? settings.Density : "Comfortable",
-                ResourceProfile = settings.ResourceProfile is "Auto" or "Quiet" or "Default" or "Max" ? settings.ResourceProfile : "Auto"
+                ResourceProfile = settings.ResourceProfile is "Auto" or "Quiet" or "Default" or "Max" ? settings.ResourceProfile : "Auto",
+                SetupState = SetupPlan.Normalize(settings.SetupState)
             };
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)

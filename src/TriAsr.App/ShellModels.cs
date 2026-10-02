@@ -98,7 +98,7 @@ public sealed partial class ShellViewModel
     }
     private bool SetupBusy()
     {
-        if (!IsProcessing && !IsModelBusy && !IsBenchmarking && !IsCheckingSystem) return false;
+        if (!IsProcessing && !IsModelBusy && !IsBenchmarking && !IsCheckingSystem && !SetupRunning) return false;
         ReportError("Setup is busy", "Finish or cancel the current operation before changing models or tuning."); return true;
     }
     [RelayCommand]

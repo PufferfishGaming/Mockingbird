@@ -251,6 +251,69 @@ public partial class App : System.Windows.Application
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "setup-smoke.json"), JsonSerializer.Serialize(new
                     { savedModels = recommended.Select(card => card.Entry.Id), restartRestored = true, languageSetupRestored = true, networkDownloadNeeded = false }));
                 }
+                if (e.Args.Contains("--first-run-download-smoke"))
+                {
+                    // Needs TRIASR_MODEL_ROOT to point at an empty folder: starts the real download, watches the banner follow it, cancels, and checks the partial file is kept.
+                    var modelRoot = Environment.GetEnvironmentVariable("TRIASR_MODEL_ROOT");
+                    if (string.IsNullOrEmpty(modelRoot)) throw new InvalidOperationException("Set TRIASR_MODEL_ROOT to an empty folder first.");
+                    if (shell.SetupPhase != SetupStage.Offer || !shell.SetupDetail.Contains("Downloads the speech models") || !shell.SetupDetail.Contains("GiB"))
+                        throw new InvalidOperationException($"With no models the banner should offer a download, but says: {shell.SetupPhase} · {shell.SetupDetail}");
+                    shell.SelectedPage = shell.Navigation[0];
+                    window.Width = 1220;
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "setup-offer-download.png"), 1220, 400, 1);
+                    var running = shell.RunSetupCommand.ExecuteAsync(null);
+                    var deadline = DateTime.UtcNow.AddSeconds(180);
+                    while (DateTime.UtcNow < deadline && !(shell.SetupTitle.Contains("Downloading") && shell.SetupPercent > 0.5)) await Task.Delay(250);
+                    if (!shell.SetupTitle.Contains("Downloading") || shell.SetupPercent <= 0.5) throw new InvalidOperationException($"The download did not start: {shell.SetupTitle} · {shell.SetupDetail} · {shell.ErrorMessage}");
+                    await Task.Delay(1500);
+                    var seen = new { shell.SetupTitle, shell.SetupDetail, shell.SetupPercent, shell.SetupIndeterminate };
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "setup-downloading.png"), 1220, 400, 1);
+                    shell.CancelSetupCommand.Execute(null);
+                    await running;
+                    if (shell.SetupPhase != SetupStage.Problem || !shell.SetupTitle.Contains("paused")) throw new InvalidOperationException($"Cancelling should pause setup, but it is {shell.SetupPhase}: {shell.SetupTitle}");
+                    var partialBytes = Directory.EnumerateFiles(modelRoot, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length);
+                    if (partialBytes <= 0) throw new InvalidOperationException("The partial download was not kept.");
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "setup-paused.png"), 1220, 400, 1);
+                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "first-run-download-smoke.json"), JsonSerializer.Serialize(new
+                    { seen, partialMiB = partialBytes / 1048576d, paused = shell.SetupTitle, startLabel = shell.SetupStartLabel, shell.SetupDetail }, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                if (e.Args.Contains("--first-run-smoke"))
+                {
+                    // Models come from the machine's model repository (a smoke test never downloads gigabytes); the data root is fresh, so setup is pending.
+                    if (shell.SetupPhase != SetupStage.Offer) throw new InvalidOperationException($"A fresh data root should be offered setup, but the banner is {shell.SetupPhase}.");
+                    shell.SelectedPage = shell.Navigation[0];
+                    window.Width = 1220;
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "setup-offer.png"), 1220, 760, 1);
+                    var steps = new List<string>();
+                    shell.PropertyChanged += (_, change) =>
+                    {
+                        if (change.PropertyName != nameof(ShellViewModel.SetupTitle) || steps.LastOrDefault() == shell.SetupTitle) return;
+                        steps.Add(shell.SetupTitle); logger.LogInformation("Setup: {Step}", shell.SetupTitle);
+                        if (shell.SetupTitle.Contains("Measuring")) ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "setup-running.png"), 1220, 760, 1);
+                    };
+                    await shell.RunSetupCommand.ExecuteAsync(null);
+                    if (shell.SetupPhase != SetupStage.Done) throw new InvalidOperationException($"Setup ended as {shell.SetupPhase}: {shell.SetupTitle} · {shell.SetupDetail} · {shell.ErrorMessage}");
+                    var profilePath = Path.Combine(dataRoot, "Config", "tuning-results.json");
+                    var activePath = Path.Combine(dataRoot, "Config", "active-execution.json");
+                    if (!File.Exists(profilePath) || !File.Exists(activePath)) throw new InvalidOperationException("Setup did not save measured and applied speed settings.");
+                    var profile = JsonSerializer.Deserialize<TriAsr.Benchmark.ExecutionProfile>(await File.ReadAllTextAsync(profilePath))!;
+                    if (!profile.Results.Any(row => row.Engine == "Whisper" && row.Error is null) || !profile.Results.Any(row => row.Engine == "Canary" && row.Error is null))
+                        throw new InvalidOperationException("Setup tuning has no measured Whisper and Canary row.");
+                    if (!shell.BenchmarkSummary.StartsWith("Active")) throw new InvalidOperationException("Setup did not apply the measured settings: " + shell.BenchmarkSummary);
+                    await Task.Delay(500);
+                    var saved = await _host.Services.GetRequiredService<SettingsStore>().LoadAsync();
+                    if (saved.SetupState != SetupPlan.Done) throw new InvalidOperationException("Setup completion was not saved.");
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "setup-done.png"), 1220, 760, 1);
+                    shell.DismissSetupCommand.Execute(null);
+                    if (shell.SetupBannerVisible) throw new InvalidOperationException("The finished banner did not close.");
+                    var testSpeech = Path.Combine(dataRoot, "Setup", "test-speech.wav");
+                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "first-run-smoke.json"), JsonSerializer.Serialize(new
+                    { steps, testSpeechSeconds = TriAsr.Audio.WaveAudio.Inspect(testSpeech).DurationSeconds, profile.WhisperBackend, profile.WhisperThreads, profile.CanaryBackend, profile.CanaryThreads, profile.CorrectionBackend, profile.ParallelSpeech, settled = shell.SetupDetail },
+                        new JsonSerializerOptions { WriteIndented = true }));
+                }
                 if (e.Args.Contains("--benchmark-smoke"))
                 {
                     shell.SourcePath = e.Args.Last();

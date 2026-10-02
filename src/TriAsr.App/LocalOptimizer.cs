@@ -19,7 +19,9 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         var fingerprint = paths.ConfigurationFingerprint(hardware.Fingerprint);
         var directory = Path.Combine(storage.Root, "Benchmarks", DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        foreach (var path in new[] { paths.WhisperModel, paths.CanaryModel, paths.CorrectionModel })
+        // The correction model is optional (Settings, off by default): it is measured only when it is installed.
+        var correctionInstalled = File.Exists(paths.CorrectionModel);
+        foreach (var path in correctionInstalled ? new[] { paths.WhisperModel, paths.CanaryModel, paths.CorrectionModel } : [paths.WhisperModel, paths.CanaryModel])
         {
             var entry = ModelManifest.Entries.First(item => models.PathFor(item) == path);
             progress?.Report("Verifying " + entry.Name);
@@ -35,7 +37,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         var budget = governor.For(ResourceProfile.Default).Threads; // tuning never tests more threads than a normal job may use
         var defaultThreads = Math.Clamp(hardware.Topology.PerformanceCores ?? hardware.Topology.LogicalProcessors / 2, 1, Math.Min(12, budget));
         var vram = hardware.Gpus.MaxBy(gpu => gpu.DedicatedBytes)?.DedicatedBytes ?? 0;
-        var gpuAllowed = GpuMemoryPlanner.Fits(vram, (ulong)Math.Max(new FileInfo(paths.WhisperModel).Length, new FileInfo(paths.CorrectionModel).Length), 1024UL * 1024 * 1024, 512UL * 1024 * 1024, 1024UL * 1024 * 1024);
+        var gpuAllowed = GpuMemoryPlanner.Fits(vram, (ulong)Math.Max(new FileInfo(paths.WhisperModel).Length, correctionInstalled ? new FileInfo(paths.CorrectionModel).Length : 0), 1024UL * 1024 * 1024, 512UL * 1024 * 1024, 1024UL * 1024 * 1024);
         var backends = new[] { "Whisper", "Canary", "Correction" }.SelectMany(engine => BackendRuntimes.Candidates(paths, hardware, engine))
             .Where(backend => backend == "cpu" || gpuAllowed).Distinct().OrderBy(backend => backend == "cpu" ? 1 : 0).ToArray();
         var detectionBackend = BackendRuntimes.Candidates(paths, hardware, "Whisper").Where(backend => backend == "cpu" || gpuAllowed).OrderBy(backend => backend == "cpu" ? 1 : 0).First();
@@ -108,8 +110,9 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
                 results.Add(row); measurements?.Report(row); await SaveResults(directory, results, token);
             }
         }
-        var correctionBest = results.Where(row => row.Engine == "Correction" && row.Model == ModelManifest.Entries.First(item => models.PathFor(item) == paths.CorrectionModel).Id && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds)
-            ?? throw new InvalidOperationException("No correction configuration passed. The previous tuning profile is preserved.");
+        var correctionBest = results.Where(row => row.Engine == "Correction" && row.Model == ModelManifest.Entries.First(item => models.PathFor(item) == paths.CorrectionModel).Id && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds);
+        if (correctionBest is null && correctionInstalled) throw new InvalidOperationException("No correction configuration passed. The previous tuning profile is preserved.");
+        var (correctionBackend, correctionThreads) = correctionBest is null ? ("cpu", defaultThreads) : (correctionBest.Backend, correctionBest.Threads);
         var combinedWeights = (ulong)(new FileInfo(paths.WhisperModel).Length + new FileInfo(paths.CanaryModel).Length);
         var parallelSafe = hardware.RamBytes >= 16UL * 1024 * 1024 * 1024 &&
             (whisperBest.Backend == "cpu" || canaryBest.Backend == "cpu" || GpuMemoryPlanner.Fits(vram, combinedWeights, 3UL * 1024 * 1024 * 1024, 0, 2UL * 1024 * 1024 * 1024));
@@ -129,7 +132,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         var strategy = results.Where(row => row.Engine == "Dual ASR" && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds)
             ?? throw new InvalidOperationException("No dual-engine strategy passed. The previous tuning profile is preserved.");
         var profile = new ExecutionProfile(fingerprint, whisperBest.Backend, whisperBest.Threads, canaryBest.Backend, canaryBest.Threads,
-            correctionBest.Backend, correctionBest.Threads, strategy.Strategy == "parallel", DateTimeOffset.UtcNow, results);
+            correctionBackend, correctionThreads, strategy.Strategy == "parallel", DateTimeOffset.UtcNow, results);
         await File.WriteAllTextAsync(Path.Combine(directory, "profile.json"), JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true }), token);
         var destination = Path.Combine(storage.Root, "Config", "tuning-results.json");
         var temporary = destination + ".tmp";

@@ -19,7 +19,7 @@ public sealed record NavigationItem(string Name, string Title, string Icon, bool
 public sealed partial class ShellViewModel(SettingsStore store, ThemeManager themes, ILogger<ShellViewModel> logger,
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
-    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor) : ObservableObject
+    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor, IProcessRunner processes) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
@@ -80,7 +80,9 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         }
     }
     public bool HasReadinessIssues => Readiness.Length > 0;
-    private void RefreshReadiness() { OnPropertyChanged(nameof(Readiness)); OnPropertyChanged(nameof(HasReadinessIssues)); }
+    /// <summary>The "missing files" card on New transcription; while setup runs, its banner reports the same download, so the card steps aside.</summary>
+    public bool ShowReadinessCard => HasReadinessIssues && !SetupRunning;
+    private void RefreshReadiness() { OnPropertyChanged(nameof(Readiness)); OnPropertyChanged(nameof(HasReadinessIssues)); OnPropertyChanged(nameof(ShowReadinessCard)); if (_initialized) RefreshSetupOffer(); }
     partial void OnSelectedLanguageChanged(string value) => RefreshReadiness();
     public ObservableCollection<ReviewRegion> Regions { get; } = [];
     public System.ComponentModel.ICollectionView ReviewItems { get; private set; } = null!;
@@ -123,6 +125,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RestoreUpdateSettings(settings);
         RestoreResourceSettings(settings);
         RestoreSpeechDetectionSettings(settings);
+        RestoreSetupSettings(settings);
         if (store.LastLoadError is not null) ReportError("Preferences could not be restored", "Defaults were loaded. " + store.LastLoadError);
         if (runtimes.StorageLoadError is not null) ReportError("Saved folders could not be restored", "Existing model files have not been removed. Select your previous model repository in Settings. " + runtimes.StorageLoadError);
         SelectedPage = Navigation[0];
@@ -158,6 +161,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         pipeline.ProgressChanged += (_, update) => System.Windows.Application.Current.Dispatcher.Invoke(() => ApplyTranscriptionProgress(update));
         stages.IssueOccurred += (_, issue) => System.Windows.Application.Current.Dispatcher.Invoke(() => ReportError(issue.Title, issue.Message));
         await ReadUpdateResultAsync();
+        RefreshSetupOffer();
         _initialized = true;
     }
     public void ApplyTranscriptionProgress(TranscriptionProgress update)
@@ -207,7 +211,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [RelayCommand]
     private async Task PrepareAudioAsync()
     {
-        if (IsProcessing || IsBenchmarking || IsModelBusy) return;
+        if (IsProcessing || IsBenchmarking || IsModelBusy || SetupRunning) return;
         if (!System.IO.File.Exists(SourcePath)) { ReportError("No recording selected", "Choose an existing audio or video file first."); return; }
         var missing = MissingRequiredModels();
         if (missing.Length > 0)
@@ -232,7 +236,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [RelayCommand]
     private async Task ResumeAudioAsync()
     {
-        if (SelectedJob is null || IsProcessing || IsBenchmarking || IsModelBusy) return;
+        if (SelectedJob is null || IsProcessing || IsBenchmarking || IsModelBusy || SetupRunning) return;
         IsProcessing = true;
         _jobCancellation = new();
         try { using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing"); var job = await pipeline.RunAsync(SelectedJob, _jobCancellation.Token); if (job.State == JobState.Complete) await OpenReviewAsync(); }

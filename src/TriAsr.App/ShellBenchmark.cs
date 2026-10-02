@@ -57,18 +57,24 @@ public sealed partial class ShellViewModel
         if (SetupBusy()) return;
         await DetectHardwareAsync();
         if (Hardware is null) return;
-        var missing = ModelCards.Where(card => card.Selected && !File.Exists(card.Location)).Select(card => card.Title).ToArray();
+        var missing = ModelCards.Where(card => card.Selected && card.Entry.Family != "Correction" && !File.Exists(card.Location)).Select(card => card.Title).ToArray();
         if (missing.Length > 0)
         {
-            ReportError("Models are not ready", "Download the recommended models, or install your selected models on Models, before tuning.\nMissing: " + string.Join(", ", missing));
-            BenchmarkProgress = "Step 2: download models first."; return;
+            ReportError("Models are not ready", "Download the recommended models on Models before tuning.\nMissing: " + string.Join(", ", missing));
+            BenchmarkProgress = "Download the models first."; return;
         }
         var source = File.Exists(SourcePath) ? SourcePath : SelectedJob?.SourcePath;
         if (source is null || !File.Exists(source))
         {
             ReportError("Choose a tuning recording", "Select a recording with at least three seconds of speech. Tuning uses up to eight seconds of it.");
-            BenchmarkProgress = "Step 3: choose a speech recording."; return;
+            BenchmarkProgress = "Choose a speech recording."; return;
         }
+        await RunTuningAsync(source);
+    }
+    /// <summary>Measures every setting on <paramref name="source"/> and keeps the result. False when tuning was cancelled or failed (the previous profile is kept).</summary>
+    private async Task<bool> RunTuningAsync(string source)
+    {
+        if (Hardware is null) return false;
         IsBenchmarking = true; _benchmarkCancellation = new(); using var awake = TriAsr.Infrastructure.SleepGuard.Begin("Mockingbird Studio is tuning");
         BenchmarkResults.Clear();
         try
@@ -82,13 +88,16 @@ public sealed partial class ShellViewModel
             BenchmarkResults.Clear(); foreach (var row in profile.Results) BenchmarkResults.Add(row);
             _measuredProfile = profile;
             RefreshBenchmarkApplicability();
+            if (_initialized) RefreshSetupOffer();
             BenchmarkProgress = "Tuning finished. Review the result, then press Apply all best settings to switch backends, thread counts and speech strategy together.";
             Status = "Tuning complete. Measured settings saved locally.";
+            return true;
         }
-        catch (OperationCanceledException) { BenchmarkProgress = "Tuning cancelled. Partial results are kept in Benchmarks; the previous saved profile is preserved."; }
-        catch (Exception error) { BenchmarkProgress = "Tuning stopped. The previous profile is preserved."; ReportError("Tuning failed", error.Message); }
+        catch (OperationCanceledException) { BenchmarkProgress = "Tuning cancelled. Partial results are kept in Benchmarks; the previous saved profile is preserved."; return false; }
+        catch (Exception error) { BenchmarkProgress = "Tuning stopped. The previous profile is preserved."; ReportError("Tuning failed", error.Message); _tuningError = error.Message; return false; }
         finally { _benchmarkCancellation.Dispose(); _benchmarkCancellation = null; IsBenchmarking = false; }
     }
+    private string? _tuningError;
     [RelayCommand] private void CancelBenchmark() => _benchmarkCancellation?.Cancel();
     private async Task LoadBenchmarkAsync()
     {
