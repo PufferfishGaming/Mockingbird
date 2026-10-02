@@ -1,22 +1,22 @@
-# Mockingbird Studio privacy policy
+# Mockingbird privacy policy
 
 Effective date: 1 October 2026
 
 ## Local processing
-Mockingbird Studio transcribes recordings and corrects transcripts on your computer. The application does not upload media or transcripts to a transcription service. It has no built-in analytics, account system, advertising or automatic crash-report upload.
+Mockingbird Studio, Mockingbird Server and Mockingbird Client share this policy; "the app" means the one you installed. Studio and Server transcribe recordings and correct transcripts on your computer. The Client does not transcribe anything itself: the recordings you choose are sent to the server you connect to, which transcribes them, and the transcripts come back; they go nowhere else. The application does not upload media or transcripts to a transcription service. It has no built-in analytics, account system, advertising or automatic crash-report upload.
 
 ## Files stored on your computer
 Projects may contain a source-media path and hash, normalized audio, raw engine output, transcripts, the changes you made while reviewing, checkpoints, hardware measurements and application logs. Models, partial downloads, records of checksum checks and settings are saved locally. These files can include personal information from your recordings or file paths. They are not encrypted by the application.
 
-Installed versions of the app use the legacy LocalAppData/TriASR directory unless you choose another project or model folder. This preserves existing installations. Uninstalling the app leaves projects, settings and downloaded models in place. To remove your data, close the app and delete the chosen folders yourself. Keep any recordings or exports you want to retain.
+Installed versions of the app use the legacy LocalAppData/TriASR directory unless you choose another project or model folder. This preserves existing installations. Uninstalling the app leaves projects, settings and downloaded models in place. To remove your data, close the app and delete the chosen folders yourself. Keep any recordings or exports you want to retain. Server keeps its files in LocalAppData/TriASR-Server and Client in LocalAppData/TriASR-Client.
 
 ## Network connections
 When you request model or runtime downloads, the app connects to Hugging Face or GitHub and their download infrastructure. Those providers receive normal connection information such as your IP address and the requested asset. Media and transcript contents are not included in these download requests. Provider privacy policies apply to their services:
 - https://huggingface.co/privacy
 - https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
 
-### Network API
-Off by default. If you switch it on in Settings, the app listens on a port of your computer so that other programs can send it recordings and fetch transcripts. Without "Allow other computers on the network" only programs on this computer can connect; with it, anyone on your network who has the API key can use it. Every request needs the key. The connection is not encrypted, so use it only on a network you trust. Recordings sent this way are saved in your projects folder like any other project. The API only answers requests; the app does not report its use to anyone.
+### Servers and the network
+Off by default (a newly installed Server edition turns it on, because serving is its purpose). While a server is on, the app listens on a port of your computer so that other computers and programs can send it recordings and fetch transcripts. Without "Reachable from other computers on the network" only programs on this computer can connect. With it, the server announces its name, address and certificate fingerprint to your local network (a UDP broadcast every two seconds), and every connection over the network is encrypted with a certificate the app makes for itself; a computer that connects for the first time shows its user the fingerprint to compare. A server can be protected with a password; without one, anyone who can reach it can use it. A password you ask a client to remember is stored protected by your Windows account; the password of a server is kept in its settings file, which is not encrypted, like the other files. Recordings sent to a server are saved in its projects folder like any other project and can be read by whoever runs that server. The app does not report any of this to anyone else.
 
 ### Update checks
 Unless you turn it off in Settings, the app asks GitHub for a small version file (latest.json) when it starts, at most every 12 hours, and whenever you choose Check for updates now. GitHub receives normal connection information such as your IP address, and the request carries the app's name and version. No recordings, transcripts, project data, hardware details or identifiers are sent. The app never installs an update by itself: you choose Update now, and the downloaded installer is checked against its published SHA256 checksum before it runs.

@@ -56,7 +56,7 @@ internal static partial class TranslationSources
         "Time", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
         // the user's own words, program output, paths and numbers
         "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Location",
-        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText",
+        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName",
         // the name of a language in that language
         "NativeName"
     };

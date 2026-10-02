@@ -806,5 +806,18 @@
  "Not connected: the server was not trusted.": "Sin conexión: no se confió en el servidor.",
  "Found {0}. Choose Connect.": "Se encontró {0}. Elija Conectar.",
  "That password was not accepted. Enter the password of {0} again.": "Esa contraseña no se aceptó. Introduzca de nuevo la contraseña de {0}.",
- "No server connected": "Ningún servidor conectado"
+ "No server connected": "Ningún servidor conectado",
+ "TRANSCRIPTION RUNS ON THE SERVER": "LA TRANSCRIPCIÓN SE EJECUTA EN EL SERVIDOR",
+ "Show or hide the panel with the servers on your network": "Mostrar u ocultar el panel con los servidores de su red",
+ "Connect to a server": "Conectar con un servidor",
+ "Your recordings are sent to a server, which transcribes them with the speech models installed there. The transcripts come back here to be read, edited and exported. Nothing is transcribed on this computer.": "Sus grabaciones se envían a un servidor, que las transcribe con los modelos de voz instalados allí. Las transcripciones vuelven aquí para leerlas, editarlas y exportarlas. En este equipo no se transcribe nada.",
+ "Pick a server in the list on the right. Servers on this network appear by themselves; you can also add one by its address. Connections are encrypted, and the first time you connect you check the server's fingerprint.": "Elija un servidor en la lista de la derecha. Los servidores de esta red aparecen solos; también puede añadir uno por su dirección. Las conexiones están cifradas y, la primera vez que se conecta, comprueba la huella del servidor.",
+ "Recordings and transcripts travel only between this computer and the server you connect to, and the connection is encrypted.": "Las grabaciones y las transcripciones viajan solo entre este equipo y el servidor al que se conecta, y la conexión está cifrada.",
+ "Not connected to a server": "Sin conexión con un servidor",
+ "SERVING": "EN SERVICIO",
+ "NOT SERVING": "FUERA DE SERVICIO",
+ "Waiting for recordings from other computers.": "Esperando grabaciones de otros equipos.",
+ "Recent recordings": "Grabaciones recientes",
+ "A recording is being transcribed. Closing now stops the server and cancels it.": "Se está transcribiendo una grabación. Si cierra ahora, el servidor se detiene y la transcripción se cancela.",
+ "Close the server?": "¿Cerrar el servidor?"
 }

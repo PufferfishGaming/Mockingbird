@@ -806,5 +806,18 @@
   "Not connected: the server was not trusted.": "Nincs kapcsolat: a szerver nem lett megbízhatónak jelölve.",
   "Found {0}. Choose Connect.": "Megtalálva: {0}. Válassza a Csatlakozás lehetőséget.",
   "That password was not accepted. Enter the password of {0} again.": "Ez a jelszó nem lett elfogadva. Adja meg újra {0} jelszavát.",
-  "No server connected": "Nincs csatlakoztatott szerver"
+  "No server connected": "Nincs csatlakoztatott szerver",
+  "TRANSCRIPTION RUNS ON THE SERVER": "AZ ÁTÍRÁS A SZERVEREN FUT",
+  "Show or hide the panel with the servers on your network": "A hálózaton elérhető szerverek paneljének megjelenítése vagy elrejtése",
+  "Connect to a server": "Csatlakozás szerverhez",
+  "Your recordings are sent to a server, which transcribes them with the speech models installed there. The transcripts come back here to be read, edited and exported. Nothing is transcribed on this computer.": "A felvételei egy szerverre kerülnek, amely az ott telepített beszédmodellekkel átírja őket. Az átiratok ide érkeznek vissza, hogy elolvashassa, szerkeszthesse és exportálhassa őket. Ezen a számítógépen semmit sem írunk át.",
+  "Pick a server in the list on the right. Servers on this network appear by themselves; you can also add one by its address. Connections are encrypted, and the first time you connect you check the server's fingerprint.": "Válasszon egy szervert a jobb oldali listából. A hálózaton lévő szerverek maguktól megjelennek; cím alapján is hozzáadhat egyet. A kapcsolatok titkosítottak, és az első csatlakozáskor ellenőrzi a szerver ujjlenyomatát.",
+  "Recordings and transcripts travel only between this computer and the server you connect to, and the connection is encrypted.": "A felvételek és az átiratok csak ez a számítógép és a szerver között mozognak, amelyhez csatlakozik, és a kapcsolat titkosított.",
+  "Not connected to a server": "Nincs kapcsolat szerverrel",
+  "SERVING": "SZOLGÁL",
+  "NOT SERVING": "NEM SZOLGÁL",
+  "Waiting for recordings from other computers.": "Várakozás más számítógépek felvételeire.",
+  "Recent recordings": "Legutóbbi felvételek",
+  "A recording is being transcribed. Closing now stops the server and cancels it.": "Egy felvétel átírása folyamatban van. Ha most bezárja, a szerver leáll, és az átírás megszakad.",
+  "Close the server?": "Bezárja a szervert?"
 }

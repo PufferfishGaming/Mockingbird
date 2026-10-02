@@ -1,6 +1,6 @@
 # ADR-0013: The network API
 
-Status: accepted (after 0.1.19, unreleased).
+Status: accepted (after 0.1.19, unreleased). The API-key, plain-HTTP and Settings-card parts were replaced before release by ADR-0014: a server has a name and an optional password, the network connection is encrypted (TLS with a fingerprint the client confirms), servers announce themselves on the network, and hosting lives in a panel beside the window. What is written below about the requests, the HTTP server, the limits and the visibility of uploads still holds; read "key" as "password" and ignore "No TLS".
 
 ## Context
 Features.md asks for "the ability to run a local AI server like LM Studio". The owner's answer to what that means: the app serves a local API that other programs can call, on this computer and over the network. Link transcription (yt-dlp) is a separate step; the API takes recordings.

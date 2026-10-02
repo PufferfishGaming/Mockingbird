@@ -14,11 +14,21 @@ One file. Download `Mockingbird-Studio-Setup.exe`, double-click it, accept the l
 
 </div>
 
+## Editions
+
+| Edition | What it is | Installer |
+| --- | --- | --- |
+| **Mockingbird Studio** | The whole program on one computer. It can also host a server and connect to one. | `Mockingbird-Studio-Setup.exe` |
+| **Mockingbird Server** | Only the server: the models and the speech programs live on that computer, in a small light window. Other computers send their recordings to it. | `Mockingbird-Server-Setup.exe` |
+| **Mockingbird Client** | Only the window you work in. Nothing is transcribed on that computer: recordings go to a server and the transcripts come back to be read, edited and exported. | `Mockingbird-Client-Setup.exe` |
+
+Server and Client are new in the release after 0.1.19. Each edition installs, updates and keeps its data on its own (`TriASR`, `TriASR-Server`, `TriASR-Client`), and has its own checksum file (`SHA256SUMS.txt`, `SHA256SUMS-server.txt`, `SHA256SUMS-client.txt`) and update file (`latest.json`, `latest-server.json`, `latest-client.json`).
+
 ## Install
 
 Download `Mockingbird-Studio-Setup.exe` from the `download` release and double-click it. The setup wizard installs for your user only and includes the .NET runtime, so nothing else is required. Download models inside the app after installing.
 
-The installer is unsigned, so Windows SmartScreen may show "Windows protected your PC". Choose **More info**, then **Run anyway**. To check the download first, compare `SHA256SUMS.txt` from the same release with `Get-FileHash .\Mockingbird-Studio-Setup.exe`.
+The installer is unsigned, so Windows SmartScreen may show "Windows protected your PC". Choose **More info**, then **Run anyway**. To check the download first, compare `SHA256SUMS.txt` from the same release with `Get-FileHash .\Mockingbird-Studio-Setup.exe` (the other editions have their own checksum file). The Server edition downloads its models after installing, like Studio; the Client needs none.
 
 To remove the app, use **Settings → Apps → Installed apps → Mockingbird Studio**. Uninstalling keeps your projects, settings and models.
 
@@ -39,36 +49,51 @@ Native Linux support is pending; there is currently no native Linux build.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.
 - The interface in English, Hungarian, German, Spanish and French: chosen on the first start, switchable in Settings without a restart.
 - In-app update checks with a verified one-click update.
-- An optional HTTP API, off by default, so that other programs can send recordings and fetch transcripts (see Network API below).
+- Three editions: Studio does everything on one computer, Server holds the models and serves them, Client is only the window (see Editions).
+- A server you can name and protect with an optional password, found on your network by the computers that want to use it, with every connection over the network encrypted (see Servers on the network).
+- An optional HTTP API, so that other programs can send recordings and fetch transcripts.
 
 Recognition can be wrong, particularly with music, noise or silence. Review important transcripts. Readable export normalizes spacing without rewriting wording.
 
-## Network API
+## Servers on the network
 
-Settings → **Network API** → *Turn on the API* makes the app answer HTTP requests while it is open (default port 8642). Without *Allow other computers on the network* only programs on the same computer can connect; with it anyone on your network who has the key can. Every request except the health check needs the key (`Authorization: Bearer <key>` or `X-Api-Key`); *Copy key* and *New key* are in the same card. The connection is plain HTTP, so use the network option only on a network you trust. Recordings sent through the API are kept in the projects folder (`Api/Incoming`) and listed under Projects; the API shows only what was sent through it, and works on one recording at a time.
+In Studio the **Servers** button at the top right opens a panel on the right. It lists the servers found on your network, and below it you can host one of your own. The Server edition is that panel, hosting by itself; the Client edition has only the list.
+
+**Hosting.** *Host a server* turns it on. Give the server a **name** (shown to the others; empty uses the computer's name) and, if you like, a **password**: type one or press *Make a password*; with none, anyone who can reach the server may use it. *Reachable from other computers on the network* lets the server be found and used from elsewhere; without it only programs on the same computer can connect. The server runs while the app is open. The first time, Windows may ask whether to let it through its firewall.
+
+**Encrypted.** Every connection over the network is encrypted (TLS). The server makes a certificate for itself, and its **fingerprint** is shown in its *Identity* box. The first time a computer connects it shows the same fingerprint; compare the two, and confirm only if they match. After that the server must show the same fingerprint, or the connection is refused with a warning. The password is sent only after you have confirmed the fingerprint, and it can be remembered (protected by your Windows account) or asked every time. *New identity* makes a new certificate; every computer then asks again.
+
+**Finding servers.** A server reachable from the network announces its name and address on the local network every two seconds; the list shows what it hears. A server on another network is added by typing its address (`192.168.1.20` or `kitchen:8642`). The announcement is only a hint and is never trusted without the fingerprint check.
+
+**Using a server.** Choose it and press *Connect*. In Studio a *Remote server* page appears in the sidebar, in the Client it fills the window: *New* sends a recording and a language to the server, *Projects* follows the recordings and their progress, and *Review* opens a transcript with its audio, the two engines' wording and your edits, which are saved on the server and can be exported. The speech programs run on the server; the client only sends and reads.
+
+### The HTTP API
+
+The same server answers programs. On this computer `http://127.0.0.1:8642` works without encryption; from the network use `https://` (a self-signed certificate, so `curl.exe -k`, or pin the fingerprint). When a password is set, every request except the health check needs it (`Authorization: Bearer <password>` or `X-Api-Key`). Recordings sent through the API are kept in the projects folder (`Api/Incoming`) and listed under Projects; the API shows only what was sent through it, and works on one recording at a time.
 
 ```powershell
-curl.exe -H "Authorization: Bearer KEY" http://127.0.0.1:8642/v1/health
-curl.exe -X POST --data-binary "@meeting.mp3" -H "Authorization: Bearer KEY" "http://127.0.0.1:8642/v1/transcriptions?language=auto&name=meeting.mp3"
-curl.exe -H "Authorization: Bearer KEY" "http://127.0.0.1:8642/v1/transcriptions/ID?wait=60"
-curl.exe -H "Authorization: Bearer KEY" "http://127.0.0.1:8642/v1/transcriptions/ID/transcript?format=srt"
+curl.exe http://127.0.0.1:8642/v1/health
+curl.exe -X POST --data-binary "@meeting.mp3" -H "Authorization: Bearer PASSWORD" "http://127.0.0.1:8642/v1/transcriptions?language=auto&name=meeting.mp3"
+curl.exe -H "Authorization: Bearer PASSWORD" "http://127.0.0.1:8642/v1/transcriptions/ID?wait=60"
+curl.exe -H "Authorization: Bearer PASSWORD" "http://127.0.0.1:8642/v1/transcriptions/ID/transcript?format=srt"
 ```
 
 | Request | Answer |
 | --- | --- |
-| `GET /v1/health` | server check, no key needed |
+| `GET /v1/health`, `GET /v1/server` | server check (name, edition, version, whether a password is needed and the connection is encrypted); no password needed |
 | `GET /v1/languages`, `GET /v1/models` | the 100 languages (and which have a second engine); an OpenAI-style model list |
 | `POST /v1/transcriptions?language=auto&name=file.mp3` | the request body is the recording; answers `202` with an `id` |
 | `GET /v1/transcriptions`, `GET /v1/transcriptions/{id}` | state (`queued`, `running`, `complete`, `failed`, `cancelled`), stage and percent; `?wait=30` waits for the end |
 | `GET /v1/transcriptions/{id}/transcript?format=json\|txt\|md\|srt\|vtt\|csv\|docx\|full-json&mode=strict\|readable` | the transcript (`json` has segments and a `needsListening` flag per segment) |
+| `GET` and `PUT /v1/transcriptions/{id}/review`, `GET .../audio` | the review as the window shows it, saving edits (with a revision history), the recording for playback |
 | `POST /v1/transcriptions/{id}/cancel` | stops a waiting or running recording |
 | `POST /v1/audio/transcriptions` | OpenAI-compatible: a multipart form with `file`, `language`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`); answers when the transcript is ready, so existing tools that speak that API can use it with the base URL `http://127.0.0.1:8642/v1` |
 
-Errors are `{"error":{"code":"...","message":"...","type":"..."}}`. More in `docs/decisions/ADR-0013-network-api.md`.
+Errors are `{"error":{"code":"...","message":"...","type":"..."}}`. More in `docs/decisions/ADR-0013-network-api.md` and `docs/decisions/ADR-0014-editions-and-remote-servers.md`.
 
 ## Privacy
 
-Transcription runs locally. Requested model/runtime downloads and the update check (which can be turned off) contact their providers. The network API listens only when you switch it on. Terminal commands can access the network. Projects and logs can contain private information. See [PRIVACY.md](PRIVACY.md), also available in Settings.
+Transcription runs locally. Requested model/runtime downloads and the update check (which can be turned off) contact their providers. A hosted server listens only when you switch it on, encrypts what it sends over the network and announces itself on your local network only while the network option is on. Terminal commands can access the network. Projects and logs can contain private information. See [PRIVACY.md](PRIVACY.md), also available in Settings.
 
 ## Build
 

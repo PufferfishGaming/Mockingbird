@@ -22,31 +22,43 @@ public partial class App : System.Windows.Application
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { DisableDefaults = true });
         builder.Services.AddInfrastructure(dataRoot);
         builder.Services.AddPersistence();
-        var runtimes = new RuntimePaths();
-        builder.Services.AddSingleton(runtimes);
-        builder.Services.AddSingleton(new ModelStore(runtimes.ModelRoot));
-        builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
-        builder.Services.AddSingleton<IJobWorkspace, JobWorkspace>();
-        builder.Services.AddSingleton<IJobRepository, JobRepository>();
-        builder.Services.AddSingleton<IRecordRepository, RecordRepository>();
-        builder.Services.AddSingleton<IAudioNormalizer>(services => new FfmpegNormalizer(services.GetRequiredService<IProcessRunner>(), runtimes.Ffmpeg));
-        builder.Services.AddSingleton<AudioJobQueue>();
-        builder.Services.AddSingleton<LocalTranscriptionStages>();
-        builder.Services.AddSingleton<ITranscriptionStages>(services => services.GetRequiredService<LocalTranscriptionStages>());
-        builder.Services.AddSingleton<TranscriptionPipeline>();
-        builder.Services.AddSingleton<LocalOptimizer>();
-        builder.Services.AddSingleton<HardwareProfiler>();
         builder.Services.AddSingleton<SettingsStore>();
-        builder.Services.AddSingleton<ResourceGovernor>();
-        builder.Services.AddSingleton(UpdateOptions.FromEnvironment());
+        builder.Services.AddSingleton(UpdateOptions.FromEnvironment(Edition.Label));
         builder.Services.AddSingleton(services => new UpdateService(services.GetRequiredService<UpdateOptions>()));
         builder.Services.AddSingleton<ThemeManager>();
-        builder.Services.AddSingleton<ShellViewModel>();
-        builder.Services.AddSingleton<BootstrapViewModel>();
-        builder.Services.AddSingleton<BootstrapWindow>();
-        builder.Services.AddSingleton<MainWindow>();
+        if (Edition.RunsEngines) AddEngines(builder.Services);
+        else
+        {
+            // The client transcribes nothing: no speech programs, no models, no hardware check, no queue of its own.
+            builder.Services.AddSingleton<ClientViewModel>();
+            builder.Services.AddSingleton<ClientWindow>();
+        }
         configure?.Invoke(builder.Services);
         return builder.Build();
+    }
+
+    private static void AddEngines(IServiceCollection services)
+    {
+        var runtimes = new RuntimePaths();
+        services.AddSingleton(runtimes);
+        services.AddSingleton(new ModelStore(runtimes.ModelRoot));
+        services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<IJobWorkspace, JobWorkspace>();
+        services.AddSingleton<IJobRepository, JobRepository>();
+        services.AddSingleton<IRecordRepository, RecordRepository>();
+        services.AddSingleton<IAudioNormalizer>(provider => new FfmpegNormalizer(provider.GetRequiredService<IProcessRunner>(), runtimes.Ffmpeg));
+        services.AddSingleton<AudioJobQueue>();
+        services.AddSingleton<LocalTranscriptionStages>();
+        services.AddSingleton<ITranscriptionStages>(provider => provider.GetRequiredService<LocalTranscriptionStages>());
+        services.AddSingleton<TranscriptionPipeline>();
+        services.AddSingleton<LocalOptimizer>();
+        services.AddSingleton<HardwareProfiler>();
+        services.AddSingleton<ResourceGovernor>();
+        services.AddSingleton<ShellViewModel>();
+        services.AddSingleton<BootstrapViewModel>();
+        services.AddSingleton<BootstrapWindow>();
+        services.AddSingleton<MainWindow>();
+        services.AddSingleton<ServerWindow>();
     }
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -62,6 +74,7 @@ public partial class App : System.Windows.Application
             var logger = _host.Services.GetRequiredService<ILogger<App>>();
             logger.LogInformation("Application started: {ApplicationVersion} {Architecture}",
                 typeof(App).Assembly.GetName().Version, System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture);
+            if (Edition.IsClient) { await RunClientAsync(dataRoot, smoke, logger); return; }
             var shell = _host.Services.GetRequiredService<ShellViewModel>();
             await shell.InitializeAsync();
             if (!smoke && !shell.LanguageChosen)
@@ -71,6 +84,7 @@ public partial class App : System.Windows.Application
                 shell.ChooseLanguage(chooser.SelectedCode);
             }
             await shell.DetectHardwareCommand.ExecuteAsync(null);
+            if (Edition.IsServer) { await RunServerAsync(shell, dataRoot, smoke, logger); return; }
             var window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;
             if (smoke)
@@ -520,7 +534,7 @@ public partial class App : System.Windows.Application
                 command.CommandText = "SELECT sqlite_version();";
                 var version = (string?)await command.ExecuteScalarAsync();
                 await File.WriteAllTextAsync(Path.Combine(dataRoot, "bootstrap-smoke.json"),
-                    JsonSerializer.Serialize(new { success = true, windowCreated = true, sqliteVersion = version,
+                    JsonSerializer.Serialize(new { success = true, windowCreated = true, edition = Edition.Label, sqliteVersion = version,
                         shellMatrix = matrix, architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
                         utc = DateTimeOffset.UtcNow }));
                 logger.LogInformation("Shell smoke passed: {RenderCount} renders", matrix);
@@ -539,6 +553,71 @@ public partial class App : System.Windows.Application
             await StopHostAsync();
             Shutdown(1);
         }
+    }
+
+    /// <summary>The Client edition: the window with the servers, and nothing that transcribes.</summary>
+    private async Task RunClientAsync(string dataRoot, bool smoke, ILogger logger)
+    {
+        var client = _host!.Services.GetRequiredService<ClientViewModel>();
+        await client.InitializeAsync();
+        if (!smoke && !client.LanguageChosen)
+        {
+            var chooser = new LanguageChoiceWindow(Loc.Detect());
+            chooser.ShowDialog();
+            client.ChooseLanguage(chooser.SelectedCode);
+        }
+        var window = _host.Services.GetRequiredService<ClientWindow>();
+        MainWindow = window;
+        if (smoke)
+        {
+            await ShowHiddenAsync(window);
+            var renders = await EditionSmoke.RunAsync(window, client.ChooseLanguage, dataRoot);
+            if (_host.Services.GetService<TranscriptionPipeline>() is not null) throw new InvalidOperationException("The client edition must not carry the transcription engines.");
+            await EditionSmoke.WriteReportAsync(dataRoot, renders);
+            logger.LogInformation("Client smoke passed: {RenderCount} renders", renders);
+            window.Close();
+            await StopHostAsync();
+            Shutdown(0);
+            return;
+        }
+        window.Show();
+        _ = client.RunUpdateCheckAsync(manual: false);
+    }
+
+    /// <summary>The Server edition: a small window over the same services as Studio. It starts hosting by itself.</summary>
+    private async Task RunServerAsync(ShellViewModel shell, string dataRoot, bool smoke, ILogger logger)
+    {
+        var window = _host!.Services.GetRequiredService<ServerWindow>();
+        MainWindow = window;
+        if (smoke)
+        {
+            if (shell.Hardware is null) throw new InvalidOperationException(shell.Diagnostics);
+            await ShowHiddenAsync(window);
+            var renders = await EditionSmoke.RunAsync(window, shell.ChooseLanguage, dataRoot);
+            await EditionSmoke.WriteReportAsync(dataRoot, renders);
+            logger.LogInformation("Server smoke passed: {RenderCount} renders", renders);
+            window.Close();
+            await StopHostAsync();
+            Shutdown(0);
+            return;
+        }
+        window.Show();
+        _ = shell.RunUpdateCheckAsync(manual: false);
+    }
+
+    /// <summary>Opens a window where nobody sees it, so that it is laid out and can be rendered.</summary>
+    private async Task ShowHiddenAsync(Window window)
+    {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        window.ShowActivated = false;
+        window.ShowInTaskbar = false;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -20000;
+        window.Top = -20000;
+        window.Show();
+        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        if (!window.IsLoaded || new System.Windows.Interop.WindowInteropHelper(window).Handle == IntPtr.Zero)
+            throw new InvalidOperationException("WPF window did not initialize.");
     }
 
     private async Task StopHostAsync()

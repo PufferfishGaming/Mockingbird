@@ -15,7 +15,7 @@ namespace TriAsr.App;
 /// <param name="ExportFolder">Scratch space for building a transcript file in a requested format.</param>
 /// <param name="GetPassword">The password, read for every request so that a new one takes effect at once. Empty means the server is open to anyone who can reach it.</param>
 /// <param name="GetName">The name the server goes by on the network.</param>
-/// <param name="Edition">Studio or Server.</param>
+/// <param name="Edition">Studio or Server (the edition that hosts).</param>
 /// <param name="LoadReview">The transcript as reviewed and as the programs wrote it, with the raw engine texts, for the remote review page.</param>
 /// <param name="SaveReview">Stores an edited transcript.</param>
 /// <param name="AudioPath">The file of a job's audio (<c>playback</c> or <c>normalized</c>), or null.</param>
@@ -172,7 +172,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird Studio {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no key needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nSend the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nSend the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- the password -----------------------------------------------------------------------------------------------------------------
 

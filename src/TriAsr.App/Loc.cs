@@ -47,8 +47,11 @@ public sealed class Loc : INotifyPropertyChanged
     public string Translate(string text)
     {
         if (text.Length == 0) return text;
-        return _table.TryGetValue(text, out var translated) && translated.Length > 0 ? translated : text;
+        return Brand(_table.TryGetValue(text, out var translated) && translated.Length > 0 ? translated : text);
     }
+
+    /// <summary>The texts name "Mockingbird Studio"; in the Server and Client editions they name that edition instead.</summary>
+    private static string Brand(string text) => Edition.IsStudio ? text : text.Replace("Mockingbird Studio", Edition.ProductName, StringComparison.Ordinal);
 
     public static string T(string text) => Instance.Translate(text);
 
@@ -67,9 +70,10 @@ public sealed class Loc : INotifyPropertyChanged
     /// </summary>
     public static string Describe(string message)
     {
-        if (message.Length == 0 || Instance.Language == English) return message;
+        if (message.Length == 0) return message;
+        if (Instance.Language == English) return Brand(message);
         var translated = Instance.Translate(message);
-        return translated != message ? translated : LowerLayerMessages.Translate(message) ?? message;
+        return translated != Brand(message) ? translated : Brand(LowerLayerMessages.Translate(message) ?? message);
     }
 
     /// <summary>Marks a text that is shown later (in a list of choices, say) so that it is translated and checked like the others.</summary>

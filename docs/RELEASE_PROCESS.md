@@ -1,6 +1,6 @@
 # Release process
 
-How a Mockingbird Studio version gets from the source to users. Installers are published as assets of one GitHub pre-release tagged `download`; the README button and the in-app updater both read that tag, so its URLs never change.
+How a Mockingbird version gets from the source to users. There are three editions (Studio, Server, Client; ADR-0014) with one version number; each has its own installer, checksum file and update manifest, and is built and uploaded on its own. Installers are published as assets of one GitHub pre-release tagged `download`; the README button and the in-app updater both read that tag, so its URLs never change.
 
 ## Rules
 
@@ -11,8 +11,12 @@ How a Mockingbird Studio version gets from the source to users. Installers are p
 ## 1. Build and verify
 
 ```powershell
-scripts\release-chain.ps1 -Notes "One short sentence for the update banner."
+scripts\release-chain.ps1 -Notes "One short sentence for the update banner."                          # Studio; also builds and tests everything
+scripts\release-chain.ps1 -Edition Server -SkipVerify -Notes "One short sentence for the update banner."
+scripts\release-chain.ps1 -Edition Client -SkipVerify -Notes "One short sentence for the update banner."
 ```
+
+Studio keeps its folder `artifacts\packages\<version>`; the others are built next to it as `<version>-server` and `<version>-client`. The Client's package has no speech programs (the audit fails if it has); the Server's and Studio's packages carry the same engines.
 
 It runs, in order, and stops at the first failure (log: `artifacts\release-logs\<version>.log`):
 
@@ -35,15 +39,17 @@ Commit the version bump and release changes, then push `main` normally. Do not f
 
 Replace the same-named assets on the `download` release, waiting for each upload to finish:
 
-1. `Mockingbird-Studio-Setup.exe`
-2. `SHA256SUMS.txt`
-3. `latest.json` **last**
+| Edition | 1. installer | 2. checksums | 3. manifest, **last** |
+| --- | --- | --- | --- |
+| Studio | `Mockingbird-Studio-Setup.exe` | `SHA256SUMS.txt` | `latest.json` |
+| Server | `Mockingbird-Server-Setup.exe` | `SHA256SUMS-server.txt` | `latest-server.json` |
+| Client | `Mockingbird-Client-Setup.exe` | `SHA256SUMS-client.txt` | `latest-client.json` |
 
-`latest.json` is how installed apps learn about a version (schema, version, URL, SHA256, size, notes). It must appear only after the installer it points to is available. Never edit it by hand; it carries the installer's real size and hash.
+A manifest is how installed apps of that edition learn about a version (schema, version, URL, SHA256, size, notes). It must appear only after the installer it points to is available. Never edit it by hand; it carries the installer's real size and hash.
 
 ## 4. Verify what was published
 
-With fresh URLs (add a cache-busting query), check that the asset names, sizes and SHA256 digests on GitHub equal the local files and that `latest.json` was uploaded last. Then read the live manifest the way an installed app does and confirm an older version is offered the new one and a current or newer version is offered nothing.
+With fresh URLs (add a cache-busting query), check that the asset names, sizes and SHA256 digests on GitHub equal the local files and that each edition's manifest was uploaded last. Then read the live manifest the way an installed app does and confirm an older version is offered the new one and a current or newer version is offered nothing.
 
 ## 5. Try the update
 

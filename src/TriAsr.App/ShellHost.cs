@@ -12,8 +12,6 @@ public sealed partial class ShellViewModel
     public static readonly string RemoteServerPage = Loc.Key("Remote server");
 
     private HostViewModel? _host;
-    private ServerBrowserViewModel? _servers;
-    private RemoteWorkspaceViewModel? _remote;
     private Action<TranscriptionJob>? _updateJob;
 
     /// <summary>Whether the right-hand panel (servers on the network, the server this computer hosts) is open. It also closes by itself when the window is narrow.</summary>
@@ -24,45 +22,34 @@ public sealed partial class ShellViewModel
 
     private HostViewModel MakeHost()
     {
-        var host = new HostViewModel(storage.Root, "Studio", AppInfo.Version, CreateApiService, (title, message) => OnUi(() => ReportError(title, message)), OnUi, logger);
+        var host = new HostViewModel(storage.Root, Edition.Label, AppInfo.Version, CreateApiService, (title, message) => OnUi(() => ReportError(title, message)), OnUi, logger);
         host.SettingsChanged += () => { if (_initialized) Persist(); };
         return host;
     }
 
+    private RemoteSession? _session;
+
+    /// <summary>The servers on the network, the connection to one of them and the pages of the connected server.</summary>
+    private RemoteSession Session => _session ??= MakeSession();
+
     /// <summary>The questions a connection asks (trust this fingerprint, enter the password). The window sets the real dialogs; until then nothing is trusted.</summary>
-    public IServerDialogs? Dialogs { get; set; }
+    public IServerDialogs? Dialogs { get => Session.Dialogs; set => Session.Dialogs = value; }
 
     /// <summary>The servers on the network, and the connection to one of them.</summary>
-    public ServerBrowserViewModel Servers => _servers ??= MakeServers();
+    public ServerBrowserViewModel Servers => Session.Servers;
 
     /// <summary>The pages of the connected server (send, projects, review).</summary>
-    public RemoteWorkspaceViewModel Remote => _remote ??= MakeRemote();
+    public RemoteWorkspaceViewModel Remote => Session.Remote;
 
-    private ServerBrowserViewModel MakeServers()
+    private RemoteSession MakeSession()
     {
-        var servers = new ServerBrowserViewModel(new TriAsr.Infrastructure.SavedServerStore(Path.Combine(storage.Root, "Config", "servers.json")), new ForwardedDialogs(() => Dialogs), OnUi);
-        servers.ConnectionChanged += connection => OnUi(() =>
+        var session = new RemoteSession(storage.Root, (title, message) => OnUi(() => ReportError(title, message)), () => Status = T("Edits saved with revision history"));
+        session.ConnectionChanged += connection =>
         {
-            Remote.Attach(connection);
             if (connection is not null) SelectedPage = Navigation.First(page => page.Name == RemoteServerPage);
             else if (IsRemotePage) SelectedPage = Navigation[0];
-        });
-        return servers;
-    }
-
-    private RemoteWorkspaceViewModel MakeRemote()
-    {
-        var remote = new RemoteWorkspaceViewModel(OnUi, (title, message) => OnUi(() => ReportError(title, message)), Path.Combine(storage.Root, "Temp", "Remote"));
-        remote.ConnectionLost += reason => OnUi(() => Servers.Lost(reason));
-        remote.ReviewSaved += () => OnUi(() => Status = T("Edits saved with revision history"));
-        return remote;
-    }
-
-    /// <summary>Passes the connection's questions on to whatever dialogs the window has set; with none, the answer is no.</summary>
-    private sealed class ForwardedDialogs(Func<IServerDialogs?> current) : IServerDialogs
-    {
-        public Task<bool> ConfirmTrustAsync(TrustRequest request) => current() is { } dialogs ? dialogs.ConfirmTrustAsync(request) : Task.FromResult(false);
-        public Task<PasswordAnswer?> AskPasswordAsync(string serverName, bool wrongBefore) => current() is { } dialogs ? dialogs.AskPasswordAsync(serverName, wrongBefore) : Task.FromResult<PasswordAnswer?>(null);
+        };
+        return session;
     }
 
     private string IncomingFolder => Path.Combine(storage.Root, "Api", "Incoming");
@@ -73,7 +60,7 @@ public sealed partial class ShellViewModel
         language => { var missing = Array.Empty<string>(); OnUi(() => missing = MissingRequiredModelsFor(language)); return missing; },
         () => !IsModelBusy && !IsBenchmarking && !SetupRunning && !IsCheckingSystem,
         busy => OnUi(() => host.IsBusy = busy),
-        () => host.DisplayName, "Studio", LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor));
+        () => host.DisplayName, Edition.Label, LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor));
 
     private bool IsApiJob(TranscriptionJob job) => job.SourcePath.StartsWith(IncomingFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 

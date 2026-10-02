@@ -58,7 +58,7 @@ public static class ShellSmoke
         shell.ReportError("Download needs attention", "The download host is unavailable. Your downloaded models and partial files are retained. Retry when the connection is restored.");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (!shell.HasError || FindText(window, shell.ErrorTitle) is null) throw new InvalidOperationException("Error alert did not appear.");
-        if (shell.PulseError && !window.ErrorAlert.HasAnimatedProperties) throw new InvalidOperationException("Error pulse did not start.");
+        if (shell.PulseError && !window.ErrorBanner.Alert.HasAnimatedProperties) throw new InvalidOperationException("Error pulse did not start.");
         Capture(window, Path.Combine(output, "error-alert.png"), 1220, 900, 1);
         shell.DismissErrorCommand.Execute(null);
         if (shell.HasError) throw new InvalidOperationException("Error alert did not dismiss.");

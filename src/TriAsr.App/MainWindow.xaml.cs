@@ -5,27 +5,7 @@ namespace TriAsr.App;
 
 public partial class MainWindow : Window
 {
-    private void ShowPrivacyPolicy(object sender, RoutedEventArgs args)
-    {
-        var policy = new System.Windows.Controls.TextBox
-        {
-            Text = AppInfo.PrivacyPolicy,
-            IsReadOnly = true,
-            TextWrapping = TextWrapping.Wrap,
-            VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
-            Padding = new Thickness(22),
-            FontSize = 14
-        };
-        policy.SetResourceReference(ForegroundProperty, "TextPrimaryBrush");
-        policy.SetResourceReference(BackgroundProperty, "SurfaceBrush");
-        new Window
-        {
-            Owner = this, Title = Loc.T("{0} · Privacy policy", AppInfo.Name),
-            Width = 760, Height = 650, MinWidth = 460, MinHeight = 320,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Content = policy
-        }.ShowDialog();
-    }
+    private void ShowPrivacyPolicy(object sender, RoutedEventArgs args) => PrivacyPolicyWindow.Show(this);
 
     private async void ImportRuntimeClick(object sender, RoutedEventArgs args)
     {

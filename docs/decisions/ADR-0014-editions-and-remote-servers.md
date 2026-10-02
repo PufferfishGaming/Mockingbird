@@ -1,0 +1,46 @@
+# ADR-0014: Three editions, and servers you can name, protect and find
+
+Status: accepted (after 0.1.19, unreleased). Replaces the API-key, plain-HTTP and Settings-card parts of ADR-0013, which never shipped.
+
+## Context
+ADR-0013 let programs call Studio over HTTP. The owner then asked for something larger: the program should come in three editions, a server should have a name and an optional password, it should be found on the network by the people who want to use it, and the traffic should be encrypted.
+
+- **Mockingbird Studio**: the program as it is, with hosting and connecting added. Nothing else changes.
+- **Mockingbird Server**: only the server. The models and the speech programs live on that computer. Its window is small and light.
+- **Mockingbird Client**: only the window where the user works. Nothing is transcribed on that computer; it has no speech programs, no models and no hardware check.
+
+## Decision
+
+### One code base, three programs
+- The edition is decided at start-up (`Edition`): the file `edition.txt` that the installer puts next to the program (`studio`, `server`, `client`), overridden by the environment variable `TRIASR_EDITION` for tests and screenshots. Without either it is Studio, so a build from the repository or an old portable folder behaves as before.
+- Each edition has its own name, install folder (`Programs\TriASR`, `TriASR-Server`, `TriASR-Client`), data folder (`%LOCALAPPDATA%` of the same names), MSI and setup-wizard identity, shortcut, `Setup.exe` and update manifest (`latest.json`, `latest-server.json`, `latest-client.json`). Studio keeps every name it has, so an installed Studio updates in place. Server and Studio can be installed side by side; they use different data folders and, unless the owner changes it, the same default port, so only one of them can host at a time.
+- The Client's service container has no engines at all: no `TranscriptionPipeline`, no `RuntimePaths`, no `ShellViewModel`. Its package has no `Runtimes` folder and no worker, and the package audit fails if one appears. Server and Studio share the engine payload.
+- Texts that name "Mockingbird Studio" name the running edition instead (`Loc` substitutes the product name when the edition is not Studio), so the translations are written once.
+- A first start of the Server edition begins hosting, open to the network and without a password, until the owner chooses otherwise: a server that does not serve has no use. Studio and the Client start with hosting off.
+
+### The windows
+- **Studio**: the right-hand panel (the *Servers* button in the header shows or hides it; it also folds away in a narrow window) has the servers found on the network with *Connect*, *Disconnect*, *Forget* and *Add a server by address*, and under it *Host a server*: on or off, name, optional password (type one or *Make a password*), *Reachable from other computers on the network*, port, the identity fingerprint and example commands. A connected server gets its own sidebar page, *Remote server*, with the pages *New*, *Projects* and *Review* (the review is the same as Studio's own: listen, choose Whisper or Canary, edit, export).
+- **Server**: one small page. A headline with the server's name and what it is doing (waiting, or the stage and progress of the recording in work), the setup banner and the *Download models* card when models are missing, the *Host a server* box, the last recordings and a card with theme, language, folders and the privacy policy. Closing the window while a recording is being transcribed asks first.
+- **Client**: the servers panel on the right (the same list, no hosting), the connected server's pages in the middle, or an explanation while there is no connection. Theme and language are chosen in the panel.
+
+### Encryption: TLS with a certificate the server makes for itself
+- A server makes a self-signed ECDSA P-256 certificate the first time it needs one (valid ten years, with the computer's names and addresses) and keeps it in `Config\Identity`. Nobody vouches for it. A client recognises a server by the **SHA-256 fingerprint** of the certificate: the first time it connects it shows the fingerprint (64 hex characters in 16 groups) and asks the user to compare it with the one in the server's *Identity* box; after that the fingerprint must be the same. A certificate that is not the one trusted before is refused with a warning, not accepted silently. Ordinary certificate-chain validation is not used and is never the reason a connection is trusted. *New identity* makes a new certificate; every client then asks again.
+- The same port speaks TLS and plain HTTP: the first byte of a connection tells them apart. A server that is reachable from the network answers **only TLS** (plain requests get 426 and a short text). A server limited to this computer answers both, so that `curl http://127.0.0.1:8642` works without ceremony. Nothing is ever sent in clear over the network.
+- **The password is sent only after the fingerprint has been trusted.** Looking at a server (*is it there, what is it called, is a password needed*) uses `GET /v1/health` and sends no credentials. A password is never put in an address. If the user chose to remember a password it is stored with the Windows account (DPAPI) in `Config\servers.json`, next to the trusted fingerprint; *Forget* removes both.
+- **The password is optional.** None means anyone who can reach the server may use it; the box says so. The password is compared in constant time, 8 wrong ones from an address in a minute lock that address out for a minute, and each wrong one is answered after a short delay. It travels as `Authorization: Bearer <password>` (or `X-Api-Key`), so programs written for ADR-0013's key keep working with the password in its place.
+- What this does not protect: a server's files on its own computer (the settings, the password and the private key are in the data folder in clear, like every other file the app keeps), and a user who trusts a fingerprint without comparing it.
+
+### Finding servers
+- A server that is reachable from the network announces itself with a small UDP message to the local network every two seconds (port 8643): its name, edition, version, address, port, whether it wants a password and its certificate's fingerprint. Nothing is announced while hosting is off or limited to this computer. The announcement is **not trusted**: it only fills the list. Names are cleaned, at most 100 servers are listed, a server not heard for eight seconds disappears from the list (saved ones stay, marked "not seen lately"), and the fingerprint in an announcement is never accepted as the user's confirmation. Discovery is not authentication: anyone on the network can announce a server, which is why the fingerprint is compared by a person.
+- A server can also be added by typing its address (`192.168.1.20`, `kitchen:8642`).
+
+### The API, and what a client does
+- ADR-0013's API is unchanged apart from the password, with additions for the client: `GET /v1/server` (name, edition, version, whether it is encrypted), the saved review (`GET` and `PUT .../review`, the latter with a size cap and a revision history), and the audio of a project (`GET .../audio`, with ranges: the playback copy, or the normalised one). A client can reach only what was uploaded through the API; it cannot read other projects or any other file.
+- The Client edition sends the recording, follows the stages and the percentage by polling, and fetches the transcript. Edits are saved on the server, not on the client.
+
+## Limits
+- One recording at a time per server (as ADR-0013); no accounts or users, one password for everyone; discovery works only on the local network segment (broadcast; routers do not forward it, so a server on another network is added by address); the certificate has no expiry reminder and no revocation (replace the identity); each edition updates itself from GitHub like Studio does, with its own manifest and installer name (the Client has the same banner and choices: later, skip this version, off).
+- Link transcription, live dictation and the other wish-list items are not part of this decision.
+
+## Verification
+Unit tests over real sockets for TLS and plain on one port (426 for plain on a network server, fingerprint pinning, a changed certificate refused, no credentials before trust), the beacon sender and listener (garbage, oversize, spoofed names, the 100-server cap, expiry), the password rules, the saved-servers store with DPAPI, the host view model (settings round trip, port errors, restarts, new identity), the server list and connection flow (first connection, remembered password, wrong password, give up, lost connection) and the remote workspace (send, follow, cancel, review, edit, export). `EditionTests` cover the marker, names and folders, the first-start defaults, the update manifests, the substituted product name, the Client's missing engines, its settings and its connection to a real server. `scripts/api-smoke.ps1` runs the real engines through the real connect flow; `scripts/edition-smoke.ps1` starts each edition and renders its window in all five languages; `package.ps1`, `build-msi.ps1`, `build-setup.ps1`, `verify-package.ps1` and `release-audit.ps1` take `-Edition` and produce and check each edition's installer.

@@ -172,6 +172,35 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task EachEditionDownloadsAnInstallerNamedAfterItselfFromItsOwnManifest()
+    {
+        foreach (var edition in new[] { "Server", "Client" })
+        {
+            var root = TempDirectory();
+            try
+            {
+                var asked = new List<string>();
+                using var service = Service(request =>
+                {
+                    asked.Add(request.RequestUri!.AbsolutePath);
+                    if (request.RequestUri.AbsolutePath.EndsWith(".json", StringComparison.Ordinal)) return Json(Manifest());
+                    return new(HttpStatusCode.OK) { Content = new ByteArrayContent(Installer) };
+                }, UpdateOptions.ForEdition(edition));
+                var offer = (await service.CheckAsync("0.1.16"))!;
+                Assert.EndsWith($"/latest-{edition.ToLowerInvariant()}.json", asked[0]);
+                var path = await service.DownloadAsync(offer, root);
+                Assert.Equal($"Mockingbird-{edition}-Setup-0.1.17.exe", Path.GetFileName(path));
+                // Leftovers of any edition's installer are cleared, nothing else.
+                File.WriteAllText(Path.Combine(root, "Mockingbird-Studio-Setup-0.1.16.exe"), "x");
+                File.WriteAllText(Path.Combine(root, "keep.txt"), "x");
+                UpdateService.RemoveStaleDownloads(root);
+                Assert.Equal(["keep.txt"], Directory.GetFiles(root).Select(Path.GetFileName));
+            }
+            finally { Directory.Delete(root, true); }
+        }
+    }
+
+    [Fact]
     public async Task TamperedDownloadIsDiscardedAndNeverHandedOver()
     {
         var root = TempDirectory();

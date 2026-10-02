@@ -6,7 +6,7 @@ namespace TriAsr.App;
 public static class StorageLocations
 {
     public sealed record Location(string? DataRoot = null, string? ModelRoot = null);
-    private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TriASR", "storage-location.json");
+    private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Edition.DataFolderName, "storage-location.json");
     public static string? LastLoadError { get; private set; }
     public static Location Load()
     {

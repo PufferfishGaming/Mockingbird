@@ -9,7 +9,7 @@ public sealed class RuntimePaths
     public string Root { get; }
     private readonly StorageLocations.Location _location = StorageLocations.Load();
     public string? StorageLoadError { get; } = StorageLocations.LastLoadError;
-    public string DefaultDataRoot => _location.DataRoot ?? (File.Exists(Path.Combine(Root, "TriAsr.slnx")) ? Root : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TriASR"));
+    public string DefaultDataRoot => _location.DataRoot ?? (File.Exists(Path.Combine(Root, "TriAsr.slnx")) ? Root : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Edition.DataFolderName));
     public string ModelRoot => Environment.GetEnvironmentVariable("TRIASR_MODEL_ROOT") is { Length: > 0 } configured ? Path.GetFullPath(configured) : _location.ModelRoot ?? DefaultDataRoot;
     public string Ffmpeg => Path.Combine(Root, "Runtimes", "FFmpeg", "ffmpeg.exe");
     public string Whisper => Path.Combine(Root, "Runtimes", "Whisper-Vulkan", "whisper-cli.exe");

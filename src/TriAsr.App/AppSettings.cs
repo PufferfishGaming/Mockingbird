@@ -13,6 +13,9 @@ public sealed record AppSettings(string Theme = "System", string Density = "Comf
     bool HostEnabled = false, string HostName = "", int HostPort = 8642, bool HostAllowNetwork = false, string HostPassword = "", string HostId = "")
 {
     public const int CurrentVersion = 2;
+
+    /// <summary>What a first start begins with. A server exists to be reached, so the Server edition starts hosting, open to the network, until the user says otherwise.</summary>
+    public static AppSettings ForFirstStart => Edition.IsServer ? new(HostEnabled: true, HostAllowNetwork: true) : new();
 }
 
 public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)
@@ -27,7 +30,7 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
         LastLoadError = null;
         try
         {
-            if (!File.Exists(FilePath)) return new();
+            if (!File.Exists(FilePath)) return AppSettings.ForFirstStart;
             // Readers must never block the atomic replace performed by a save, so they share the file for writing and replacing.
             await using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, _json) ?? new();

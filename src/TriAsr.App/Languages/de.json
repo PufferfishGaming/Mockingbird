@@ -806,5 +806,18 @@
  "Not connected: the server was not trusted.": "Nicht verbunden: Dem Server wurde nicht vertraut.",
  "Found {0}. Choose Connect.": "{0} gefunden. Wählen Sie Verbinden.",
  "That password was not accepted. Enter the password of {0} again.": "Dieses Passwort wurde nicht akzeptiert. Geben Sie das Passwort von {0} erneut ein.",
- "No server connected": "Kein Server verbunden"
+ "No server connected": "Kein Server verbunden",
+ "TRANSCRIPTION RUNS ON THE SERVER": "DIE TRANSKRIPTION LÄUFT AUF DEM SERVER",
+ "Show or hide the panel with the servers on your network": "Den Bereich mit den Servern in Ihrem Netzwerk ein- oder ausblenden",
+ "Connect to a server": "Mit einem Server verbinden",
+ "Your recordings are sent to a server, which transcribes them with the speech models installed there. The transcripts come back here to be read, edited and exported. Nothing is transcribed on this computer.": "Ihre Aufnahmen werden an einen Server gesendet, der sie mit den dort installierten Sprachmodellen transkribiert. Die Transkripte kommen hierher zurück, damit Sie sie lesen, bearbeiten und exportieren können. Auf diesem Computer wird nichts transkribiert.",
+ "Pick a server in the list on the right. Servers on this network appear by themselves; you can also add one by its address. Connections are encrypted, and the first time you connect you check the server's fingerprint.": "Wählen Sie rechts in der Liste einen Server. Server in diesem Netzwerk erscheinen von selbst; Sie können auch einen über seine Adresse hinzufügen. Die Verbindungen sind verschlüsselt, und beim ersten Verbinden prüfen Sie den Fingerabdruck des Servers.",
+ "Recordings and transcripts travel only between this computer and the server you connect to, and the connection is encrypted.": "Aufnahmen und Transkripte werden nur zwischen diesem Computer und dem Server übertragen, mit dem Sie sich verbinden, und die Verbindung ist verschlüsselt.",
+ "Not connected to a server": "Mit keinem Server verbunden",
+ "SERVING": "AKTIV",
+ "NOT SERVING": "NICHT AKTIV",
+ "Waiting for recordings from other computers.": "Warten auf Aufnahmen von anderen Computern.",
+ "Recent recordings": "Letzte Aufnahmen",
+ "A recording is being transcribed. Closing now stops the server and cancels it.": "Eine Aufnahme wird gerade transkribiert. Wenn Sie jetzt schließen, wird der Server beendet und die Transkription abgebrochen.",
+ "Close the server?": "Server beenden?"
 }

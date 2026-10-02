@@ -95,11 +95,7 @@ public sealed partial class ShellViewModel
             : T("Watching {0} · {1} recordings arriving", WatchFolder, waiting);
     }
 
-    private static void OnUi(Action action)
-    {
-        if (System.Windows.Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess()) dispatcher.Invoke(action);
-        else action();
-    }
+    private static void OnUi(Action action) => RemoteSession.OnUi(action);
 
     private async Task<WatchOutcome> ProcessWatchedFileAsync(string path, CancellationToken token)
     {

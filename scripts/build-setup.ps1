@@ -1,10 +1,11 @@
-param([string]$Version = '', [string]$Notes = '')   # Notes appear in the update banner; pass a short plain-language summary of the release.
+param([string]$Version = '', [string]$Notes = '', [ValidateSet('Studio', 'Server', 'Client')][string]$Edition = 'Studio')   # Notes appear in the update banner; pass a short plain-language summary of the release.
 . "$PSScriptRoot/common.ps1"
+$info = Get-EditionInfo $Edition
 $releaseVersion = ([xml](Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 if (-not $Version) { $Version = $releaseVersion }
 if ($Version -ne $releaseVersion) { throw 'Package version must match Directory.Build.props.' }
-$packageRoot = Join-Path $repoRoot "artifacts/packages/$Version"
-$msi = Join-Path $packageRoot "Mockingbird-Studio-$Version-win-x64.msi"
+$packageRoot = Get-EditionPackageRoot $Version $info
+$msi = Join-Path $packageRoot "Mockingbird-$($info.Name)-$Version-win-x64.msi"
 if (-not (Test-Path -LiteralPath $msi)) { throw 'Run package.ps1 and build-msi.ps1 first.' }
 $wixExtension = Join-Path $repoRoot '.tools/wix-extensions/WixToolset.BootstrapperApplications.wixext/6.0.2/WixToolset.BootstrapperApplications.wixext.dll'
 if (-not (Test-Path -LiteralPath $wixExtension)) {
@@ -18,17 +19,17 @@ function XmlEscape([string]$value) { [Security.SecurityElement]::Escape($value) 
 # integrity manifest stay valid. The bundle is per-user: no administrator prompt.
 $wxs = @"
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
-  <Bundle Name="Mockingbird Studio" Version="$Version" Manufacturer="PufferfishGaming" UpgradeCode="5141A589-D800-47E9-8906-181D4668E635"
+  <Bundle Name="$($info.Product)" Version="$Version" Manufacturer="PufferfishGaming" UpgradeCode="$($info.BundleUpgrade)"
           Copyright="Copyright (c) 2026 PufferfishGaming. GPL-3.0-or-later." AboutUrl="https://github.com/PufferfishGaming/Mockingbird"
           IconSourceFile="$(XmlEscape $icon)">
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl="https://github.com/PufferfishGaming/Mockingbird/blob/main/LICENSE"
                                               LogoFile="$(XmlEscape $logo)" SuppressOptionsUI="yes" ShowVersion="yes" />
     </BootstrapperApplication>
-    <Variable Name="LaunchTarget" Value="[LocalAppDataFolder]Programs\TriASR\TriAsr.App.exe" />
-    <Variable Name="LaunchWorkingFolder" Value="[LocalAppDataFolder]Programs\TriASR" />
+    <Variable Name="LaunchTarget" Value="[LocalAppDataFolder]Programs\$($info.Folder)\TriAsr.App.exe" />
+    <Variable Name="LaunchWorkingFolder" Value="[LocalAppDataFolder]Programs\$($info.Folder)" />
     <Chain>
-      <MsiPackage Id="MockingbirdStudio" SourceFile="$(XmlEscape $msi)" Vital="yes">
+      <MsiPackage Id="Mockingbird$($info.Name)" SourceFile="$(XmlEscape $msi)" Vital="yes">
         <MsiProperty Name="ARPSYSTEMCOMPONENT" Value="1" />
       </MsiPackage>
     </Chain>
@@ -40,21 +41,21 @@ $source = Join-Path $packageRoot 'Setup.wxs'
 $env:DOTNET_ROOT = Split-Path $script:Dotnet -Parent
 $env:DOTNET_ROLL_FORWARD = 'Major'
 $wix = Join-Path $repoRoot '.tools/wix/wix.exe'
-$setup = Join-Path $packageRoot 'Mockingbird-Studio-Setup.exe'
+$setup = Join-Path $packageRoot $info.Setup
 if (Test-Path -LiteralPath $setup) { Remove-Item -LiteralPath $setup -Force }
 & $wix build $source -arch x64 -ext $wixExtension -o $setup
 if ($LASTEXITCODE -ne 0) { throw 'Setup build failed.' }
 $hash = Get-FileHash -LiteralPath $setup -Algorithm SHA256
-"$($hash.Hash)  Mockingbird-Studio-Setup.exe" | Set-Content -LiteralPath (Join-Path $packageRoot 'SHA256SUMS.txt') -Encoding ascii
-# latest.json is what installed apps read to learn about this release. Upload it AFTER Mockingbird-Studio-Setup.exe so
+"$($hash.Hash)  $($info.Setup)" | Set-Content -LiteralPath (Join-Path $packageRoot $info.Sums) -Encoding ascii
+# The manifest (latest.json for Studio, latest-server.json, latest-client.json) is what installed apps read to learn about this release. Upload it AFTER the Setup.exe so
 # no app is told about a version whose installer is not yet available. Written without a byte-order mark.
 $manifest = [ordered]@{
     schema = 1
     version = $Version
-    url = 'https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Studio-Setup.exe'
+    url = "https://github.com/PufferfishGaming/Mockingbird/releases/download/download/$($info.Setup)"
     sha256 = $hash.Hash
     bytes = (Get-Item -LiteralPath $setup).Length
     notes = $Notes
 }
-[IO.File]::WriteAllText((Join-Path $packageRoot 'latest.json'), ($manifest | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $packageRoot $info.Manifest), ($manifest | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
 $hash

@@ -806,5 +806,18 @@
  "Not connected: the server was not trusted.": "Non connecté : le serveur n'a pas été approuvé.",
  "Found {0}. Choose Connect.": "{0} trouvé. Choisissez Se connecter.",
  "That password was not accepted. Enter the password of {0} again.": "Ce mot de passe n'a pas été accepté. Saisissez de nouveau le mot de passe de {0}.",
- "No server connected": "Aucun serveur connecté"
+ "No server connected": "Aucun serveur connecté",
+ "TRANSCRIPTION RUNS ON THE SERVER": "LA TRANSCRIPTION SE FAIT SUR LE SERVEUR",
+ "Show or hide the panel with the servers on your network": "Afficher ou masquer le panneau des serveurs de votre réseau",
+ "Connect to a server": "Se connecter à un serveur",
+ "Your recordings are sent to a server, which transcribes them with the speech models installed there. The transcripts come back here to be read, edited and exported. Nothing is transcribed on this computer.": "Vos enregistrements sont envoyés à un serveur, qui les transcrit avec les modèles vocaux installés sur place. Les transcriptions reviennent ici pour être lues, modifiées et exportées. Rien n'est transcrit sur cet ordinateur.",
+ "Pick a server in the list on the right. Servers on this network appear by themselves; you can also add one by its address. Connections are encrypted, and the first time you connect you check the server's fingerprint.": "Choisissez un serveur dans la liste de droite. Les serveurs de ce réseau apparaissent d'eux-mêmes ; vous pouvez aussi en ajouter un par son adresse. Les connexions sont chiffrées et, à la première connexion, vous vérifiez l'empreinte du serveur.",
+ "Recordings and transcripts travel only between this computer and the server you connect to, and the connection is encrypted.": "Les enregistrements et les transcriptions ne circulent qu'entre cet ordinateur et le serveur auquel vous vous connectez, et la connexion est chiffrée.",
+ "Not connected to a server": "Non connecté à un serveur",
+ "SERVING": "EN SERVICE",
+ "NOT SERVING": "HORS SERVICE",
+ "Waiting for recordings from other computers.": "En attente des enregistrements d'autres ordinateurs.",
+ "Recent recordings": "Enregistrements récents",
+ "A recording is being transcribed. Closing now stops the server and cancels it.": "Un enregistrement est en cours de transcription. Si vous fermez maintenant, le serveur s'arrête et la transcription est annulée.",
+ "Close the server?": "Fermer le serveur ?"
 }

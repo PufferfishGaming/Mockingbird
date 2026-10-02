@@ -137,7 +137,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RestoreSetupSettings(settings);
         RestoreWatchSettings(settings);
         Host.Restore(settings);
-        Servers.Start();
+        if (Edition.CanConnect) Servers.Start(); // a server is not a client: it has no use for the list of servers on the network
         if (store.LastLoadError is not null) ReportError(T("Preferences could not be restored"), T("Defaults were loaded. {0}", store.LastLoadError));
         if (runtimes.StorageLoadError is not null) ReportError(T("Saved folders could not be restored"), T("Existing model files have not been removed. Select your previous model repository in Settings. {0}", runtimes.StorageLoadError));
         SelectedPage = Navigation[0];

@@ -13,9 +13,10 @@ public sealed record UpdateOffer(Version Version, string VersionText, Uri Downlo
 
 /// <summary>
 /// Where updates may come from. Production accepts only this project's GitHub release assets over HTTPS.
-/// The environment override exists for local end-to-end tests and only accepts a loopback address.
+/// The environment override exists for local end-to-end tests and only accepts a loopback address. Each edition (Studio, Server, Client) has a manifest
+/// and installers of its own, so that one never offers another's installer.
 /// </summary>
-public sealed record UpdateOptions(Uri ManifestUri, string AllowedHost, string AllowedPathPrefix, bool AllowLoopbackHttp = false, bool IsTestSource = false)
+public sealed record UpdateOptions(Uri ManifestUri, string AllowedHost, string AllowedPathPrefix, bool AllowLoopbackHttp = false, bool IsTestSource = false, string Edition = "Studio")
 {
     public const string ManifestEnvironmentVariable = "TRIASR_UPDATE_MANIFEST";
 
@@ -23,12 +24,16 @@ public sealed record UpdateOptions(Uri ManifestUri, string AllowedHost, string A
         new Uri("https://github.com/PufferfishGaming/Mockingbird/releases/download/download/latest.json"),
         "github.com", "/PufferfishGaming/Mockingbird/releases/download/");
 
-    public static UpdateOptions FromEnvironment()
+    /// <summary>The release information file of an edition: latest.json for Studio, latest-server.json and latest-client.json for the others.</summary>
+    public static UpdateOptions ForEdition(string edition) => edition == "Studio" ? GitHub
+        : GitHub with { ManifestUri = new Uri($"https://github.com/PufferfishGaming/Mockingbird/releases/download/download/latest-{edition.ToLowerInvariant()}.json"), Edition = edition };
+
+    public static UpdateOptions FromEnvironment(string edition = "Studio")
     {
         var value = Environment.GetEnvironmentVariable(ManifestEnvironmentVariable);
         return !string.IsNullOrWhiteSpace(value) && Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.IsLoopback && uri.Scheme == Uri.UriSchemeHttp
             ? new UpdateOptions(uri, uri.Host, "/", AllowLoopbackHttp: true, IsTestSource: true)
-            : GitHub;
+            : ForEdition(edition);
     }
 }
 
@@ -128,7 +133,7 @@ public sealed partial class UpdateService : IDisposable
     public async Task<string> DownloadAsync(UpdateOffer offer, string directory, IProgress<DownloadProgress>? progress = null, CancellationToken token = default)
     {
         Directory.CreateDirectory(directory);
-        var destination = Path.Combine(directory, $"Mockingbird-Studio-Setup-{offer.VersionText}.exe");
+        var destination = Path.Combine(directory, $"Mockingbird-{Options.Edition}-Setup-{offer.VersionText}.exe");
         var partial = destination + ".partial";
         TryDelete(partial); TryDelete(destination);
         var free = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(directory))!).AvailableFreeSpace;
@@ -177,7 +182,7 @@ public sealed partial class UpdateService : IDisposable
     public static void RemoveStaleDownloads(string directory)
     {
         if (!Directory.Exists(directory)) return;
-        foreach (var file in Directory.EnumerateFiles(directory, "Mockingbird-Studio-Setup-*"))
+        foreach (var file in Directory.EnumerateFiles(directory, "Mockingbird-*-Setup-*"))
             TryDelete(file);
     }
 

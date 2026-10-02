@@ -41,18 +41,10 @@ public sealed partial class ShellViewModel
     /// <summary>Arguments for the app the helper starts after the installer finishes. Normally none.</summary>
     public string? UpdateRelaunchArguments { get; set; }
     public UpdateOffer? AvailableUpdate => _updateOffer;
-    public string UpdateDirectory => Path.Combine(Path.GetTempPath(), "MockingbirdStudio-Update");
+    public string UpdateDirectory => Edition.UpdateDirectory;
     public string UpdateResultPath => Path.Combine(storage.Root, "Config", "update-result.json");
     /// <summary>Only the installed copy can replace itself; a development or portable copy would install a second one.</summary>
-    public bool CanSelfUpdate => updates.Options.IsTestSource || IsInstalledCopy();
-
-    private static bool IsInstalledCopy()
-    {
-        var path = Environment.ProcessPath;
-        if (path is null) return false;
-        var installRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "TriASR") + Path.DirectorySeparatorChar;
-        return Path.GetFullPath(path).StartsWith(installRoot, StringComparison.OrdinalIgnoreCase);
-    }
+    public bool CanSelfUpdate => updates.Options.IsTestSource || Edition.IsInstalledCopy();
 
     private AppSettings CurrentSettings() => Host.Write(new AppSettings(SelectedTheme, SelectedDensity, AnimateErrors: AnimateErrors,
         CheckForUpdates: AutoCheckUpdates, SkippedUpdateVersion: _skippedUpdateVersion, LastUpdateCheckUtc: _lastUpdateCheck, ResourceProfile: SelectedResourceProfile,

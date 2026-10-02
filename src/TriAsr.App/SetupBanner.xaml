@@ -1,0 +1,18 @@
+<UserControl x:Class="TriAsr.App.SetupBanner" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- The first-run setup banner. DataContext: ShellViewModel. -->
+  <Border Visibility="{Binding SetupBannerVisible, Converter={StaticResource BoolVisibility}}" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,0,0,2" Padding="24,14" AutomationProperties.Name="{local:T 'Setup'}" AutomationProperties.LiveSetting="Polite">
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{Binding SetupTitle}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding SetupDetail}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,16,0" />
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding SetupPercent}" IsIndeterminate="{Binding SetupIndeterminate}" Height="6" Margin="0,10,16,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding SetupRunning, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Setup progress'}" />
+      </StackPanel>
+      <WrapPanel Grid.Column="1" VerticalAlignment="Center" MaxWidth="380">
+        <Button Content="{Binding SetupStartLabel}" Command="{Binding RunSetupCommand}" Visibility="{Binding SetupCanStart, Converter={StaticResource BoolVisibility}}" Margin="0,0,10,4" ToolTip="{local:T 'Downloads the recommended speech models if needed and measures the speed of this computer. You can cancel and continue later.'}" />
+        <Button Content="{local:T 'Cancel'}" Command="{Binding CancelSetupCommand}" Visibility="{Binding SetupRunning, Converter={StaticResource BoolVisibility}}" Margin="0,0,10,4" />
+        <Button Content="{Binding SetupDismissLabel}" Command="{Binding DismissSetupCommand}" Visibility="{Binding SetupCanDismiss, Converter={StaticResource BoolVisibility}}" Margin="0,0,0,4" />
+      </WrapPanel>
+    </Grid>
+  </Border>
+</UserControl>

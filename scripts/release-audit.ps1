@@ -1,8 +1,9 @@
-param([switch]$RequirePublishReady)
+param([switch]$RequirePublishReady, [ValidateSet('Studio', 'Server', 'Client')][string]$Edition = 'Studio')
 . "$PSScriptRoot/common.ps1"
+$info = Get-EditionInfo $Edition
 $version = ([xml](Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
-$package = Join-Path $repoRoot "artifacts/packages/$version"
-$payload = Join-Path $package 'TriASR'
+$package = Get-EditionPackageRoot $version $info
+$payload = Join-Path $package $info.Folder
 $checks = [Collections.Generic.List[object]]::new()
 function Check([string]$name, [bool]$passed, [string]$detail) {
     $checks.Add([ordered]@{ Name=$name; Passed=$passed; Detail=$detail })
@@ -23,23 +24,26 @@ foreach ($entry in $manifest) {
 }
 Check 'Payload integrity' $valid "$($manifest.Count) files"
 $verification = Get-Content (Join-Path $package 'msi-verification.json') -Raw | ConvertFrom-Json
-Check 'Packaged pipeline and checkpoint reuse' ($verification.State -eq 8 -and $verification.Regions -gt 0 -and $verification.CheckpointReused) 'Administrative MSI extraction plus real audio smoke.'
-$msi = Join-Path $package "Mockingbird-Studio-$version-win-x64.msi"
+if ($info.Engines) { Check 'Packaged pipeline and checkpoint reuse' ($verification.State -eq 8 -and $verification.Regions -gt 0 -and $verification.CheckpointReused) 'Administrative MSI extraction plus real audio smoke.' }
+Check 'Packaged edition starts as itself' ($verification.Edition -eq $Edition -and $verification.Renders -gt 0) "$Edition from edition.txt, $($verification.Renders) renders"
+Check 'Edition marker matches' ((Get-Content -LiteralPath (Join-Path $payload 'edition.txt') -Raw).Trim() -eq $Edition.ToLowerInvariant()) $Edition
+if (-not $info.Engines) { Check 'No speech programs in the client' (-not (Test-Path -LiteralPath (Join-Path $payload 'Runtimes'))) 'The client sends recordings to a server and transcribes nothing.' }
+$msi = Join-Path $package "Mockingbird-$($info.Name)-$version-win-x64.msi"
 $signature = (Get-AuthenticodeSignature -LiteralPath $msi).Status.ToString()
 Check 'Signature status disclosed' ((Get-Content (Join-Path $repoRoot 'README.md') -Raw) -match 'unsigned') $signature
-$setup = Join-Path $package 'Mockingbird-Studio-Setup.exe'
-$sums = Join-Path $package 'SHA256SUMS.txt'
+$setup = Join-Path $package $info.Setup
+$sums = Join-Path $package $info.Sums
 $setupHash = if (Test-Path -LiteralPath $setup) { (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash } else { '' }
-Check 'Setup wizard built and checksummed' ($setupHash -ne '' -and (Test-Path -LiteralPath $sums) -and (Get-Content -LiteralPath $sums -Raw).Contains($setupHash)) "Mockingbird-Studio-Setup.exe $setupHash"
-$latestPath = Join-Path $package 'latest.json'
-$latestOk = $false; $latestDetail = 'latest.json missing'
+Check 'Setup wizard built and checksummed' ($setupHash -ne '' -and (Test-Path -LiteralPath $sums) -and (Get-Content -LiteralPath $sums -Raw).Contains($setupHash)) "$($info.Setup) $setupHash"
+$latestPath = Join-Path $package $info.Manifest
+$latestOk = $false; $latestDetail = "$($info.Manifest) missing"
 if (Test-Path -LiteralPath $latestPath) {
     $latest = Get-Content -LiteralPath $latestPath -Raw | ConvertFrom-Json
     $latestOk = $latest.schema -eq 1 -and $latest.version -eq $version -and $latest.sha256 -eq $setupHash -and $latest.bytes -eq (Get-Item -LiteralPath $setup).Length `
-        -and ([Uri]$latest.url).Scheme -eq 'https' -and ([Uri]$latest.url).Host -eq 'github.com' -and ([Uri]$latest.url).AbsolutePath.EndsWith('/Mockingbird-Studio-Setup.exe')
-    $latestDetail = "latest.json $($latest.version) $($latest.bytes) bytes"
+        -and ([Uri]$latest.url).Scheme -eq 'https' -and ([Uri]$latest.url).Host -eq 'github.com' -and ([Uri]$latest.url).AbsolutePath.EndsWith('/' + $info.Setup)
+    $latestDetail = "$($info.Manifest) $($latest.version) $($latest.bytes) bytes"
 }
-Check 'Update manifest matches the Setup.exe' $latestOk $latestDetail
+Check "Update manifest matches the $($info.Setup)" $latestOk $latestDetail
 $pending = @(
     'Complete third-party notices and exact FFmpeg GPL corresponding-source/build bundle',
     'Clean-machine install/download/offline/upgrade/uninstall acceptance',
