@@ -25,13 +25,14 @@ namespace TriAsr.App;
 /// <param name="Links">Fetches the sound of a web address for <c>POST /v1/links</c>. Null: this server does not fetch links.</param>
 /// <param name="Live">Reads one phrase of live dictation for <c>POST /v1/live</c>. Null: this server does not read dictation.</param>
 /// <param name="LiveReady">Whether <paramref name="Live"/> can read a phrase right now (a speech model is installed); null means always.</param>
+/// <param name="Notes">Keeps the notes for <c>/v1/notes</c>. Null: this server does not keep notes.</param>
 /// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c>. Null: this server does not delete recordings.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
     Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null,
-    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null);
+    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null, INoteStore? Notes = null);
 
 /// <summary>Everything the remote review page needs about a finished job.</summary>
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
@@ -171,6 +172,10 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "POST" ? await LiveAsync(request, token) : MethodNotAllowed("POST");
             case ["v1", "links"]:
                 return request.Method == "POST" ? await LinkAsync(request, token) : MethodNotAllowed("POST");
+            case ["v1", "notes"]:
+                return request.Method switch { "GET" => await NotesAsync(token), "POST" => await CreateNoteAsync(request, token), _ => MethodNotAllowed("GET, POST") };
+            case ["v1", "notes", var id]:
+                return request.Method switch { "GET" => await NoteAsync(id, token), "PUT" => await SaveNoteAsync(id, request, token), "DELETE" => await DeleteNoteAsync(id, token), _ => MethodNotAllowed("GET, PUT, DELETE") };
             case ["v1", "transcriptions", var id]:
                 return request.Method switch { "GET" => await StatusAsync(id, request, token), "DELETE" => await DeleteRecordingAsync(id, token), _ => MethodNotAllowed("GET, DELETE") };
             case ["v1", "transcriptions", var id, "transcript"]:
@@ -192,7 +197,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nGET  /v1/notes, POST /v1/notes             the notes kept on this server (JSON: title, text)\nGET  /v1/notes/{{id}}, PUT, DELETE        read, save (with the revision you read) and delete a note\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- who the request is for -------------------------------------------------------------------------------------------------------
 
@@ -336,14 +341,104 @@ public sealed class ApiService : IAsyncDisposable
             buffer.Write(piece, 0, read);
         }
         if (buffer.Length < 44) return HttpResponse.Error(400, "empty_upload", "Send one phrase as a WAV file in the request body.");
-        try { return HttpResponse.Json(200, new { text = await live.RecognizeAsync(buffer.ToArray(), language, token) }); }
+        try
+        {
+            // The words come back without the program's markers. A client that says how much of the phrase was speech (?speech=milliseconds) also gets nothing for the few words
+            // Whisper invents for a cough or a click, as the programs' own dictation does.
+            var text = PhraseText.Clean(await live.RecognizeAsync(buffer.ToArray(), language, token));
+            if (int.TryParse(request.Query.GetValueOrDefault("speech"), out var speech) && speech >= 0 && PhraseText.IsPhantom(text, TimeSpan.FromMilliseconds(speech))) text = "";
+            return HttpResponse.Json(200, new { text });
+        }
         catch (LiveException error) when (error.Message == LiveMessages.NoModel) { return HttpResponse.Error(409, "models_missing", error.Message); }
         catch (LiveException error) when (error.Message == LiveMessages.TooLong) { return HttpResponse.Error(413, "payload_too_large", error.Message); }
         catch (LiveException error) { return HttpResponse.Error(502, "live_failed", error.Message); }
     }
 
-    // ---- links ------------------------------------------------------------------------------------------------------------------------
+    // ---- notes ------------------------------------------------------------------------------------------------------------------------
 
+    private const int MaxNoteBody = 8 * 1024 * 1024;       // a note of the longest allowed size, with room for the JSON around it
+
+    private static RemoteNote Describe(UserNote note) => new(note.Id, note.Title, note.Text, note.CreatedUtc, note.UpdatedUtc, note.Revision);
+
+    private async Task<HttpResponse> NotesAsync(CancellationToken token)
+    {
+        if (_deps.Notes is not { } notes) return NotesUnavailable();
+        var list = await notes.ListAsync(token);
+        return HttpResponse.Json(200, new RemoteNotes(list.Select(note => new RemoteNoteSummary(note.Id, note.Title, NoteText.Preview(note.Text), note.CreatedUtc, note.UpdatedUtc, note.Revision, note.Text.Length)).ToArray()));
+    }
+
+    private async Task<HttpResponse> NoteAsync(string id, CancellationToken token)
+    {
+        if (_deps.Notes is not { } notes) return NotesUnavailable();
+        if (!Guid.TryParse(id, out var guid) || await notes.GetAsync(guid, token) is not { } note) return HttpResponse.Error(404, "not_found", NoteMessages.NotFound);
+        return HttpResponse.Json(200, Describe(note));
+    }
+
+    private async Task<HttpResponse> CreateNoteAsync(HttpRequest request, CancellationToken token)
+    {
+        if (_deps.Notes is not { } notes) return NotesUnavailable();
+        var (edit, refusal) = await ReadNoteEditAsync(request, token);
+        if (refusal is not null) return refusal;
+        try
+        {
+            var note = await notes.CreateAsync(edit!.Title ?? "", edit.Text ?? "", token);
+            return HttpResponse.Json(201, Describe(note)).With("Location", $"/v1/notes/{note.Id}");
+        }
+        catch (NoteException error) { return NoteProblem(error); }
+    }
+
+    private async Task<HttpResponse> SaveNoteAsync(string id, HttpRequest request, CancellationToken token)
+    {
+        if (_deps.Notes is not { } notes) return NotesUnavailable();
+        if (!Guid.TryParse(id, out var guid)) return HttpResponse.Error(404, "not_found", NoteMessages.NotFound);
+        var (edit, refusal) = await ReadNoteEditAsync(request, token);
+        if (refusal is not null) return refusal;
+        try
+        {
+            // A save that leaves out a part keeps what is there; one that leaves out the revision saves over whatever is there.
+            var current = await notes.GetAsync(guid, token);
+            if (current is null) return HttpResponse.Error(404, "not_found", NoteMessages.NotFound);
+            return HttpResponse.Json(200, Describe(await notes.SaveAsync(guid, edit!.Title ?? current.Title, edit.Text ?? current.Text, edit.Revision, token)));
+        }
+        catch (NoteException error) { return NoteProblem(error); }
+    }
+
+    private async Task<HttpResponse> DeleteNoteAsync(string id, CancellationToken token)
+    {
+        if (_deps.Notes is not { } notes) return NotesUnavailable();
+        if (!Guid.TryParse(id, out var guid) || !await notes.DeleteAsync(guid, token)) return HttpResponse.Error(404, "not_found", NoteMessages.NotFound);
+        return HttpResponse.Json(200, new { deleted = true });
+    }
+
+    private static HttpResponse NotesUnavailable() => HttpResponse.Error(501, "notes_unavailable", "This server does not keep notes.");
+
+    private static HttpResponse NoteProblem(NoteException error) => error.Message switch
+    {
+        NoteMessages.NotFound => HttpResponse.Error(404, "not_found", error.Message),
+        NoteMessages.Changed => HttpResponse.Error(409, "note_changed", error.Message),
+        NoteMessages.TooLong => HttpResponse.Error(413, "payload_too_large", error.Message),
+        _ => HttpResponse.Error(400, "bad_note", error.Message)
+    };
+
+    private static async Task<(RemoteNoteEdit?, HttpResponse?)> ReadNoteEditAsync(HttpRequest request, CancellationToken token)
+    {
+        if (request.ContentLength > MaxNoteBody) return (null, HttpResponse.Error(413, "payload_too_large", NoteMessages.TooLong));
+        using var buffer = new MemoryStream();
+        var piece = new byte[64 * 1024]; int read;
+        while ((read = await request.Body.ReadAsync(piece, token)) > 0)
+        {
+            if (buffer.Length + read > MaxNoteBody) return (null, HttpResponse.Error(413, "payload_too_large", NoteMessages.TooLong));
+            buffer.Write(piece, 0, read);
+        }
+        try
+        {
+            var edit = System.Text.Json.JsonSerializer.Deserialize<RemoteNoteEdit>(buffer.ToArray(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+            return edit is null ? (null, HttpResponse.Error(400, "bad_json", "Send JSON like {\"title\": \"…\", \"text\": \"…\"}.")) : (edit, null);
+        }
+        catch (System.Text.Json.JsonException) { return (null, HttpResponse.Error(400, "bad_json", "Send JSON like {\"title\": \"…\", \"text\": \"…\"}.")); }
+    }
+
+    // ---- links ------------------------------------------------------------------------------------------------------------------------
     /// <summary>
     /// <c>POST /v1/links</c> {"url", "language"}: this server downloads the sound of a web address and transcribes it. Only a server with a password
     /// does this, because it makes the server fetch what a client names. The address is checked at once (public hosts only); the download runs in the background
@@ -527,7 +622,7 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true)));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

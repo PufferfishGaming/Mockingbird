@@ -143,6 +143,7 @@
     stopPolling();
     state.password = ""; keep.set("sessionStorage", "mb-password", null);
     state.review = null; state.dirty = false;
+    abandonNotes();
     renderHeader();
     showLogin(message);
   }
@@ -178,6 +179,8 @@
 
   async function remount() {
     if (recorder.media) stopRecording();
+    if (notes.rec) await stopNoteRecording();
+    await flushNote();
     renderHeader();
     if (!state.health) return;
     if (state.health.passwordRequired && !state.password) { showLogin(""); return; }
@@ -192,8 +195,9 @@
     ui.newView = h("section", { id: "view-new" });
     ui.projectsView = h("section", { id: "view-projects" });
     ui.reviewView = h("section", { id: "view-review" });
+    ui.notesView = h("section", { id: "view-notes" });
     ui.tabs = h("nav", { class: "tabs", role: "tablist" });
-    ui.main.replaceChildren(ui.notice, ui.newView, ui.projectsView, ui.reviewView);
+    ui.main.replaceChildren(ui.notice, ui.newView, ui.projectsView, ui.reviewView, ui.notesView);
     ui.frame.querySelector("[data-tabs]").replaceChildren(ui.tabs);
     await guard(async () => {
       state.info = await getJson("/v1/server");
@@ -201,6 +205,7 @@
       state.languages = catalog.data;
     });
     buildNew();
+    buildNotes();
     renderTabs();
     selectTab(state.tab);
     renderInfoNotice();
@@ -210,17 +215,18 @@
   }
 
   function renderTabs() {
-    const items = [["new", t("New transcription")], ["projects", t("Projects")], ["review", t("Review")]];
+    const items = [["new", t("New transcription")], ["projects", t("Projects")], ["review", t("Review")], ["notes", t("Notes")]];
     ui.tabs.replaceChildren(...items.map(([id, label]) => h("button", { class: "tab", type: "button", role: "tab", id: "tab-" + id, "aria-selected": String(state.tab === id), onClick: () => selectTab(id) }, label)));
   }
 
   function selectTab(id) {
     state.tab = id;
-    for (const [name, view] of [["new", ui.newView], ["projects", ui.projectsView], ["review", ui.reviewView]]) view.hidden = name !== id;
+    for (const [name, view] of [["new", ui.newView], ["projects", ui.projectsView], ["review", ui.reviewView], ["notes", ui.notesView]]) view.hidden = name !== id;
     for (const tab of ui.tabs.children) tab.setAttribute("aria-selected", String(tab.id === "tab-" + id));
     if (id === "projects") renderProjects();
     if (id === "review") renderReview();
     if (id === "new") refreshInfo();
+    if (id === "notes") { renderNotesList(); refreshNotes(true); }
   }
 
   /** Looks at what the server says about itself again (its link helper may have been installed, its models downloaded). */
@@ -241,6 +247,7 @@
     state.timer = window.setInterval(async () => {
       if (document.visibilityState !== "visible" || !state.password && state.health && state.health.passwordRequired) return;
       await refreshJobs(true);
+      if (state.tab === "notes" && !notes.rec && !(notes.open && notes.open.dirty)) await refreshNotes(true);        // the notes change when others write
     }, 2500);
   }
   function stopPolling() { if (state.timer) { window.clearInterval(state.timer); state.timer = 0; } }
@@ -798,7 +805,409 @@
     }, (message) => t("Export failed") + ": " + message);
   }
 
-  window.addEventListener("beforeunload", (event) => { if (state.dirty || recorder.media) { event.preventDefault(); event.returnValue = ""; } });
+  // ---- notes ---------------------------------------------------------------------------------------------------------------------------
+  // Notes are kept on the server, a file each. The open note saves itself a moment after the last change and names the revision it opened, so that another window's changes are never
+  // overwritten. A note can be recorded: the sound is cut into phrases in this page (live.js), the server reads each phrase (POST /v1/live), and the words are added to the end of the note.
+
+  const notes = {
+    list: [], open: null, timer: 0, failed: "", notice: "", status: "", rec: null,
+    language: keep.get("localStorage", "mb-notes-language") || "auto",
+    keys: MbLive.parseCombo(keep.get("localStorage", "mb-notes-keys")), capture: null
+  };
+  let noteChain = Promise.resolve();
+
+  const shorten = (value, length) => value.length <= length ? value : value.slice(0, length).trimEnd() + "…";
+  const noteHeading = (note) => note.title || (note.preview ? shorten(note.preview, 48) : t("Untitled note"));
+
+  function buildNotes() {
+    ui.nList = h("ul", { class: "notelist", role: "listbox", "aria-label": t("Notes") });
+    ui.nNew = h("button", { class: "btn primary", type: "button", onClick: () => newNote() }, t("New note"));
+    ui.nEmpty = h("p", { class: "muted" }, t("No notes yet. Make one, then type or record into it."));
+    ui.nEditor = h("div");
+    ui.notesView.replaceChildren(h("h1", null, t("Notes")), h("div", { class: "notes" }, h("div", null, ui.nNew, ui.nEmpty, ui.nList), ui.nEditor));
+    renderNotesList();
+    renderNoteEditor();
+  }
+
+  function renderNotesList() {
+    if (!ui.nList) return;
+    const unavailable = !!state.info && state.info.notesEnabled === false;
+    ui.nNew.disabled = !!notes.rec || unavailable;
+    ui.nEmpty.hidden = notes.list.length > 0 || unavailable;
+    ui.nList.replaceChildren(...notes.list.map((note) => h("li", { role: "option", "aria-selected": String(!!notes.open && notes.open.id === note.id), onClick: () => { if (!notes.rec) openNote(note.id); } },
+      h("div", { class: "title" }, noteHeading(note)),
+      note.title && note.preview && h("div", { class: "preview" }, note.preview),
+      h("div", { class: "when" }, new Date(note.updatedUtc).toLocaleString(text.lang)))));
+  }
+
+  const defaultNoteStatus = () => notes.rec ? t("Listening…") : notes.failed ? notes.failed : notes.open && !notes.open.dirty ? t("All changes are saved") : "";
+  function setNoteStatus(value) {
+    notes.status = value;
+    if (ui.nStatus) ui.nStatus.textContent = value;
+  }
+
+  function renderNoteEditor() {
+    if (!ui.nEditor) return;
+    const info = state.info;
+    if (info && info.notesEnabled === false) { ui.nEditor.replaceChildren(h("p", { class: "muted" }, t("This server does not keep notes. It may be an older version."))); return; }
+    const open = notes.open;
+    if (!open) { ui.nEditor.replaceChildren(h("p", { class: "muted" }, t("Open a note from the list, or make a new one."))); return; }
+    const recording = !!notes.rec;
+    ui.nTitle = h("input", { type: "text", class: "notetitle", value: open.title, maxlength: "200", "aria-label": t("Title of the note"), title: t("Title of the note"),
+      onInput: (event) => { open.title = event.target.value; noteEdited(); } });
+    ui.nText = h("textarea", { class: "notetext", value: open.text, "aria-label": t("Text of the note"), onInput: (event) => { open.text = event.target.value; noteEdited(); } });
+    ui.nNotice = h("div", { class: "note", hidden: !notes.notice, style: "margin-top:12px" }, notes.notice);
+    ui.nStatus = h("span", { class: "muted", "aria-live": "polite" }, notes.status || defaultNoteStatus());
+    ui.nRecord = h("button", { class: "btn primary", type: "button", onClick: () => toggleNoteRecording() }, recording ? t("Stop recording") : t("Record"));
+    ui.nLevel = h("progress", { max: "100", value: "0", hidden: !recording, "aria-label": t("Microphone level") });
+    ui.nLanguage = h("select", { "aria-label": t("Language of the recording"), title: t("Choosing the language is more reliable than detecting it, because a phrase is short."), disabled: recording,
+      onChange: (event) => { notes.language = event.target.value; keep.set("localStorage", "mb-notes-language", notes.language); } }, languageOptions());
+    ui.nLanguage.value = notes.language;
+    ui.nMic = h("select", { "aria-label": t("Microphone"), disabled: recording }, h("option", { value: "" }, t("Default microphone")));
+    ui.nHint = h("p", { class: "note", hidden: !(info && info.liveEnabled === false), style: "margin-top:12px" }, t("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet."));
+    ui.nKeys = h("div", { style: "margin-top:14px" });
+    ui.nEditor.replaceChildren(ui.nTitle, ui.nNotice,
+      h("div", { class: "card", style: "margin-top:14px" },
+        h("div", { class: "row" }, ui.nRecord,
+          h("div", null, h("label", null, t("Language")), ui.nLanguage),
+          h("div", null, h("label", null, t("Microphone")), ui.nMic)),
+        ui.nLevel, ui.nHint, ui.nKeys),
+      ui.nText,
+      h("div", { class: "row", style: "margin-top:10px" }, ui.nStatus, h("span", { class: "spacer" }),
+        h("button", { class: "btn", type: "button", onClick: () => copyNote() }, t("Copy text")),
+        h("button", { class: "btn", type: "button", disabled: recording, title: t("Delete this note"), "aria-label": t("Delete note"), onClick: () => deleteNote() }, t("Delete"))));
+    renderNoteKeys();
+    listNoteMicrophones();
+  }
+
+  async function copyNote() {
+    if (!notes.open || !notes.open.text) return;
+    try { await navigator.clipboard.writeText(notes.open.text); }
+    catch { ui.nText.select(); try { document.execCommand("copy"); } catch { /* the person copies by hand */ } }
+  }
+
+  // ---- the list ------------------------------------------------------------------------------------------------------------------------
+
+  async function refreshNotes(quiet) {
+    if (state.info && state.info.notesEnabled === false) { notes.list = []; renderNotesList(); renderNoteEditor(); return; }
+    let list;
+    try { list = (await (await api("/v1/notes")).json()).data || []; }
+    catch (error) {
+      if (error instanceof ApiError && error.status === 401) { signOut(t("The password is wrong.")); return; }
+      if (!quiet) notice("error", t("The notes could not be read: {0}", t(error.message)));
+      return;
+    }
+    notes.list = list;
+    const open = notes.open;
+    const row = open && list.find((note) => note.id === open.id);
+    if (open && !open.dirty && !notes.rec) {
+      if (!row) { notes.open = null; renderNoteEditor(); }
+      else if (row.revision > open.revision) await loadNote(open.id);
+    }
+    renderNotesList();
+  }
+
+  async function loadNote(id) {
+    const data = await (await api("/v1/notes/" + id)).json();
+    notes.open = { id: data.id, title: data.title, text: data.text, revision: data.revision, dirty: false };
+    notes.failed = "";
+    renderNoteEditor();
+  }
+
+  async function openNote(id) {
+    if (notes.open && notes.open.id === id) return;
+    await flushNote();
+    notes.notice = ""; notes.status = "";
+    await guard(async () => {
+      try { await loadNote(id); }
+      catch (error) {
+        if (error instanceof ApiError && error.code === "not_found") { notes.open = null; notes.notice = t("That note was deleted on another computer."); await refreshNotes(); renderNoteEditor(); return; }
+        throw error;
+      }
+      renderNotesList();
+    }, (message) => t("The note could not be opened: {0}", t(message)));
+  }
+
+  async function newNote() {
+    if (notes.rec) return;
+    await flushNote();
+    await guard(async () => {
+      const data = await (await api("/v1/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "", text: "" }) })).json();
+      notes.list.unshift({ id: data.id, title: "", preview: "", updatedUtc: data.updatedUtc, createdUtc: data.createdUtc, revision: data.revision, length: 0 });
+      notes.open = { id: data.id, title: "", text: "", revision: data.revision, dirty: false };
+      notes.notice = ""; notes.failed = ""; notes.status = "";
+      renderNotesList();
+      renderNoteEditor();
+      ui.nTitle.focus();
+    }, (message) => t("The note could not be created: {0}", t(message)));
+  }
+
+  async function deleteNote() {
+    const open = notes.open;
+    if (!open || notes.rec) return;
+    const row = notes.list.find((note) => note.id === open.id);
+    if (!window.confirm(t("Delete \"{0}\"? The note and its text are removed. This cannot be undone.", noteHeading(row || { title: open.title, preview: shorten(open.text.replace(/\s+/g, " ").trim(), 60) })))) return;
+    window.clearTimeout(notes.timer);
+    await guard(async () => {
+      try { await api("/v1/notes/" + open.id, { method: "DELETE" }); }
+      catch (error) { if (!(error instanceof ApiError && error.code === "not_found")) throw error; }
+      notes.open = null; notes.notice = ""; notes.failed = ""; notes.status = "";
+      notes.list = notes.list.filter((note) => note.id !== open.id);
+      renderNotesList();
+      renderNoteEditor();
+    }, (message) => t("The note could not be deleted: {0}", t(message)));
+  }
+
+  // ---- saving --------------------------------------------------------------------------------------------------------------------------
+
+  function noteEdited() {
+    const open = notes.open;
+    if (!open) return;
+    open.dirty = true; notes.failed = "";
+    scheduleNoteSave(900);
+    setNoteStatus("");
+  }
+
+  function scheduleNoteSave(delay) {
+    window.clearTimeout(notes.timer);
+    notes.timer = window.setTimeout(() => saveNote(), delay);
+  }
+
+  /** Saves the open note if it changed. Saves follow one another, so that each names the revision the one before made. */
+  const saveNote = () => (noteChain = noteChain.then(saveNoteNow, saveNoteNow));
+
+  async function flushNote() {
+    window.clearTimeout(notes.timer);
+    for (let attempt = 0; attempt < 3 && notes.open && notes.open.dirty && !notes.failed; attempt++) await saveNote();
+  }
+
+  async function saveNoteNow() {
+    window.clearTimeout(notes.timer);
+    const open = notes.open;
+    if (!open || !open.dirty) return;
+    const { id, title, text: body, revision } = open;
+    setNoteStatus(t("Saving…"));
+    try {
+      const saved = await (await api("/v1/notes/" + id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, text: body, revision }) })).json();
+      notes.failed = "";
+      if (notes.open && notes.open.id === id) {
+        open.revision = saved.revision;
+        if (open.title === title && open.text === body) open.dirty = false; else scheduleNoteSave(900);   // changed again meanwhile: saved once more
+      }
+      const row = notes.list.find((note) => note.id === id);
+      if (row) { Object.assign(row, { title: saved.title, preview: MbPreview(saved.text), updatedUtc: saved.updatedUtc, revision: saved.revision }); notes.list = [row, ...notes.list.filter((note) => note !== row)]; }
+      renderNotesList();
+    } catch (error) { await noteSaveFailed(error, id, title, body); }
+    setNoteStatus(defaultNoteStatus());
+  }
+
+  /** The first words of a note for the list, as the server writes them. */
+  function MbPreview(value) {
+    const flat = value.replace(/\s+/g, " ").trim();
+    return flat.length > 160 ? flat.slice(0, 160).trimEnd() + "…" : flat;
+  }
+
+  async function noteSaveFailed(error, id, title, body) {
+    if (error instanceof ApiError && error.status === 401) { signOut(t("The password is wrong.")); return; }
+    try {
+      if (error instanceof ApiError && error.code === "note_changed") {
+        // Someone saved the note meanwhile. Nothing is overwritten and nothing is lost: what was written here is kept as a note of its own, and the note shows what the other computer saved.
+        const name = title || MbPreview(body).slice(0, 30);
+        const copy = await (await api("/v1/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: name ? t("{0} (my version)", name) : t("Untitled note (my version)"), text: body }) })).json();
+        notes.notice = t("This note was changed on another computer. What you wrote was kept as a new note called \"{0}\".", copy.title);
+        await loadNote(id);
+        await refreshNotes(true);
+        return;
+      }
+      if (error instanceof ApiError && error.code === "not_found") {
+        const again = await (await api("/v1/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, text: body }) })).json();
+        notes.notice = t("This note was deleted on another computer. It was saved again.");
+        notes.open = { id: again.id, title, text: body, revision: again.revision, dirty: false };
+        await refreshNotes(true);
+        renderNoteEditor();
+        return;
+      }
+    } catch (second) { error = second; }
+    notes.failed = t("The note could not be saved: {0}", t(error.message));
+    scheduleNoteSave(5000);                                   // and tried again in a moment
+    renderNoteEditor();
+  }
+
+  // ---- recording ------------------------------------------------------------------------------------------------------------------------
+
+  async function listNoteMicrophones() {
+    try {
+      const found = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "audioinput" && device.deviceId && device.deviceId !== "default");
+      if (!ui.nMic || !found.length) return;
+      const chosen = ui.nMic.value;
+      ui.nMic.replaceChildren(h("option", { value: "" }, t("Default microphone")), ...found.map((device) => h("option", { value: device.deviceId }, device.label || t("Microphone"))));
+      ui.nMic.value = found.some((device) => device.deviceId === chosen) ? chosen : "";
+    } catch { /* the list stays as it was */ }
+  }
+
+  const toggleNoteRecording = () => notes.rec ? stopNoteRecording() : startNoteRecording();
+
+  async function startNoteRecording() {
+    if (notes.rec || notes.starting) return;
+    if (state.info && state.info.notesEnabled === false) return;
+    if (!state.info || state.info.liveEnabled !== true) { setNoteStatus(t("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet.")); return; }
+    if (!window.isSecureContext || !navigator.mediaDevices) { setNoteStatus(t("The browser only allows recording on a secure page (https, or localhost).")); return; }
+    if (typeof AudioWorkletNode === "undefined") { setNoteStatus(t("Recording is not available in this browser.")); return; }
+    notes.starting = true;
+    try {
+      if (!notes.open) await newNote();
+      if (!notes.open) return;
+      const wanted = ui.nMic ? ui.nMic.value : "";
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: wanted ? { deviceId: { exact: wanted } } : true }); }
+      catch (error) {
+        setNoteStatus(error && error.name === "NotFoundError" ? t("No microphone was found. Connect one and allow the browser to use it.")
+          : t("The browser did not allow this page to use the microphone. Allow it in the address bar, then try again."));
+        return;
+      }
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      try { await context.audioWorklet.addModule("/worklet.js"); }
+      catch { for (const track of stream.getTracks()) track.stop(); context.close().catch(() => { }); setNoteStatus(t("Recording is not available in this browser.")); return; }
+      const source = context.createMediaStreamSource(stream);
+      const node = new AudioWorkletNode(context, "mb-tap", { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
+      const silent = context.createGain();
+      silent.gain.value = 0;                                  // the sound goes through the page and out of no speaker
+      source.connect(node); node.connect(silent); silent.connect(context.destination);
+      const resampler = new MbLive.Resampler(context.sampleRate);
+      const rec = { context, stream, node, source, language: notes.language, queue: [], busy: null, problem: false, meter: 0 };
+      rec.detector = new MbLive.UtteranceDetector((phrase) => { rec.queue.push(phrase); pumpPhrases(rec); });
+      node.port.onmessage = (event) => { const pcm = resampler.push(event.data); if (pcm.length) rec.detector.feed(pcm); };
+      rec.meter = window.setInterval(() => { if (ui.nLevel) ui.nLevel.value = Math.min(100, rec.detector.level * 600); }, 100);
+      notes.rec = rec;
+      setNoteStatus(t("Listening…"));
+      renderNotesList();
+      renderNoteEditor();
+    } finally { notes.starting = false; }
+  }
+
+  /** Reads the phrases one at a time, in the order they were spoken, so that a slow phrase never overtakes a quick one. */
+  function pumpPhrases(rec) {
+    if (rec.busy) return;
+    rec.busy = (async () => {
+      while (rec.queue.length) {
+        const phrase = rec.queue.shift();
+        if (notes.rec === rec) setNoteStatus(t("Reading what you said…"));
+        try {
+          const response = await api("/v1/live?language=" + encodeURIComponent(rec.language) + "&speech=" + Math.round(phrase.speechMs), { method: "POST", headers: { "Content-Type": "audio/wav" }, body: MbLive.encodeWav(phrase.pcm) });
+          const words = ((await response.json()).text || "").trim();
+          rec.problem = false;
+          if (words && notes.open) addWords(words);
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 401) { signOut(t("The password is wrong.")); return; }
+          rec.problem = true;
+          setNoteStatus(error instanceof ApiError && error.status === 0 ? error.message : t(error.message));
+        }
+      }
+      if (notes.rec === rec && !rec.problem) setNoteStatus(t("Listening…"));
+    })().finally(() => { rec.busy = null; if (rec.queue.length) pumpPhrases(rec); });
+  }
+
+  /** The words of a phrase go to the end of the open note. */
+  function addWords(words) {
+    const open = notes.open;
+    open.text = MbLive.appendWords(open.text, words);
+    if (ui.nText) { ui.nText.value = open.text; ui.nText.scrollTop = ui.nText.scrollHeight; }
+    noteEdited();
+    if (notes.rec) setNoteStatus(t("Listening…"));
+  }
+
+  async function stopNoteRecording() {
+    const rec = notes.rec;
+    if (!rec) return;
+    notes.rec = null;                                          // no new sound is taken from now on
+    window.clearInterval(rec.meter);
+    for (const track of rec.stream.getTracks()) track.stop();
+    rec.node.port.onmessage = null;
+    rec.detector.flush();                                      // a phrase that was half-way is read as well
+    setNoteStatus(t("Finishing…"));
+    while (rec.busy || rec.queue.length) { pumpPhrases(rec); await (rec.busy || Promise.resolve()); }
+    try { rec.source.disconnect(); rec.node.disconnect(); await rec.context.close(); } catch { /* already closed */ }
+    await flushNote();
+    setNoteStatus(defaultNoteStatus());
+    renderNotesList();
+    renderNoteEditor();
+  }
+
+  // ---- the keys of recording ---------------------------------------------------------------------------------------------------------
+  // They work while this page is open. Press Change keys, press the keys, click Done (with the mouse: every key goes to the keys being chosen).
+
+  function renderNoteKeys() {
+    if (!ui.nKeys) return;
+    ui.nKeys.replaceChildren(h("label", null, t("Keys to start and stop recording")),
+      h("div", { class: "row" }, h("span", { class: "keybox" }, notes.keys ? MbLive.comboLabel(notes.keys) : t("Not set")),
+        h("button", { class: "btn", type: "button", onClick: () => beginCapture() }, t("Change keys"))),
+      h("p", { class: "keys" }, t("The keys work while this page is open.")));
+  }
+
+  const keyProblemText = (combo) => {
+    const problem = MbLive.comboProblem(combo);
+    return problem === "needsModifier" ? t("Hold Alt (or Ctrl and Shift) while you press the key, or use a function key such as F9 on its own.")
+      : problem === "common" ? t("Almost every program uses these keys (copying, pasting, closing and the like). Choose other keys.") : "";
+  };
+
+  function beginCapture() {
+    const capture = notes.capture = { pending: null, held: "" };
+    const combo = h("div", { class: "combo", "aria-live": "polite" });
+    const problem = h("div", { class: "problem", role: "alert" });
+    const hint = h("p", { class: "keys", hidden: true }, t("Click here first, then press the keys."));
+    const button = (label, action, primary) => h("button", { class: "btn" + (primary ? " primary" : ""), type: "button", tabindex: "-1", onMouseDown: (event) => event.preventDefault(), onClick: action }, label);
+    const done = button(t("Done"), () => finishCapture(capture.pending), true);
+    const panel = h("div", { class: "capture", tabindex: "0", "aria-label": t("Press the keys you want to use") }, combo, h("p", { class: "muted" }, t("Press the keys together, then click Done.")), hint, problem,
+      h("div", { class: "row" }, done, button(t("Cancel"), () => endCapture()), button(t("Turn off"), () => finishCapture(null))));
+    const show = () => {
+      combo.textContent = capture.held ? capture.held + "…" : capture.pending ? MbLive.comboLabel(capture.pending) : t("Press the keys you want to use");
+      problem.textContent = capture.pending ? keyProblemText(capture.pending) : "";
+      done.disabled = !capture.pending || !!problem.textContent;
+    };
+    const held = (event) => (event.ctrlKey ? "Ctrl+" : "") + (event.altKey ? "Alt+" : "") + (event.shiftKey ? "Shift+" : "");
+    panel.addEventListener("keydown", (event) => {
+      event.preventDefault(); event.stopPropagation();           // every key is for the keys being chosen
+      if (event.repeat) return;
+      const next = MbLive.comboOf(event);
+      if (next) { capture.pending = next; capture.held = ""; } else capture.held = held(event);
+      show();
+    });
+    // Letting go of a key shows nothing new, except that the modifiers shown while they are being held follow what is still held; the keys that were pressed stay on show.
+    panel.addEventListener("keyup", (event) => { event.preventDefault(); if (capture.held) { capture.held = held(event); show(); } });
+    panel.addEventListener("focus", () => { hint.hidden = true; });
+    panel.addEventListener("blur", () => { hint.hidden = false; });
+    panel.addEventListener("mousedown", () => panel.focus());
+    ui.nKeys.replaceChildren(h("label", null, t("Keys to start and stop recording")), panel);
+    show();
+    panel.focus();
+  }
+
+  function endCapture() { notes.capture = null; renderNoteKeys(); }
+
+  function finishCapture(combo) {
+    notes.keys = combo;
+    keep.set("localStorage", "mb-notes-keys", combo ? MbLive.comboId(combo) : null);
+    endCapture();
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.repeat || notes.capture || !notes.keys || !ui.notesView || (state.health && state.health.passwordRequired && !state.password)) return;
+    const combo = MbLive.comboOf(event);
+    if (!combo || !MbLive.same(combo, notes.keys)) return;
+    event.preventDefault();
+    selectTab("notes");
+    toggleNoteRecording();
+  });
+  /** The person signed out (or the password was refused): the note that was open is let go of without being saved, and a recording stops. */
+  function abandonNotes() {
+    const rec = notes.rec;
+    notes.rec = null;
+    if (rec) { window.clearInterval(rec.meter); for (const track of rec.stream.getTracks()) track.stop(); rec.context.close().catch(() => { }); }
+    window.clearTimeout(notes.timer);
+    Object.assign(notes, { list: [], open: null, failed: "", notice: "", status: "", capture: null });
+  }
+
+  window.addEventListener("beforeunload", (event) => { if (state.dirty || recorder.media || notes.rec || (notes.open && notes.open.dirty)) { event.preventDefault(); event.returnValue = ""; } });
 
   document.addEventListener("keydown", (event) => {
     if (state.tab !== "review" || !state.review || event.ctrlKey || event.metaKey || event.altKey) return;

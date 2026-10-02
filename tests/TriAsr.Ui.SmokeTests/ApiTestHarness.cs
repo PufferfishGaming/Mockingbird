@@ -125,6 +125,8 @@ internal sealed class Harness : IAsyncDisposable
     public FakeLinks? Links { get; set; }
     /// <summary>Reads the phrases of live dictation for <c>POST /v1/live</c>; null makes the server one that does not read dictation.</summary>
     public FakeLive? Live { get; set; }
+    /// <summary>Keeps the notes for <c>/v1/notes</c>; null makes the server one that keeps no notes.</summary>
+    public INoteStore? Notes { get; set; }
     /// <summary>Deletes a finished recording with its files, the real thing over the harness's repository and folders.</summary>
     public ProjectRemoval Removal { get; private set; } = null!;
     public FinalTranscript? Saved { get; private set; }
@@ -147,7 +149,7 @@ internal sealed class Harness : IAsyncDisposable
             (id, _) => Task.FromResult(ApiTestData.Transcript(id, harness.Native)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
             () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(ApiTestData.Transcript(id, harness.Native), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
-            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true));
+            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();
         harness.Identity = ServerIdentity.LoadOrCreate(Path.Combine(harness.Root, "Identity"));

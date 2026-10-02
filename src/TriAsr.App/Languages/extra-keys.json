@@ -199,5 +199,8 @@
  "The link helper is in use. Wait until the download that uses it has finished, then try again.",
  "No speech model is downloaded yet. Download one on the Models page.",
  "The phrase could not be recognised.",
- "The phrase is too long."
+ "The phrase is too long.",
+ "This note no longer exists.",
+ "This note was changed on another computer.",
+ "The note is too long."
 ]

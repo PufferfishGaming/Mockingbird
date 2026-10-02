@@ -66,6 +66,23 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     /// <summary>Where the words go. Only a test changes it, and before dictation is first used.</summary>
     public ITextOutput DictationOutput { get; set; } = new WindowsKeyboard();
 
+    private NotesViewModel? _notes;
+
+    /// <summary>
+    /// The notes of the connected server (ADR: notes), written and recorded here and kept there, so that the Client, the web page and Studio's own window see the same ones.
+    /// In the Client the keys of recording work in every program through this page; in Studio they belong to Studio's own notes.
+    /// </summary>
+    public NotesViewModel Notes => _notes ??= MakeNotes();
+
+    private NotesViewModel MakeNotes()
+    {
+        var notes = new NotesViewModel(() => _connection is { Info.NotesEnabled: true } ? new RemoteNoteSource(() => _connection?.Client) : null, Microphone, ServerEngine,
+            new NotesSettingsStore(_dataRoot), _onUi, ownsHotkey: Edition.IsClient,
+            noSourceText: () => _connection is null ? Loc.T("Connect to a server to use its notes.") : Loc.T("This server does not keep notes. It may be an older version."));
+        notes.ConnectionLost += reason => ConnectionLost?.Invoke(reason);
+        return notes;
+    }
+
     private DictationEngine ServerEngine()
     {
         if (_connection is not { } connection) return new(null, Loc.T("Connect to a server to dictate."));
@@ -133,8 +150,13 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     public bool IsNewTab => SelectedTab == "New";
     public bool IsProjectsTab => SelectedTab == "Projects";
     public bool IsReviewTab => SelectedTab == "Review";
+    public bool IsNotesTab => SelectedTab == "Notes";
 
-    partial void OnSelectedTabChanged(string value) { OnPropertyChanged(nameof(IsNewTab)); OnPropertyChanged(nameof(IsProjectsTab)); OnPropertyChanged(nameof(IsReviewTab)); OnPropertyChanged(nameof(ShowPlayer)); }
+    partial void OnSelectedTabChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsNewTab)); OnPropertyChanged(nameof(IsProjectsTab)); OnPropertyChanged(nameof(IsReviewTab)); OnPropertyChanged(nameof(IsNotesTab)); OnPropertyChanged(nameof(ShowPlayer));
+        if (value == "Notes") _ = Notes.RefreshAsync();                       // another window may have saved notes meanwhile
+    }
 
     [RelayCommand] private void ShowTab(string tab) => SelectedTab = tab;
 
@@ -159,6 +181,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _connection = connection;
         Jobs.Clear(); Regions.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
         if (connection is null && _dictation is { IsListening: true } running) _ = running.StopAsync();      // the server is gone: nothing can read the phrases
+        if (_notes is not null) _ = _notes.SourceChangedAsync();
         IsConnected = connection is not null;
         ServerName = connection?.Info.Name ?? "";
         SelectedTab = "New";
@@ -174,6 +197,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         UpdateCanSend();
         Link.ServerChanged();
         _dictation?.RefreshAvailability();
+        _notes?.RefreshAvailability();
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -184,6 +208,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _recorder?.RefreshTexts();
         Link.RefreshTexts();
         _dictation?.RefreshTexts();
+        _notes?.RefreshTexts();
         foreach (var row in Jobs) row.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
         if (Regions.Count > 0) ShowReviewSummary();
@@ -272,7 +297,13 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
                 var asked = Volatile.Read(ref _localChanges);
                 var list = await connection.Client.ListAsync(token);
                 var info = await connection.Client.InfoAsync(token);
-                _onUi(() => { if (ReferenceEquals(_connection?.Client, connection.Client)) { if (asked == _localChanges) Merge(list, replace: true); if (!ReferenceEquals(_connection.Info, info)) { _connection = _connection with { Info = info }; RefreshServerNote(info); } } });
+                _onUi(() =>
+                {
+                    if (!ReferenceEquals(_connection?.Client, connection.Client)) return;
+                    if (asked == _localChanges) Merge(list, replace: true);
+                    if (!ReferenceEquals(_connection.Info, info)) { _connection = _connection with { Info = info }; RefreshServerNote(info); }
+                    if (SelectedTab == "Notes" && _notes is { IsListening: false }) _ = _notes.RefreshAsync();         // the notes of the server change when others write
+                });
                 await Task.Delay(list.Any(job => !job.IsFinished) ? TimeSpan.FromMilliseconds(1200) : TimeSpan.FromSeconds(6), token);
             }
             catch (OperationCanceledException) { return; }
@@ -510,5 +541,6 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _polling?.Dispose(); _audio?.Dispose();
         _recorder?.Dispose();   // a recording that is running is saved
         _dictation?.Dispose();
+        _notes?.Dispose();
     }
 }

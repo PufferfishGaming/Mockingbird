@@ -136,6 +136,31 @@ public sealed class RemoteServerClient : IDisposable
         return document.RootElement.TryGetProperty("text", out var text) ? text.GetString() ?? "" : "";
     }
 
+    // ---- notes ------------------------------------------------------------------------------------------------------------------------
+
+    public async Task<IReadOnlyList<RemoteNoteSummary>> NotesAsync(CancellationToken token) => (await GetAsync<RemoteNotes>("/v1/notes", token)).Data;
+
+    public Task<RemoteNote> NoteAsync(Guid id, CancellationToken token) => GetAsync<RemoteNote>($"/v1/notes/{id}", token);
+
+    public async Task<RemoteNote> CreateNoteAsync(string title, string text, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/notes") { Content = JsonContent.Create(new RemoteNoteEdit(title, text, null), options: Json) };
+        using var response = await SendAsync(request, 60, token);
+        return (await response.Content.ReadJsonAsync<RemoteNote>(token))!;
+    }
+
+    /// <summary>Saves a note that was open at <paramref name="revision"/>. A note that someone else saved meanwhile is refused (<c>note_changed</c>); one that is gone, too (<c>not_found</c>).</summary>
+    public async Task<RemoteNote> SaveNoteAsync(Guid id, string title, string text, int revision, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"/v1/notes/{id}") { Content = JsonContent.Create(new RemoteNoteEdit(title, text, revision), options: Json) };
+        using var response = await SendAsync(request, 60, token);
+        return (await response.Content.ReadJsonAsync<RemoteNote>(token))!;
+    }
+
+    public async Task DeleteNoteAsync(Guid id, CancellationToken token)
+    {
+        using var response = await SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/v1/notes/{id}"), 60, token);
+    }
     /// <summary>Deletes a finished recording on the server with its transcript, edits and the copy of the recording it holds. One that is still being worked on is refused (<c>still_running</c>).</summary>
     public async Task DeleteAsync(Guid id, CancellationToken token)
     {

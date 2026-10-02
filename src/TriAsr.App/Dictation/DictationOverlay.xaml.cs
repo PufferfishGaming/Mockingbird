@@ -14,9 +14,9 @@ public partial class DictationOverlay : Window
 {
     private const int GwlExStyle = -20, WsExNoActivate = 0x08000000, WsExToolWindow = 0x00000080, WmMouseActivate = 0x0021, MaNoActivate = 3;
 
-    private readonly DictationViewModel _model;
+    private readonly ILiveOverlay _model;
 
-    public DictationOverlay(DictationViewModel model)
+    public DictationOverlay(ILiveOverlay model)
     {
         _model = model;
         InitializeComponent();
@@ -67,16 +67,13 @@ public partial class DictationOverlay : Window
     [DllImport("user32.dll", EntryPoint = "SetWindowLong")] private static extern int SetWindowLong(IntPtr window, int index, int value);
 }
 
-/// <summary>Shows the little dictation window and listens for its hotkey, for one <see cref="DictationViewModel"/>. It is created on the window's thread.</summary>
-public sealed class WpfDictationPresenter : IDictationPresenter, IDisposable
+/// <summary>Shows a little window that floats above the other programs for one <see cref="ILiveOverlay"/>. It is created on the window's thread.</summary>
+public sealed class WpfOverlayPresenter : IOverlayPresenter, IDisposable
 {
     private DictationOverlay? _overlay;
-    private GlobalHotkey? _hotkey;
-    private DictationViewModel? _model;
 
-    public void ShowOverlay(DictationViewModel model)
+    public void ShowOverlay(ILiveOverlay model)
     {
-        _model = model;
         _overlay ??= new DictationOverlay(model);
         _overlay.Show();
     }
@@ -87,22 +84,5 @@ public sealed class WpfDictationPresenter : IDictationPresenter, IDisposable
         _overlay = null;
     }
 
-    public bool RegisterHotkey(HotkeyChoice choice)
-    {
-        if (_hotkey is null)
-        {
-            _hotkey = new GlobalHotkey();
-            _hotkey.Pressed += async () => { if (_model is { } model) await model.ToggleListeningAsync(); };
-        }
-        return _hotkey.Register(choice);
-    }
-
-    public void UnregisterHotkey() => _hotkey?.Unregister();
-
-    public void Dispose()
-    {
-        HideOverlay();
-        _hotkey?.Dispose();
-        _hotkey = null;
-    }
+    public void Dispose() => HideOverlay();
 }

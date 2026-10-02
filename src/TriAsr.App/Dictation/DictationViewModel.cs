@@ -1,26 +1,12 @@
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Net.Http;
-using System.Threading.Channels;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TriAsr.Application;
-using TriAsr.Audio.Live;
 using TriAsr.Audio.Recording;
 using TriAsr.Domain;
 
 namespace TriAsr.App;
-
-/// <summary>What shows the little dictation window and listens for its hotkey. The windows provide it; tests use a stand-in.</summary>
-public interface IDictationPresenter
-{
-    void ShowOverlay(DictationViewModel model);
-    void HideOverlay();
-
-    /// <returns>False when another program already uses the keys.</returns>
-    bool RegisterHotkey(HotkeyChoice choice);
-    void UnregisterHotkey();
-}
 
 /// <summary>Where the phrases are read and why that may not be possible.</summary>
 /// <param name="Recognizer">Null when dictation cannot be used right now; <paramref name="Note"/> says why.</param>
@@ -28,12 +14,17 @@ public sealed record DictationEngine(ILiveRecognizer? Recognizer, string Note = 
 
 /// <summary>
 /// Live dictation (ADR: live dictation): a little window that floats above the other programs; while it listens, every phrase that is spoken is read and typed where
-/// the cursor is, in whatever program has the keyboard. The microphone's sound is cut into phrases at the pauses (<see cref="UtteranceDetector"/>), each phrase is read
-/// by <see cref="ILiveRecognizer"/> (on this computer, or on the server a Client is connected to), and the words go to <see cref="ITextOutput"/>. One phrase is read at a time
-/// and typed in the order it was spoken, so that a slow phrase never overtakes a quick one.
+/// the cursor is, in whatever program has the keyboard. The listening itself is a <see cref="LiveSession"/>; this puts the words on the keyboard (<see cref="ITextOutput"/>),
+/// keeps what the person chose, and shows the little window and its keys.
 /// </summary>
-public sealed partial class DictationViewModel : ObservableObject, IDisposable
+public sealed partial class DictationViewModel : ObservableObject, IDisposable, ILiveOverlay
 {
+    /// <summary>The name of dictation among the hotkeys of the program.</summary>
+    public const string HotkeyAction = "dictation";
+
+    /// <summary>The keys that start and stop dictation until the person chooses others.</summary>
+    public static readonly KeyCombo DefaultKeys = new(KeyCombo.Control | KeyCombo.Alt, 0x20);
+
     private static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
     private static readonly string TypeMethod = Loc.Key("Type the words"), PasteMethod = Loc.Key("Paste the words");
 
@@ -42,27 +33,31 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
     private readonly ITextOutput _output;
     private readonly DictationSettingsStore _store;
     private readonly Action<Action> _onUi;
-    private readonly object _gate = new();
-    private IDisposable? _capture;
-    private UtteranceDetector? _detector;
-    private Channel<Utterance>? _phrases;
-    private Task _consumer = Task.CompletedTask;
-    private CancellationTokenSource? _cancellation;
+    private readonly LiveSession _session;
     private Func<string>? _statusMake;
     private DictationSettings _saved;
     private bool _restoring;
-    private int _waiting;
-    private volatile bool _problem;                // a problem is on show; it stays until the next phrase is read
     private IReadOnlyList<LanguageOption>? _languages;
+    private IHotkeys? _hotkeys;
+    private IDisposable? _paused;
     private System.Windows.Threading.DispatcherTimer? _timer;
 
     public DictationViewModel(IMicrophone microphone, Func<DictationEngine> engine, ITextOutput output, DictationSettingsStore store, Action<Action> onUi)
     {
         _microphone = microphone; _engine = engine; _output = output; _store = store; _onUi = onUi;
         _saved = store.Load();
+        _session = new LiveSession(microphone, onUi);
+        _session.Reading += () => SetStatus(() => Loc.T("Reading what you said…"));
+        _session.Settled += () => SetStatus(() => Loc.T("Listening…"));
+        _session.Problem += make => SetStatus(make);
+        _session.MicrophoneFailed += make =>
+        {
+            if (!IsListening) return;
+            _ = StopAsync().ContinueWith(_ => _onUi(() => SetStatus(make)), TaskScheduler.Default);
+        };
+        Keybind = new KeybindViewModel(KeyCombo.ParseOr(_saved.Hotkey, DefaultKeys), DefaultKeys, RefuseKeys, Capturing, OnKeysChosen);
         _restoring = true;
         SelectedLanguage = _saved.Language;
-        SelectedHotkey = HotkeyChoice.Find(_saved.Hotkey);
         SelectedMethod = _saved.Method == "paste" ? PasteMethod : TypeMethod;
         RefreshDevices();
         _restoring = false;
@@ -70,16 +65,28 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
         SetStatus(null);
     }
 
-    /// <summary>Set by the window that shows the little window and listens for the hotkey.</summary>
-    public IDictationPresenter? Presenter { get; set; }
+    /// <summary>Set by the window that shows the little window.</summary>
+    public IOverlayPresenter? Presenter { get; set; }
+
+    /// <summary>Set by the window: the keys that work in every program. Dictation uses it while its little window is on show.</summary>
+    public IHotkeys? Hotkeys
+    {
+        get => _hotkeys;
+        set
+        {
+            _hotkeys = value;
+            value?.Claim(HotkeyAction, Keybind.Current);
+        }
+    }
+
+    /// <summary>The keys that start and stop dictation, and choosing others by pressing them.</summary>
+    public KeybindViewModel Keybind { get; }
 
     public IReadOnlyList<LanguageOption> Languages => _languages ??= LanguageText.InOrder(LanguageCatalog.All).Prepend(AutoDetect).ToArray();
-    public IReadOnlyList<HotkeyChoice> Hotkeys => HotkeyChoice.All;
     public IReadOnlyList<string> Methods { get; } = [TypeMethod, PasteMethod];
     public ObservableCollection<DeviceChoice> Devices { get; } = [];
 
     [ObservableProperty] private string _selectedLanguage = "auto";
-    [ObservableProperty] private HotkeyChoice _selectedHotkey = HotkeyChoice.All[0];
     [ObservableProperty] private string _selectedMethod = TypeMethod;
     [ObservableProperty] private DeviceChoice? _selectedDevice;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChoose))] private bool _isListening;
@@ -96,34 +103,26 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
     public bool IsAvailable => _engine().Recognizer is not null;
     public string OverlayButtonLabel => IsOverlayVisible ? Loc.T("Hide the dictation window") : Loc.T("Show the dictation window");
 
+    ICommand ILiveOverlay.ToggleListeningCommand => ToggleListeningCommand;
+
     partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(HasNote));
     partial void OnHotkeyNoteChanged(string value) => OnPropertyChanged(nameof(HasHotkeyNote));
-    partial void OnSelectedLanguageChanged(string value) => Save();
-    partial void OnSelectedMethodChanged(string value) => Save();
-    partial void OnSelectedDeviceChanged(DeviceChoice? value) => Save();
-    partial void OnSelectedHotkeyChanged(HotkeyChoice value)
-    {
-        Save();
-        if (_restoring) return;
-        if (IsOverlayVisible) RegisterHotkey();                    // the new keys take over at once
-        if (!IsListening && !_problem) SetStatus(null);            // and the hint names them
-    }
+    partial void OnSelectedLanguageChanged(string value) => Change(settings => settings with { Language = value });
+    partial void OnSelectedMethodChanged(string value) => Change(settings => settings with { Method = value == PasteMethod ? "paste" : "type" });
+    partial void OnSelectedDeviceChanged(DeviceChoice? value) => Change(settings => settings with { Microphone = value?.Id ?? WindowsMicrophone.DefaultDevice });
 
     private string MethodId => SelectedMethod == PasteMethod ? "paste" : "type";
 
-    private void Save()
+    /// <summary>Changes one thing the person chose. The file is read again first: Studio's dictation and the one of its Remote server page keep their choices in the same file, and the other may have changed something else meanwhile.</summary>
+    private void Change(Func<DictationSettings, DictationSettings> change)
     {
         if (_restoring) return;
-        _saved = _saved with { Language = SelectedLanguage, Hotkey = SelectedHotkey.Id, Method = MethodId, Microphone = SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice };
+        _saved = change(_store.Load());
         _store.Save(_saved);
     }
 
     /// <summary>The window was moved: the next time it appears where it was left.</summary>
-    public void RememberPosition(double left, double top)
-    {
-        _saved = _saved with { Left = left, Top = top };
-        _store.Save(_saved);
-    }
+    public void RememberPosition(double left, double top) => Change(settings => settings with { Left = left, Top = top });
 
     public (double Left, double Top)? Position => _saved is { Left: { } left, Top: { } top } ? (left, top) : null;
 
@@ -141,6 +140,34 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
         Note = _engine().Note;
         OnPropertyChanged(nameof(IsAvailable));
         if (!IsListening) SetStatus(null);
+    }
+
+    // ---- the keys ---------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Why the keys cannot be chosen: another program has them. Null when they are free.</summary>
+    private string? RefuseKeys(KeyCombo combo) =>
+        _hotkeys?.IsFree(combo, HotkeyAction) == false ? Loc.T("The keys {0} are used by another program, or already have a use here. Choose other keys.", combo.Label) : null;
+
+    /// <summary>The person is choosing keys: the keys that are on are switched off meanwhile, so that pressing one of them can be chosen too.</summary>
+    private void Capturing(bool on)
+    {
+        if (on) _paused ??= _hotkeys?.Pause();
+        else { _paused?.Dispose(); _paused = null; }
+    }
+
+    private void OnKeysChosen(KeyCombo combo)
+    {
+        Change(settings => settings with { Hotkey = combo.Id });
+        _hotkeys?.Claim(HotkeyAction, combo);
+        if (IsOverlayVisible) RegisterHotkey();                    // the new keys take over at once
+        if (!IsListening && !_session.HasProblem) SetStatus(null); // and the hint names them
+    }
+
+    private void RegisterHotkey()
+    {
+        var combo = Keybind.Current;
+        if (_hotkeys is null) return;
+        HotkeyNote = _hotkeys.Register(HotkeyAction, combo, async () => await ToggleListeningAsync()) ? "" : Loc.T("The keys {0} are used by another program. Choose other keys.", combo.Label);
     }
 
     // ---- the little window ------------------------------------------------------------------------------------------------------------
@@ -164,16 +191,10 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
     {
         if (!IsOverlayVisible) return;
         await StopAsync();
-        Presenter?.UnregisterHotkey();
+        _hotkeys?.Unregister(HotkeyAction);
         Presenter?.HideOverlay();
         IsOverlayVisible = false;
         HotkeyNote = "";
-    }
-
-    private void RegisterHotkey()
-    {
-        var choice = SelectedHotkey;
-        HotkeyNote = Presenter?.RegisterHotkey(choice) == false ? Loc.T("The keys {0} are used by another program. Choose other keys.", choice.Label) : "";
     }
 
     /// <summary>The window's own close button, and the hotkey: pressing it starts or stops dictation.</summary>
@@ -188,23 +209,15 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
     public async Task StartAsync()
     {
         if (IsListening) return;
-        await _consumer.ConfigureAwait(true);                         // a stop that is still reading its last phrase has to finish first
         var engine = _engine();
         if (engine.Recognizer is not { } recognizer) { SetStatus(() => _engine().Note); return; }
-        var phrases = Channel.CreateUnbounded<Utterance>(new UnboundedChannelOptions { SingleReader = true });
-        var detector = new UtteranceDetector(phrase => phrases.Writer.TryWrite(phrase));
-        var cancellation = new CancellationTokenSource();
-        try { _capture = _microphone.Start(SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice, piece => detector.Feed(piece.Span), error => _onUi(() => Failed(error))); }
+        try { await _session.StartAsync(SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice, recognizer, () => SelectedLanguage, Deliver); }
         catch (MicrophoneException error)
         {
-            cancellation.Dispose();
             var reason = error.Message;
             SetStatus(() => Loc.Describe(reason));
             return;
         }
-        lock (_gate) { _detector = detector; _phrases = phrases; _cancellation = cancellation; }
-        _consumer = Task.Run(() => ReadAndTypeAsync(recognizer, phrases.Reader, cancellation.Token));
-        _problem = false;
         IsListening = true;
         SetStatus(() => Loc.T("Listening…"));
         StartTimer();
@@ -213,102 +226,31 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
     /// <summary>Stops listening. What was being said is still read and typed, so nothing is lost; this returns when the last phrase has been dealt with.</summary>
     public async Task StopAsync()
     {
-        Channel<Utterance>? phrases;
-        UtteranceDetector? detector;
-        lock (_gate) { phrases = _phrases; detector = _detector; _phrases = null; _detector = null; }
-        if (!IsListening && phrases is null) { await _consumer.ConfigureAwait(true); return; }
+        if (!IsListening && !_session.IsListening) { await _session.StopAsync(); return; }
         IsListening = false;
         StopTimer();
-        _capture?.Dispose();                                          // waits for the last piece of sound
-        _capture = null;
-        detector?.Flush();
-        phrases?.Writer.TryComplete();
         Level = 0;
-        if (Volatile.Read(ref _waiting) > 0) SetStatus(() => Loc.T("Finishing…"));
-        await _consumer.ConfigureAwait(true);
-        _cancellation?.Dispose(); _cancellation = null;
+        await _session.StopAsync(() => SetStatus(() => Loc.T("Finishing…")));
         SetStatus(null);
     }
 
-    private void Failed(Exception error)
+    /// <summary>Types (or pastes) the words of a phrase, with a space after them for the next one.</summary>
+    private void Deliver(string text)
     {
-        if (!IsListening) return;
-        var reason = error.Message;
-        _ = StopAsync().ContinueWith(_ => _onUi(() => SetStatus(() => Loc.Describe(reason))), TaskScheduler.Default);
-    }
-
-    private async Task ReadAndTypeAsync(ILiveRecognizer recognizer, ChannelReader<Utterance> phrases, CancellationToken token)
-    {
-        try
-        {
-            await foreach (var phrase in phrases.ReadAllAsync(token).ConfigureAwait(false))
-            {
-                Interlocked.Increment(ref _waiting);
-                _problem = false;
-                _onUi(() => { if (IsListening) SetStatus(() => Loc.T("Reading what you said…")); });
-                try { await ReadOneAsync(recognizer, phrase, token).ConfigureAwait(false); }
-                finally
-                {
-                    var left = Interlocked.Decrement(ref _waiting);
-                    _onUi(() => { if (IsListening && left == 0 && !_problem) SetStatus(() => Loc.T("Listening…")); });
-                }
-            }
-        }
-        catch (OperationCanceledException) { }
-    }
-
-    private async Task ReadOneAsync(ILiveRecognizer recognizer, Utterance phrase, CancellationToken token)
-    {
-        string text;
-        var language = SelectedLanguage;
-        var method = MethodId;
-        try { text = PhraseText.Clean(await recognizer.RecognizeAsync(PhraseText.Wav(phrase.Pcm), language, token).ConfigureAwait(false)); }
-        catch (OperationCanceledException) { throw; }
-        catch (LiveException error) { var reason = error.Message; _problem = true; _onUi(() => SetStatus(() => Loc.Describe(reason))); return; }
-        catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or UnauthorizedAccessException)
-        {
-            var reason = error.Message;
-            _problem = true;
-            _onUi(() => SetStatus(() => Loc.T("The phrase could not be recognised: {0}", Loc.Describe(reason))));
-            return;
-        }
-        if (text.Length == 0 || PhraseText.IsPhantom(text, phrase.Speech)) return;
-        try
-        {
-            var typed = text + (EndsWithoutSpaces(text) ? "" : " ");
-            if (method == "paste") _output.Paste(typed); else _output.Type(typed);
-        }
-        catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
-        {
-            var reason = error.Message;
-            _problem = true;
-            _onUi(() => SetStatus(() => reason));
-            return;
-        }
+        var typed = text + (PhraseText.IsUnspacedScript(text[^1]) ? "" : " ");
+        if (MethodId == "paste") _output.Paste(typed); else _output.Type(typed);
         _onUi(() => LastText = text);
     }
 
-    /// <summary>Chinese, Japanese and Korean are written without a space between phrases.</summary>
-    private static bool EndsWithoutSpaces(string text)
-    {
-        var c = text[^1];
-        return c is >= '぀' and <= 'ヿ' or >= '㐀' and <= '鿿' or >= '가' and <= '힯' or >= '＀' and <= '￯' or '。' or '、';
-    }
 
     // ---- what the window shows ---------------------------------------------------------------------------------------------------
 
     /// <summary>Refreshes the level of the meter; the window's timer calls it ten times a second while listening.</summary>
-    public void Tick()
-    {
-        UtteranceDetector? detector;
-        lock (_gate) detector = _detector;
-        if (detector is null) return;
-        Level = Math.Min(100, detector.Level * 600);
-    }
+    public void Tick() => Level = _session.Level;
 
     private void SetStatus(Func<string>? make)
     {
-        _statusMake = make ?? (() => IsListening ? Loc.T("Listening…") : Loc.T("Press the button or {0} to start dictating.", SelectedHotkey.Label));
+        _statusMake = make ?? (() => IsListening ? Loc.T("Listening…") : Keybind.Current.IsNone ? Loc.T("Press the button to start dictating.") : Loc.T("Press the button or {0} to start dictating.", Keybind.Current.Label));
         Status = _statusMake();
     }
 
@@ -318,6 +260,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
         foreach (var device in Devices) device.NotifyLanguageChanged();
         _languages = null; OnPropertyChanged(nameof(Languages));
         OnPropertyChanged(nameof(OverlayButtonLabel));
+        Keybind.RefreshTexts();
         RefreshAvailability();
         if (_statusMake is not null) Status = _statusMake();
         if (HotkeyNote.Length > 0) RegisterHotkey();
@@ -336,11 +279,8 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         StopTimer();
-        Channel<Utterance>? phrases;
-        lock (_gate) { phrases = _phrases; _phrases = null; _detector = null; }
-        _capture?.Dispose(); _capture = null;
-        phrases?.Writer.TryComplete();
-        _cancellation?.Cancel();
-        Presenter?.UnregisterHotkey();
+        _session.Dispose();
+        _paused?.Dispose(); _paused = null;
+        _hotkeys?.Unregister(HotkeyAction);
     }
 }

@@ -20,13 +20,14 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
     ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor, IProcessRunner processes,
-    ILinkFetcher links, ILinkTool linkTool, ProjectRemoval removal, LocalLiveRecognizer live) : ObservableObject
+    ILinkFetcher links, ILinkTool linkTool, ProjectRemoval removal, LocalLiveRecognizer live, INoteStore noteStore) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
         new(Loc.Key("New Transcription"), Loc.Key("New transcription"), "M12,3 L12,21 M3,12 L21,12"),
         new(Loc.Key("Projects"), Loc.Key("Projects"), "M3,6 L10,6 L12,8 L21,8 L21,20 L3,20 Z"),
         new(Loc.Key("Review"), Loc.Key("Review"), "M3,12 L9,18 L21,5"),
+        new(Loc.Key("Notes"), Loc.Key("Notes"), "M5,3 L19,3 L19,21 L5,21 Z M8,8 L16,8 M8,12 L16,12 M8,16 L13,16"),
         new(RemoteServerPage, RemoteServerPage, "M3,5 L21,5 L21,15 L3,15 Z M8,19 L16,19 M12,15 L12,19"),
         new(Loc.Key("Models"), Loc.Key("Models"), "M12,2 L22,7 L22,17 L12,22 L2,17 L2,7 Z M2,7 L12,12 L22,7 M12,12 L12,22"),
         new(Loc.Key("Servers"), Loc.Key("Servers"), "M3,4 L21,4 L21,10 L3,10 Z M3,14 L21,14 L21,20 L3,20 Z M7,7 L8,7 M7,17 L8,17"),
@@ -215,6 +216,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         OnPropertyChanged(nameof(IsJobsPage));
         OnPropertyChanged(nameof(IsDiagnosticsPage));
         OnPropertyChanged(nameof(IsReviewPage)); OnPropertyChanged(nameof(IsRemotePage));
+        OnPropertyChanged(nameof(IsNotesPage));
+        if (value?.Name == "Notes" && _initialized) _ = Notes.RefreshAsync();      // another window may have saved notes meanwhile
         OnPropertyChanged(nameof(IsModelsPage)); OnPropertyChanged(nameof(IsServersPage));
         OnPropertyChanged(nameof(IsBenchmarkPage));
         OnPropertyChanged(nameof(IsLanguagesPage)); OnPropertyChanged(nameof(IsBackendsPage));

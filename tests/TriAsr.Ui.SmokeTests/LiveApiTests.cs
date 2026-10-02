@@ -33,6 +33,31 @@ public sealed class LiveApiTests
         Assert.Empty(api.Repository.Jobs);                                                    // dictation is not a project: nothing is stored
     }
 
+    private static async Task<string> TextOfAsync(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("text").GetString()!;
+
+    [Fact]
+    public async Task TheWordsComeBackWithoutTheProgramsMarkersAndWithoutTheWordsInventedForSoundThatHoldsNoSpeech()
+    {
+        var live = new FakeLive { Answer = "[BLANK_AUDIO] Hello   there. (music)" };
+        await using var api = await Harness.StartAsync(h => h.Live = live);
+        using var tidy = await PostAsync(api, Wav(), "?language=en");
+        Assert.Equal("Hello there.", await TextOfAsync(tidy));                                // markers and blanks are gone
+
+        live.Answer = "Thank you.";
+        using var unknown = await PostAsync(api, Wav(), "?language=en");
+        Assert.Equal("Thank you.", await TextOfAsync(unknown));                                // without a hint how much was speech the words are left alone
+        using var brief = await PostAsync(api, Wav(), "?language=en&speech=600");
+        Assert.Equal("", await TextOfAsync(brief));                                            // 0.6 s of sound: the words Whisper invents for a cough
+        using var spoken = await PostAsync(api, Wav(), "?language=en&speech=3000");
+        Assert.Equal("Thank you.", await TextOfAsync(spoken));                                 // the same words in a long phrase are a sentence
+        using var garbage = await PostAsync(api, Wav(), "?language=en&speech=lots");
+        Assert.Equal("Thank you.", await TextOfAsync(garbage));
+
+        live.Answer = "[BLANK_AUDIO]";
+        using var nothing = await PostAsync(api, Wav(), "?language=en&speech=900");
+        Assert.Equal("", await TextOfAsync(nothing));
+    }
     [Fact]
     public async Task ItNeedsThePasswordLikeEverythingElse()
     {

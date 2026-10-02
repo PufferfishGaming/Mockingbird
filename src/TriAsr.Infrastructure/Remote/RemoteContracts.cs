@@ -11,12 +11,24 @@ public sealed record RemoteHealth(string Status, string Name, string Edition, st
 /// <summary>What a connected client learns from <c>GET /v1/server</c>: whether this server can transcribe right now and how busy it is.</summary>
 /// <param name="LinksEnabled">The server fetches links for the computers that use it. It does so only when it has a password.</param>
 /// <param name="LiveEnabled">The server can read the phrases of live dictation right now (<c>POST /v1/live</c>): it has a speech model and the program that reads it.</param>
+/// <param name="NotesEnabled">The server keeps notes for the computers that use it (<c>/v1/notes</c>).</param>
 /// <param name="LinkPages">The server can also fetch the sound of web pages, not only of links straight to a file: its link helper is installed.</param>
 public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
-    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false);
+    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false);
 
 /// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
 public sealed record RemoteLinkRequest(string Url, string? Language);
+
+/// <summary>A note as <c>GET /v1/notes/{id}</c> answers it.</summary>
+public sealed record RemoteNote(Guid Id, string Title, string Text, DateTimeOffset CreatedUtc, DateTimeOffset UpdatedUtc, int Revision);
+
+/// <summary>A note in the list <c>GET /v1/notes</c> answers: without its text, but with the first words of it.</summary>
+public sealed record RemoteNoteSummary(Guid Id, string Title, string Preview, DateTimeOffset CreatedUtc, DateTimeOffset UpdatedUtc, int Revision, int Length);
+
+public sealed record RemoteNotes(IReadOnlyList<RemoteNoteSummary> Data);
+
+/// <summary>The body of <c>POST /v1/notes</c> and <c>PUT /v1/notes/{id}</c>. A save names the <paramref name="Revision"/> it was looking at; the server refuses it if the note has changed since.</summary>
+public sealed record RemoteNoteEdit(string? Title, string? Text, int? Revision);
 
 /// <param name="State"><c>queued</c>, <c>running</c>, <c>complete</c>, <c>failed</c> or <c>cancelled</c>.</param>
 public sealed record RemoteJob(Guid Id, string State, string? Stage, int Percent, string Language, string Name, DateTimeOffset CreatedUtc, string? Error)

@@ -29,13 +29,15 @@ public partial class RemoteWorkspaceView : UserControl
         Loaded += (_, _) =>
         {
             _timer.Start();
-            if (DataContext is RemoteWorkspaceViewModel model && _dictationPresenter is null) model.Dictation.Presenter = _dictationPresenter = new WpfDictationPresenter();
+            if (DataContext is RemoteWorkspaceViewModel model && _dictationPresenter is null) { model.Dictation.Presenter = _dictationPresenter = new WpfOverlayPresenter(); model.Dictation.Hotkeys = _hotkeys = new WpfHotkeys(); model.Notes.Presenter = _notesPresenter = new WpfOverlayPresenter(); model.Notes.Hotkeys = _hotkeys; }
         };
-        Unloaded += (_, _) => { _timer.Stop(); Player.Close(); _dictationPresenter?.Dispose(); _dictationPresenter = null; };
+        Unloaded += (_, _) => { _timer.Stop(); Player.Close(); _dictationPresenter?.Dispose(); _dictationPresenter = null; _notesPresenter?.Dispose(); _notesPresenter = null; _hotkeys?.Dispose(); _hotkeys = null; };
     }
 
     private RemoteWorkspaceViewModel Model => (RemoteWorkspaceViewModel)DataContext;
-    private WpfDictationPresenter? _dictationPresenter;
+    private WpfOverlayPresenter? _dictationPresenter;
+    private WpfHotkeys? _hotkeys;
+    private WpfOverlayPresenter? _notesPresenter;
 
     private void SelectFileClick(object sender, RoutedEventArgs args)
     {

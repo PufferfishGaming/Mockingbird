@@ -10,7 +10,7 @@ namespace TriAsr.App;
 
 /// <summary>
 /// The web page of a server: the pages of the desktop Client in a browser, from the same address as the API. The page itself holds nothing
-/// private, so it is served to anyone who asks; what it shows comes from the API, which asks for the password. Three small files are embedded in the
+/// private, so it is served to anyone who asks; what it shows comes from the API, which asks for the password. A few small files are embedded in the
 /// program (<c>Web/</c>), with no library and no address outside this server, which is what lets the policy below forbid everything else.
 /// </summary>
 public static partial class WebApp
@@ -30,6 +30,8 @@ public static partial class WebApp
             "/" when WantsPage(request) => File("index.html", "text/html; charset=utf-8"),
             "/app.js" => File("app.js", "text/javascript; charset=utf-8"),
             "/app.css" => File("app.css", "text/css; charset=utf-8"),
+            "/live.js" => File("live.js", "text/javascript; charset=utf-8"),
+            "/worklet.js" => File("worklet.js", "text/javascript; charset=utf-8"),
             "/ui/strings.json" => Strings(request),
             _ => null
         };
@@ -79,6 +81,8 @@ public static partial class WebApp
         texts.Add("Whisper and Canary transcription");
         texts.Add(TranscriptionProgressTracker.LinkStage);               // what a recording is doing while its link is fetched
         texts.UnionWith(LinkMessages.All);                               // why a link failed, in the words of the layers that fetch it
+        texts.UnionWith(NoteMessages.All);                               // why a note could not be saved
+        texts.UnionWith(LiveMessages.All);                               // why a phrase could not be read
         texts.UnionWith(["agreement", "uncertain", "manual"]);          // how a region came about (the two others are spelled out by the script)
         texts.Add(TriAsr.Fusion.TranscriptQuality.RepetitionWarning);    // a warning the review can carry
         return [.. texts];

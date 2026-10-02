@@ -20,6 +20,17 @@ internal static class ProjectDialogs
         return answer == MessageBoxResult.Yes;
     }
 
+    /// <summary>Asks whether to delete a note. Where the note is kept (this computer, or the server) is not the question: it is gone from there for good.</summary>
+    public static bool ConfirmDeleteNote(Window? owner, string name)
+    {
+        var text = Loc.T("Delete \"{0}\"? The note and its text are removed. This cannot be undone.", name);
+        var title = Loc.T("Delete note");
+        var answer = owner is null
+            ? MessageBox.Show(text, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
+            : MessageBox.Show(owner, text, title, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        return answer == MessageBoxResult.Yes;
+    }
+
     /// <summary>Whether the element is, or is inside, a button of the row (below <paramref name="row"/>), so that a click on "Delete" is not also a click on the row.</summary>
     public static bool IsInsideButton(DependencyObject? element, DependencyObject row)
     {

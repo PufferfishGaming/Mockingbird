@@ -100,6 +100,9 @@
             <TabItem Header="{local:T 'Raw'}"><StackPanel Margin="16"><TextBlock Text="{local:T 'Original engine output (read-only).'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,12" /><TextBox Text="{Binding RawWhisper, Mode=OneWay}" IsReadOnly="True" MaxHeight="250" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" /><TextBox Text="{Binding RawCanary, Mode=OneWay}" IsReadOnly="True" MaxHeight="250" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" Margin="0,12,0,0" /></StackPanel></TabItem>
           </TabControl>
         </StackPanel>
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsNotesPage, Converter={StaticResource BoolVisibility}}">
+          <local:NotesView DataContext="{Binding Notes}" />
+        </StackPanel>
         <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsModelsPage, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel>
             <TextBlock Text="{local:T 'Recommended for this computer'}" FontSize="20" FontWeight="SemiBold" />

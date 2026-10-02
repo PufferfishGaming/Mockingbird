@@ -89,3 +89,23 @@ audio { width: 100%; margin-top: 12px; }
 label[for="follow"] { display: inline-flex; align-items: center; margin: 0 0 0 8px; font-weight: 400; }
 .login { max-width: 460px; margin: 40px auto; }
 .clock { font: 600 18px/1 Consolas, "Cascadia Mono", monospace; font-variant-numeric: tabular-nums; }
+
+/* Notes: a list and the open note. */
+.notes { display: grid; grid-template-columns: minmax(220px, 280px) 1fr; gap: 22px; align-items: start; }
+@media (max-width: 820px) { .notes { grid-template-columns: 1fr; } }
+.notes > * { min-width: 0; }
+.notelist { list-style: none; margin: 10px 0 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); max-height: 62vh; overflow: auto; }
+.notelist li { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.notelist li:last-child { border-bottom: 0; }
+.notelist li[aria-selected="true"] { background: var(--accent-surface); }
+.notelist li:hover .title { color: var(--accent); }
+.notelist .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notelist .preview { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notelist .when { color: var(--muted); font-size: 11px; }
+input.notetitle { max-width: none; font-size: 20px; font-weight: 600; padding: 9px 12px; }
+textarea.notetext { min-height: 340px; padding: 14px; line-height: 1.55; }
+.keybox { display: inline-block; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 9px 14px; font-weight: 600; min-width: 150px; }
+.capture { border: 2px solid var(--border); border-radius: 8px; padding: 16px; background: var(--surface-2); max-width: 560px; }
+.capture:focus { border-color: var(--accent); outline: none; }
+.capture .combo { font-size: 22px; font-weight: 600; }
+.capture .problem { color: var(--error); margin-top: 8px; }

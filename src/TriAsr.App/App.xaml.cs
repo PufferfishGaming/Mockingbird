@@ -64,6 +64,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IJobRepository, JobRepository>();
         services.AddSingleton<ProjectRemoval>();
         services.AddSingleton<LocalLiveRecognizer>();
+        services.AddSingleton<INoteStore>(provider => new FileNoteStore(provider.GetRequiredService<IStoragePaths>().Root));
         services.AddSingleton<IRecordRepository, RecordRepository>();
         services.AddSingleton<IAudioNormalizer>(provider => new FfmpegNormalizer(provider.GetRequiredService<IProcessRunner>(), runtimes.Ffmpeg));
         services.AddSingleton<AudioJobQueue>();
@@ -442,6 +443,21 @@ public partial class App : System.Windows.Application
                     if (shell.Remote.Jobs.Count != 3) throw new InvalidOperationException($"The server's project list has {shell.Remote.Jobs.Count} recordings instead of 3.");
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-projects.png"), 1220, 900, 1);
+                    // Notes through the server: written in the pages of the server they are the server's notes (here Studio's own), and Studio's own Notes page shows them.
+                    shell.Remote.SelectedTab = "Notes";
+                    await shell.Remote.Notes.RefreshAsync();
+                    if (!shell.Remote.Notes.HasSource) throw new InvalidOperationException("The server does not offer notes: " + shell.Remote.Notes.NoSourceText);
+                    await shell.Remote.Notes.NewNoteAsync();
+                    shell.Remote.Notes.Title = "Notes through the server";
+                    shell.Remote.Notes.Text = "Written in the pages of the server.\nSaved on the server, and read by every window that uses it.";
+                    await shell.Remote.Notes.SaveNowAsync();
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-notes.png"), 1220, 1100, 1);
+                    await shell.Notes.RefreshAsync();
+                    if (shell.Notes.Notes.All(item => item.DisplayTitle != "Notes through the server")) throw new InvalidOperationException("A note written through the server is not among Studio's own notes.");
+                    await shell.Remote.Notes.DeleteOpenAsync();
+                    await shell.Notes.RefreshAsync();
+                    if (shell.Notes.Notes.Any(item => item.DisplayTitle == "Notes through the server")) throw new InvalidOperationException("A note deleted through the server is still among Studio's own notes.");
                     await shell.Remote.OpenReviewAsync(job.Id);
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     if (shell.Remote.Regions.Count == 0) throw new InvalidOperationException("The review of the server's recording is empty.");

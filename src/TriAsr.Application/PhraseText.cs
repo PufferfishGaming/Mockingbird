@@ -39,6 +39,21 @@ public static partial class PhraseText
         return plain.Length == 0 || Phantoms.Contains(plain);
     }
 
+    /// <summary>Chinese, Japanese and Korean (and the full-width forms) are written without a space between words and phrases.</summary>
+    public static bool IsUnspacedScript(char c) =>
+        c is >= '぀' and <= 'ヿ' or >= '㐀' and <= '鿿' or >= '가' and <= '힯' or >= '＀' and <= '￯' or '。' or '、';
+
+    /// <summary>
+    /// Puts the words of a phrase after the text of a note: with a space between them, except where the text is empty or already ends in a space or a line break,
+    /// or where either side is written without spaces.
+    /// </summary>
+    public static string Append(string text, string words)
+    {
+        if (words.Length == 0) return text;
+        if (text.Length == 0 || char.IsWhiteSpace(text[^1]) || IsUnspacedScript(text[^1]) || IsUnspacedScript(words[0])) return text + words;
+        return text + " " + words;
+    }
+
     /// <summary>A WAV file (16 kHz, mono, 16-bit) around the sound of a phrase.</summary>
     public static byte[] Wav(ReadOnlySpan<byte> pcm)
     {

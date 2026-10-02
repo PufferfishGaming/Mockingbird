@@ -19,7 +19,9 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true) ((ShellViewModel)DataContext).SetStorageLocation(dialog.FolderName, forModels);
     }
     private bool _playing;
-    private readonly WpfDictationPresenter _dictationPresenter;
+    private readonly WpfOverlayPresenter _dictationPresenter;
+    private readonly WpfHotkeys _hotkeys = new();
+    private readonly WpfOverlayPresenter _notesPresenter;
     public static readonly DependencyProperty IsNavigationCompactProperty = DependencyProperty.Register(
         nameof(IsNavigationCompact), typeof(bool), typeof(MainWindow), new PropertyMetadata(false));
     public bool IsNavigationCompact
@@ -33,8 +35,12 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         viewModel.Dialogs = new WpfServerDialogs(() => this);
-        _dictationPresenter = new WpfDictationPresenter();
+        _dictationPresenter = new WpfOverlayPresenter();
         viewModel.Dictation.Presenter = _dictationPresenter;
+        viewModel.Dictation.Hotkeys = _hotkeys;
+        _notesPresenter = new WpfOverlayPresenter();
+        viewModel.Notes.Presenter = _notesPresenter;
+        viewModel.Notes.Hotkeys = _hotkeys;
         viewModel.PropertyChanged += (_, change) =>
         {
             if (change.PropertyName == nameof(ShellViewModel.TerminalOutput) && viewModel.TerminalAutoScroll)
@@ -138,7 +144,10 @@ public partial class MainWindow : Window
         vm.StopWatchingForExit();
         vm.StopRecordingForExit();
         vm.StopDictationForExit();
+        vm.StopNotesForExit();
+        _notesPresenter.Dispose();
         _dictationPresenter.Dispose();
+        _hotkeys.Dispose();
         vm.Host.StopForExit();
         vm.Remote.Dispose();
         _ = vm.Servers.DisposeAsync().AsTask();

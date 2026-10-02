@@ -27,6 +27,7 @@ public sealed class WebAppTests
         Assert.Contains("<title>Mockingbird Client Webview</title>", html);
         Assert.Contains("const PRODUCT = \"Mockingbird Client Webview\"", await anonymous.GetStringAsync("/app.js"));
         Assert.Contains("<script src=\"/app.js\"></script>", html);
+        Assert.Contains("<script src=\"/live.js\"></script>", html);
         Assert.Contains("<link rel=\"stylesheet\" href=\"/app.css\">", html);
         Assert.DoesNotContain("<script>", html);   // nothing inline: the policy below allows only the script that comes from this server
 
@@ -40,7 +41,7 @@ public sealed class WebAppTests
     {
         await using var api = await Harness.StartAsync();
         using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
-        foreach (var (path, type) in new[] { ("/", "text/html"), ("/app.js", "text/javascript"), ("/app.css", "text/css"), ("/ui/strings.json?lang=hu", "application/json") })
+        foreach (var (path, type) in new[] { ("/", "text/html"), ("/app.js", "text/javascript"), ("/live.js", "text/javascript"), ("/worklet.js", "text/javascript"), ("/app.css", "text/css"), ("/ui/strings.json?lang=hu", "application/json") })
         {
             using var response = await anonymous.SendAsync(Browser(path));
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -149,7 +150,7 @@ public sealed class WebAppTests
     public void ThePageNeverBuildsMarkupFromWhatTheServerSendsAndNeverReachesOutsideItsServer()
     {
         var files = Directory.GetFiles(WebFolder()).ToArray();
-        Assert.Equal(["app.css", "app.js", "index.html"], files.Select(path => Path.GetFileName(path)!).Order().ToArray());
+        Assert.Equal(["app.css", "app.js", "index.html", "live.js", "worklet.js"], files.Select(path => Path.GetFileName(path)!).Order().ToArray());
         foreach (var path in files)
         {
             var source = File.ReadAllText(path);
@@ -234,6 +235,46 @@ public sealed class WebAppTests
             {
                 Assert.True(table.ContainsKey(text), $"{code}: {text}");
                 Assert.NotEqual(text, table[text]);
+            }
+        }
+    }
+
+    [Fact]
+    public void ThePageKeepsNotesOnTheServerAndSavesThemWithTheRevisionItOpened()
+    {
+        var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
+        Assert.Contains("api(\"/v1/notes\")", script);                                              // the list
+        Assert.Contains("api(\"/v1/notes/\" + id, { method: \"PUT\"", script);                      // a save ...
+        Assert.Contains("JSON.stringify({ title, text: body, revision })", script);                 // ... names the revision that was opened
+        Assert.Contains("error.code === \"note_changed\"", script);                                 // and a note that changed meanwhile is not overwritten
+        Assert.Contains("{0} (my version)", script);                                                // what was written here is kept as a note of its own
+        Assert.Contains("api(\"/v1/live?language=", script);                                        // a recorded phrase is read by the server
+        Assert.Contains("info.liveEnabled", script);
+        Assert.Contains("info.notesEnabled", script);
+        Assert.Contains("api(\"/v1/notes/\" + open.id, { method: \"DELETE\" })", script);
+        Assert.Contains("window.confirm(t(\"Delete \\\"{0}\\\"? The note and its text are removed.", script);   // a note is deleted only after asking
+        Assert.Contains("keep.set(\"localStorage\", \"mb-notes-keys\"", script);                    // the chosen keys are a convenience of this browser, nothing the server needs
+        Assert.DoesNotContain("localStorage.setItem(\"mb-notes-text", script);                      // the text of a note is never left in the browser
+    }
+
+    [Fact]
+    public async Task ThePagesTranslationsIncludeTheTextsOfTheNotesAndOfTheKeys()
+    {
+        await using var api = await Harness.StartAsync();
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        foreach (var code in new[] { "hu", "de", "es", "fr" })
+        {
+            var table = JsonSerializer.Deserialize<Dictionary<string, string>>(await anonymous.GetStringAsync("/ui/strings.json?lang=" + code))!;
+            foreach (var message in TriAsr.Application.NoteMessages.All.Concat(TriAsr.Application.LiveMessages.All).Concat(
+            [
+                "Notes", "New note", "Untitled note", "Change keys", "Press the keys you want to use", "Press the keys together, then click Done.", "Done", "Turn off", "Not set",
+                "Hold Alt (or Ctrl and Shift) while you press the key, or use a function key such as F9 on its own.", "The keys work while this page is open.", "Keys to start and stop recording",
+                "Almost every program uses these keys (copying, pasting, closing and the like). Choose other keys.", "Listening…", "Reading what you said…", "Finishing…", "Saving…", "All changes are saved",
+                "The note could not be saved: {0}", "This note was changed on another computer. What you wrote was kept as a new note called \"{0}\".", "This note was deleted on another computer. It was saved again."
+            ]))
+            {
+                Assert.True(table.ContainsKey(message), $"{code}: {message}");
+                if (!(code == "fr" && message == "Notes")) Assert.NotEqual(message, table[message]);          // the French word for notes is the English one
             }
         }
     }

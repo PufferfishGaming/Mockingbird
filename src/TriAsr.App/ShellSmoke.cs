@@ -57,6 +57,7 @@ public static class ShellSmoke
         count += await LanguageRendersAsync(window, shell, output);
         await KaraokeRendersAsync(window, shell, output);       // extra pictures for a look at the colours; not counted in the matrix
         DictationRenders(shell, output);
+        await NotesRendersAsync(window, shell, output);
         shell.ReportError("Download needs attention", "The download host is unavailable. Your downloaded models and partial files are retained. Retry when the connection is restored.");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (!shell.HasError || FindText(window, shell.ErrorTitle) is null) throw new InvalidOperationException("Error alert did not appear.");
@@ -123,6 +124,39 @@ public static class ShellSmoke
         shell.SelectedTheme = "Light";
     }
 
+    /// <summary>The Notes page with two notes (one open), and its key-choosing panel, in both themes.</summary>
+    private static async Task NotesRendersAsync(MainWindow window, ShellViewModel shell, string output)
+    {
+        var notes = shell.Notes;
+        await notes.RefreshAsync();
+        await notes.NewNoteAsync();
+        notes.Title = "Weekly planning";
+        notes.Text = "Monday: send the quarterly figures to the finance team.\nTuesday: review the contract with the supplier and call back about the delivery date.\nThursday: prepare the slides for the board meeting.";
+        await notes.SaveNowAsync();
+        await notes.NewNoteAsync();
+        notes.Text = "Remember to book the train tickets for the conference in March, and ask whether the hotel has a quiet room.";
+        await notes.SaveNowAsync();
+        notes.SelectedNote = notes.Notes.First(row => row.DisplayTitle == "Weekly planning");
+        await notes.Settled;
+        shell.SelectedPage = shell.Navigation.First(item => item.Name == "Notes");
+        window.Width = 1220;
+        foreach (var requested in new[] { "Light", "Dark" })
+        {
+            shell.SelectedTheme = requested;
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Capture(window, Path.Combine(output, $"notes-{requested}.png"), 1220, 1100, 1);
+        }
+        notes.Keybind.BeginCommand.Execute(null);
+        notes.Keybind.Hold(KeyCombo.Control | KeyCombo.Alt);
+        notes.Keybind.Press(0x4E, KeyCombo.Control | KeyCombo.Alt);
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Capture(window, Path.Combine(output, "notes-keys-Dark.png"), 1220, 1100, 1);
+        notes.Keybind.CancelCommand.Execute(null);
+        foreach (var row in notes.Notes.ToArray()) { notes.SelectedNote = row; await notes.Settled; await notes.DeleteOpenAsync(); }
+        shell.SelectedTheme = "Light";
+        shell.SelectedPage = shell.Navigation[0];
+    }
+
     /// <summary>Every language, live: the window changes language without a restart, and the pages with the most text are rendered for a look at the layout.</summary>
     private static async Task<int> LanguageRendersAsync(MainWindow window, ShellViewModel shell, string output)
     {
@@ -147,7 +181,7 @@ public static class ShellSmoke
             regions[1].PlayProgress = 0.6;   // as if the recording were part-way through the second region: its words show how far (karaoke). Set just before the capture because the player's timer clears it when nothing is loaded.
             Capture(window, Path.Combine(output, $"lang-{language.Code}-Review-open.png"), 1220, 1100, 1);
             count++;
-            foreach (var name in new[] { "New Transcription", "Models", "Benchmark", "Backends", "Settings" })
+            foreach (var name in new[] { "New Transcription", "Notes", "Models", "Benchmark", "Backends", "Settings" })
             {
                 var page = shell.Navigation.First(item => item.Name == name);
                 shell.SelectedPage = page;

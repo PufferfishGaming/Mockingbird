@@ -1,9 +1,11 @@
-using System.Buffers.Binary;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using TriAsr.App;
 using TriAsr.Application;
 using TriAsr.Audio.Recording;
+using Reader = TriAsr.Ui.SmokeTests.FakeReader;
+using Room = TriAsr.Ui.SmokeTests.FakeRoom;
+using static TriAsr.Ui.SmokeTests.Sound;
 
 namespace TriAsr.Ui.SmokeTests;
 
@@ -14,67 +16,6 @@ public sealed class DictationTests
 
     // ---- stand-ins ---------------------------------------------------------------------------------------------------------------
 
-    private sealed class Room : IMicrophone
-    {
-        private Action<ReadOnlyMemory<byte>>? _onData;
-        private Action<Exception>? _onFailure;
-        public Exception? CannotOpen { get; set; }
-        public int? Opened { get; private set; }
-        public bool Open { get; private set; }
-
-        public IReadOnlyList<InputDevice> Devices() => [new(WindowsMicrophone.DefaultDevice, ""), new(0, "Desk microphone"), new(1, "Headset")];
-
-        public IDisposable Start(int deviceId, Action<ReadOnlyMemory<byte>> onData, Action<Exception> onFailure)
-        {
-            if (CannotOpen is not null) throw CannotOpen;
-            Opened = deviceId; _onData = onData; _onFailure = onFailure; Open = true;
-            return new Handle(this);
-        }
-
-        /// <summary>Sound arrives in pieces of a tenth of a second, as from the real microphone.</summary>
-        public void Hear(byte[] sound)
-        {
-            for (var at = 0; at < sound.Length; at += 3200) _onData!(sound.AsMemory(at, Math.Min(3200, sound.Length - at)));
-        }
-
-        public void Unplug() => _onFailure!(new MicrophoneException("The microphone is being used by another program. Close that program, or choose another microphone."));
-
-        private sealed class Handle(Room room) : IDisposable { public void Dispose() => room.Open = false; }
-    }
-
-    private static byte[] Tone(double seconds, double rms)
-    {
-        var bytes = new byte[(int)(seconds * Rate) * 2];
-        var peak = rms * Math.Sqrt(2) * 32767;
-        for (var i = 0; i < bytes.Length / 2; i++) BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(i * 2), (short)(Math.Sin(2 * Math.PI * 220 * i / Rate) * peak));
-        return bytes;
-    }
-
-    private static byte[] Quiet(double seconds)
-    {
-        var random = new Random(7);
-        var bytes = new byte[(int)(seconds * Rate) * 2];
-        for (var i = 0; i < bytes.Length / 2; i++) BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(i * 2), (short)((random.NextDouble() * 2 - 1) * 60));
-        return bytes;
-    }
-
-    private static byte[] Join(params byte[][] parts) => parts.SelectMany(part => part).ToArray();
-
-    /// <summary>A phrase of speech with pauses around it.</summary>
-    private static byte[] Phrase(double seconds = 1.2) => Join(Quiet(0.5), Tone(seconds, 0.08), Quiet(1.2));
-
-    private sealed class Reader : ILiveRecognizer
-    {
-        public Func<int, byte[], string, Task<string>> Read { get; set; } = (_, _, _) => Task.FromResult("Hello there.");
-        public List<(byte[] Wav, string Language)> Calls { get; } = [];
-        public Task<string> RecognizeAsync(byte[] wav, string language, CancellationToken token)
-        {
-            int number;
-            lock (Calls) { Calls.Add((wav, language)); number = Calls.Count; }
-            return Read(number, wav, language);
-        }
-    }
-
     private sealed class Keyboard : ITextOutput
     {
         public List<string> Typed { get; } = [];
@@ -84,17 +25,12 @@ public sealed class DictationTests
         public void Paste(string text) { if (Fail is not null) throw Fail; lock (Pasted) Pasted.Add(text); }
     }
 
-    private sealed class Window : IDictationPresenter
+    private sealed class Window : IOverlayPresenter
     {
         public int Shown { get; private set; }
         public int Hidden { get; private set; }
-        public bool HotkeyFree { get; set; } = true;
-        public List<HotkeyChoice> Registered { get; } = [];
-        public int Unregistered { get; private set; }
-        public void ShowOverlay(DictationViewModel model) => Shown++;
+        public void ShowOverlay(ILiveOverlay model) => Shown++;
         public void HideOverlay() => Hidden++;
-        public bool RegisterHotkey(HotkeyChoice choice) { Registered.Add(choice); return HotkeyFree; }
-        public void UnregisterHotkey() => Unregistered++;
     }
 
     private sealed class Setup(string root) : IDisposable
@@ -103,6 +39,7 @@ public sealed class DictationTests
         public Reader Speech { get; } = new();
         public Keyboard Keys { get; } = new();
         public Window Screen { get; } = new();
+        public FakeHotkeys Hotkeys { get; } = new();
         public DictationEngine Engine { get; set; } = null!;
         public DictationSettingsStore Store { get; } = new(root);
         public DictationViewModel Model { get; set; } = null!;
@@ -119,7 +56,7 @@ public sealed class DictationTests
     }
 
     private static DictationViewModel Build(Setup setup) =>
-        new(setup.Microphone, () => setup.Engine, setup.Keys, setup.Store, action => action()) { Presenter = setup.Screen };
+        new(setup.Microphone, () => setup.Engine, setup.Keys, setup.Store, action => action()) { Presenter = setup.Screen, Hotkeys = setup.Hotkeys };
 
     private static async Task UntilAsync(Func<bool> condition, string because)
     {
@@ -326,7 +263,7 @@ public sealed class DictationTests
         setup.Model.ShowOverlay();
         Assert.True(setup.Model.IsOverlayVisible);
         Assert.Equal(1, setup.Screen.Shown);
-        Assert.Equal(["ctrl-alt-space"], setup.Screen.Registered.Select(choice => choice.Id));
+        Assert.Equal(["Ctrl+Alt+Space"], setup.Hotkeys.Registrations.Select(item => item.Combo.Id));
         Assert.Equal("Hide the dictation window", setup.Model.OverlayButtonLabel);
 
         await setup.Model.ToggleListeningAsync();                                         // the hotkey, or the button of the window
@@ -335,7 +272,7 @@ public sealed class DictationTests
         Assert.False(setup.Model.IsListening);
         Assert.False(setup.Model.IsOverlayVisible);
         Assert.Equal(1, setup.Screen.Hidden);
-        Assert.True(setup.Screen.Unregistered >= 1);
+        Assert.False(setup.Hotkeys.Registered.ContainsKey(DictationViewModel.HotkeyAction));
         Assert.Equal("Show the dictation window", setup.Model.OverlayButtonLabel);
     }
 
@@ -343,14 +280,14 @@ public sealed class DictationTests
     public async Task KeysThatAnotherProgramUsesAreReportedAndNewKeysTakeOverAtOnce()
     {
         using var setup = Make();
-        setup.Screen.HotkeyFree = false;
+        setup.Hotkeys.RegisterResult = false;
         setup.Model.ShowOverlay();
         Assert.True(setup.Model.HasHotkeyNote);
         Assert.Equal("The keys Ctrl+Alt+Space are used by another program. Choose other keys.", setup.Model.HotkeyNote);
-        setup.Screen.HotkeyFree = true;
-        setup.Model.SelectedHotkey = HotkeyChoice.Find("f9");
+        setup.Hotkeys.RegisterResult = true;
+        FakeHotkeys.Choose(setup.Model.Keybind, new KeyCombo(0, 0x78));                       // F9
         Assert.False(setup.Model.HasHotkeyNote);
-        Assert.Equal(["ctrl-alt-space", "f9"], setup.Screen.Registered.Select(choice => choice.Id));
+        Assert.Equal(["Ctrl+Alt+Space", "F9"], setup.Hotkeys.Registrations.Select(item => item.Combo.Id));
         Assert.Equal("Press the button or F9 to start dictating.", setup.Model.Status);
         await setup.Model.HideOverlayAsync();
     }
@@ -362,14 +299,14 @@ public sealed class DictationTests
         using (var first = Make(root))
         {
             first.Model.SelectedLanguage = "hu";
-            first.Model.SelectedHotkey = HotkeyChoice.Find("ctrl-alt-d");
+            FakeHotkeys.Choose(first.Model.Keybind, new KeyCombo(KeyCombo.Control | KeyCombo.Alt, 0x44));
             first.Model.SelectedMethod = "Paste the words";
             first.Model.SelectedDevice = first.Model.Devices.First(device => device.Id == 1);
             first.Model.RememberPosition(120.5, 340);
             first.Model.Dispose();
             var again = Build(first);
             Assert.Equal("hu", again.SelectedLanguage);
-            Assert.Equal("ctrl-alt-d", again.SelectedHotkey.Id);
+            Assert.Equal("Ctrl+Alt+D", again.Keybind.Current.Id);
             Assert.Equal("Paste the words", again.SelectedMethod);
             Assert.Equal(1, again.SelectedDevice!.Id);
             Assert.Equal((120.5, 340d), again.Position);
@@ -379,7 +316,14 @@ public sealed class DictationTests
         File.WriteAllText(store.FilePath, "{\"language\":\"\",\"hotkey\":\"nonsense\",\"method\":\"shout\",\"microphone\":-1}");
         var cleaned = store.Load();
         Assert.Equal("auto", cleaned.Language);
-        Assert.Equal("ctrl-alt-space", cleaned.Hotkey);
+        Assert.Equal("Ctrl+Alt+Space", cleaned.Hotkey);
+        File.WriteAllText(store.FilePath, "{\"hotkey\":\"ctrl-alt-d\"}");                       // the id an earlier version saved becomes the keys it stood for
+        Assert.Equal("Ctrl+Alt+D", store.Load().Hotkey);
+        File.WriteAllText(store.FilePath, "{\"hotkey\":\"\"}");                                  // no keys is a choice too
+        Assert.Equal("", store.Load().Hotkey);
+        File.WriteAllText(store.FilePath, "{\"hotkey\":\"A\"}");                                 // a letter on its own cannot be a hotkey
+        Assert.Equal("Ctrl+Alt+Space", store.Load().Hotkey);
+        File.WriteAllText(store.FilePath, "{\"language\":\"\",\"hotkey\":\"nonsense\",\"method\":\"shout\",\"microphone\":-1}");
         Assert.Equal("type", cleaned.Method);
         Assert.Null(DictationSettings.Normalize(new DictationSettings(Left: double.NaN, Top: double.PositiveInfinity)).Left);
         File.WriteAllText(store.FilePath, "this is not json");
@@ -437,15 +381,6 @@ public sealed class DictationTests
     [Fact]
     public void TheStructureWindowsIsGivenHasTheSizeItExpects() =>
         Assert.Equal(Environment.Is64BitProcess ? 40 : 28, WindowsKeyboard.InputSize);
-
-    [Fact]
-    public void TheKeyCombinationsAreDistinctAndAnUnknownOneBecomesTheFirst()
-    {
-        Assert.Equal(HotkeyChoice.All.Count, HotkeyChoice.All.Select(choice => choice.Id).Distinct().Count());
-        Assert.Equal(HotkeyChoice.All.Count, HotkeyChoice.All.Select(choice => (choice.Modifiers, choice.Key)).Distinct().Count());
-        Assert.Equal("ctrl-alt-space", HotkeyChoice.Find("no-such-keys").Id);
-        Assert.All(HotkeyChoice.All.Where(choice => choice.Modifiers == 0), choice => Assert.True(choice.Key is >= 0x70 and <= 0x7B));     // a key alone is a function key
-    }
 
     // ---- the real thing ----------------------------------------------------------------------------------------------------------------
 
