@@ -113,6 +113,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                     Issue("Whisper GPU attempt failed", "Retrying on CPU. " + error.Message);
                     first = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)).TranscribeAsync(normalized, seconds, language, FileFor(job.Id, "WhisperCpu"), "cpu", token, value => Report(job.Id, stage, value), vadModel);
                 }
+                first = await RemoveLoopsAsync(job.Id, first, configuration.SkipNonSpeech, token);
                 await Write(job.Id, "whisper.json", first, token); break;
             case JobState.RunningCanary:
                 if (File.Exists(FileFor(job.Id, "canary.json"))) { await Read<CanaryNative.Result>(job.Id, "canary.json", token); return; }
@@ -264,6 +265,27 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
         {
             await Write(id, "chunks.failed.json", new { Error = error.Message, AtUtc = DateTimeOffset.UtcNow }, token);
         }
+    }
+    /// <summary>
+    /// Whisper sometimes writes one phrase hundreds of times over a stretch without speech. The repeats are taken out before the other
+    /// stages see them (they would only be compared and sent to the correction model); the first copy stays, and Whisper's own output
+    /// (Whisper/raw.json) is untouched. What was removed is listed in Whisper/loops.json.
+    /// </summary>
+    private async Task<EngineTranscript> RemoveLoopsAsync(Guid id, EngineTranscript transcript, bool alreadySkipping, CancellationToken token)
+    {
+        var (kept, runs) = LoopGuard.Remove(transcript.Segments);
+        if (runs.Count == 0) return transcript;
+        var removed = runs.Sum(run => run.Copies - 1);
+        var minutes = runs.Sum(run => run.EndMs - run.StartMs) / 60000d;
+        await Write(id, "Whisper/loops.json", new
+        {
+            Reason = "The same segment was written again and again, back to back (see LoopGuard). The first copy of each run is kept.",
+            Removed = removed, Runs = runs, RawOutput = "Whisper/raw.json"
+        }, token);
+        Issue("Repeated text removed", $"Whisper wrote the same text {removed + runs.Count} times in a row ({minutes:0.#} minutes of the recording), a known failure over stretches without speech. "
+            + "The repeats were removed and Whisper's raw output is kept in the project folder, but speech inside that stretch may be missing from the transcript."
+            + (alreadySkipping ? "" : " Turning on \"Skip silence and music\" in Settings usually avoids this and finds that speech."));
+        return transcript with { Segments = kept, Text = string.Join(" ", kept.Select(segment => segment.Text)) };
     }
     private async Task<ChunkPlan?> TryReadPlanAsync(Guid id, CancellationToken token)
     {

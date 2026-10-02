@@ -40,4 +40,4 @@ There are no human-checked transcripts, so "accuracy" above means agreement with
 1. Per-chunk language (needs language detection without reloading the model for every chunk).
 2. Measure Canary with 30 s chunks against the 20 s it uses now.
 3. A cheaper way to drop only true silence (not music) by default, and a lower detector threshold for speech over loud sound.
-4. Whisper repetition loops ("Egy kicsit, hogy mi történik" 764 times) also happen without skipping; a loop guard that works in default mode.
+4. (Done: ADR-0006.) Whisper repetition loops ("Egy kicsit, hogy mi történik" hundreds of times) also happen without skipping; the loop guard removes them in every mode.

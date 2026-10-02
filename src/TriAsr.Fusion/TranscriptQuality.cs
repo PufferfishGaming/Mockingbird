@@ -44,7 +44,7 @@ public static class TranscriptQuality
         return transcript with { Regions = regions };
     }
 
-    private static string Normalize(string text)
+    internal static string Normalize(string text)
     {
         var normalized = new StringBuilder();
         foreach (var character in text)

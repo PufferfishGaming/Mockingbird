@@ -98,6 +98,7 @@ public sealed class SkipNonSpeechTests : IDisposable
     {
         public List<ProcessRequest> Requests { get; } = [];
         public CanaryRequest? Canary { get; private set; }
+        public string? WhisperOutput { get; init; }
         public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
         {
             Requests.Add(request);
@@ -112,7 +113,7 @@ public sealed class SkipNonSpeechTests : IDisposable
             }
             if (arguments.Contains("-ojf"))
                 await File.WriteAllTextAsync(arguments[arguments.IndexOf("-of") + 1] + ".json",
-                    """{"result":{"language":"de"},"transcription":[{"offsets":{"from":10000,"to":14000},"text":" Hallo Welt"}]}""", cancellationToken);
+                    WhisperOutput ?? """{"result":{"language":"de"},"transcription":[{"offsets":{"from":10000,"to":14000},"text":" Hallo Welt"}]}""", cancellationToken);
             return new(0, "", arguments.Contains("-dl") ? "auto-detected language: de (p = 0.970000)" : "", 1);
         }
     }
@@ -148,6 +149,51 @@ public sealed class SkipNonSpeechTests : IDisposable
         Assert.DoesNotContain("--vad", runner.Requests.Single().Arguments);
         Assert.True(File.Exists(Path.Combine(Directory, "Whisper", "skip-unavailable.json")));
         Assert.Contains(_issues, issue => issue.Title.Contains("could not be skipped"));
+    }
+
+    // ---- the loop guard -------------------------------------------------------------------------------------------------------
+
+    private static string WhisperJson(IEnumerable<(int From, int To, string Text)> segments) =>
+        "{\"result\":{\"language\":\"de\"},\"transcription\":[" + string.Join(",", segments.Select(s => $"{{\"offsets\":{{\"from\":{s.From},\"to\":{s.To}}},\"text\":\" {s.Text}\"}}")) + "]}";
+
+    private static IEnumerable<(int, int, string)> LoopedOutput() =>
+        new[] { (0, 4_000, "Hallo zusammen.") }
+            .Concat(Enumerable.Range(0, 40).Select(i => (10_000 + i * 2_000, 12_000 + i * 2_000, "Egy kicsit mi tortenik.")))
+            .Concat([(100_000, 104_000, "Und weiter geht es.")]);
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task ALoopingWhisperIsCleanedKeepsItsRawOutputAndTellsTheUser(bool skipping, bool suggestsSkipping)
+    {
+        Configure(skip: skipping); if (skipping) SavePlan();
+        var runner = new Runner { WhisperOutput = WhisperJson(LoopedOutput()) };
+        await Stages(runner).ExecuteAsync(_jobRecord, JobState.RunningWhisper, default);
+
+        var saved = JsonSerializer.Deserialize<EngineTranscript>(await File.ReadAllTextAsync(Path.Combine(Directory, "whisper.json")))!;
+        Assert.Equal(["Hallo zusammen.", "Egy kicsit mi tortenik.", "Und weiter geht es."], saved.Segments.Select(segment => segment.Text));
+        Assert.Equal("Hallo zusammen. Egy kicsit mi tortenik. Und weiter geht es.", saved.Text);
+        // The recogniser output is evidence and stays whole.
+        using var raw = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "raw.json")));
+        Assert.Equal(42, raw.RootElement.GetProperty("transcription").GetArrayLength());
+        // What was removed is written down.
+        using var loops = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "loops.json")));
+        Assert.Equal(39, loops.RootElement.GetProperty("Removed").GetInt32());
+        var issue = Assert.Single(_issues, item => item.Title == "Repeated text removed");
+        Assert.Contains("40 times", issue.Message);
+        Assert.Equal(suggestsSkipping, issue.Message.Contains("Skip silence and music"));
+    }
+
+    [Fact]
+    public async Task AnOrdinaryWhisperOutputIsSavedUntouchedWithoutAnyNotice()
+    {
+        Configure(skip: false);
+        var runner = new Runner { WhisperOutput = WhisperJson(Enumerable.Range(0, 30).Select(i => (i * 3_000, i * 3_000 + 2_500, i % 2 == 0 ? "Ja, das stimmt." : "Nein, überhaupt nicht."))) };
+        await Stages(runner).ExecuteAsync(_jobRecord, JobState.RunningWhisper, default);
+        var saved = JsonSerializer.Deserialize<EngineTranscript>(await File.ReadAllTextAsync(Path.Combine(Directory, "whisper.json")))!;
+        Assert.Equal(30, saved.Segments.Count);
+        Assert.False(File.Exists(Path.Combine(Directory, "Whisper", "loops.json")));
+        Assert.Empty(_issues);
     }
 
     // ---- Canary ---------------------------------------------------------------------------------------------------------------
