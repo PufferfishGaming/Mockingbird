@@ -1,6 +1,6 @@
 # ADR-0008: The correction model answers with one letter and real probabilities
 
-Status: accepted (after 0.1.18). The correction model stays opt-in and off by default (ADR-0007).
+Status: accepted (after 0.1.18). The correction model stayed opt-in when this was written; ADR-0011 turned it on by default.
 
 ## Context
 ADR-0007 made the correction model opt-in because on a test song it changed three words and all three were mistakes, and a third of its answers were rejected. This record is the work to make it reliable and harmless, measured on a bench instead of by eye.

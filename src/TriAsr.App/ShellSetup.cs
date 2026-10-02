@@ -30,7 +30,10 @@ public sealed partial class ShellViewModel
 
     private void RestoreSetupSettings(AppSettings settings) => _setupState = SetupPlan.Normalize(settings.SetupState);
 
-    private bool RequiredModelsMissing() => ModelCards.Any(card => card.Selected && card.Entry.Family != "Correction" && !File.Exists(card.Location));
+    /// <summary>The models setup downloads: Whisper and Canary, and the correction model while Settings ask for it.</summary>
+    private bool SetupWants(ModelCard card) => card.Selected && (card.Entry.Family != "Correction" || UseCorrectionModel);
+
+    private bool RequiredModelsMissing() => ModelCards.Any(card => SetupWants(card) && !File.Exists(card.Location));
 
     /// <summary>Offers setup on a fresh install (or while models or speed tuning are still missing) until the user answers.</summary>
     private void RefreshSetupOffer() => EvaluateSetupOffer(RequiredModelsMissing(), _measuredProfile is not null);
@@ -50,7 +53,7 @@ public sealed partial class ShellViewModel
 
     private string RecommendedSetupDownloadText()
     {
-        var cards = ModelCards.Where(card => card.Selected && card.Entry.Family != "Correction" && !File.Exists(card.Location)).ToArray();
+        var cards = ModelCards.Where(card => SetupWants(card) && !File.Exists(card.Location)).ToArray();
         return cards.Length == 0 ? "" : $" (about {cards.Sum(card => card.Entry.Bytes) / 1073741824d:0.0} GiB)";
     }
 
@@ -79,7 +82,7 @@ public sealed partial class ShellViewModel
             ApplySelection(RecommendedSelection());
             await PersistSelectionAsync();
 
-            var required = ModelCards.Where(card => card.Selected && card.Entry.Family != "Correction").ToArray();
+            var required = ModelCards.Where(SetupWants).ToArray();
             bool Complete(ModelCard card) { var state = models.Inspect(card.Entry); return state.Installed && !state.WrongSize; }
             if (!required.All(Complete))
             {

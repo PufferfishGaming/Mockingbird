@@ -24,7 +24,7 @@ public sealed class SkipNonSpeechTests : IDisposable
     public SkipNonSpeechTests()
     {
         _storage = new(Path.Combine(_root, "data")); _storage.EnsureDirectories(); _workspace = new(_storage);
-        _paths = new RuntimePaths(Path.Combine(_root, "app")) { CanaryModel = CanaryModel };
+        _paths = new RuntimePaths(Path.Combine(_root, "app")) { CanaryModel = CanaryModel, CorrectionModel = Path.Combine(_root, "absent", "correction.gguf") };
         foreach (var file in new[] { _paths.WhisperFor("cpu"), _paths.VadModel, CanaryModel }) { System.IO.Directory.CreateDirectory(Path.GetDirectoryName(file)!); File.WriteAllText(file, "stand-in"); }
         System.IO.Directory.CreateDirectory(Directory);
         WriteSilence(Path.Combine(Directory, "normalized.wav"), 40);
@@ -40,9 +40,9 @@ public sealed class SkipNonSpeechTests : IDisposable
         writer.Write((short)1); writer.Write((short)1); writer.Write(16000); writer.Write(32000); writer.Write((short)2); writer.Write((short)16);
         writer.Write("data"u8); writer.Write(bytes); writer.Write(new byte[bytes]);
     }
-    private void Configure(bool skip, string job = "auto")
+    private void Configure(bool skip, string job = "auto", bool correction = false)
     {
-        File.WriteAllText(Path.Combine(Directory, "configuration.json"), JsonSerializer.Serialize(new JobConfiguration("test", "cpu", 1, "cpu", 1, "cpu", 1, false, skip)));
+        File.WriteAllText(Path.Combine(Directory, "configuration.json"), JsonSerializer.Serialize(new JobConfiguration("test", "cpu", 1, "cpu", 1, "cpu", 1, false, skip, correction)));
         _jobRecord = new(_job, "source.wav", job, JobState.Queued, DateTimeOffset.UtcNow);
     }
     private TranscriptionJob _jobRecord = null!;
@@ -257,12 +257,12 @@ public sealed class SkipNonSpeechTests : IDisposable
         Assert.Empty(_issues);
     }
 
-    // ---- the correction model is opt-in ----------------------------------------------------------------------------------------
+    // ---- the correction model ---------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void TheCorrectionModelIsOffByDefaultAndAJobKeepsItsOwnChoice()
+    public void TheCorrectionModelIsOnByDefaultAndAJobKeepsItsOwnChoice()
     {
-        Assert.False(new AppSettings().UseCorrectionModel);
+        Assert.True(new AppSettings().UseCorrectionModel);
         Assert.True(JobConfiguration.Bind(Current(), null, false, useCorrectionModelSetting: true).UseCorrectionModel);
         Assert.False(JobConfiguration.Bind(Current(), null, true).UseCorrectionModel);
         // A resumed job keeps what it started with, whatever Settings say now.
@@ -295,6 +295,29 @@ public sealed class SkipNonSpeechTests : IDisposable
         Assert.Contains("Schulternhalle", region.FinalText);       // Whisper's word stays, the engines' disagreement is marked
         Assert.Equal("uncertain", region.Source);
         Assert.Empty(_issues);
+    }
+
+    [Fact]
+    public async Task TheSettingOnWithoutTheModelDownloadedBehavesAsIfItWereOffAndStaysQuiet()
+    {
+        // The setting is on for everybody now, so a fresh install has it on before the model is downloaded: that must not raise an alert per job.
+        Configure(skip: false, correction: true);
+        var whisper = new EngineTranscript("Whisper", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1,
+            [new(1_000, 6_000, "Wir treffen uns am Montag in der Schulternhalle zum Training.")], "Wir treffen uns am Montag in der Schulternhalle zum Training.", true);
+        var canary = new EngineTranscript("Canary", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1, [], "Wir treffen uns am Montag in der Schulturnhalle zum Training.", false);
+        await File.WriteAllTextAsync(Path.Combine(Directory, "comparison.json"), JsonSerializer.Serialize(TriAsr.Fusion.DisagreementDetector.Compare(whisper, canary)));
+        var runner = new Runner();
+        var stages = Stages(runner);
+        Assert.False(File.Exists(_paths.CorrectionModel));
+
+        await stages.ExecuteAsync(_jobRecord, JobState.Correcting, default);
+        await stages.ExecuteAsync(_jobRecord, JobState.Finalizing, default);
+
+        Assert.Empty(runner.Requests);
+        Assert.Empty(_issues);
+        var region = Assert.Single((await stages.LoadFinalAsync(_job)).Regions);
+        Assert.Contains("Schulternhalle", region.FinalText);
+        Assert.Equal("uncertain", region.Source);
     }
 
     // ---- Canary ---------------------------------------------------------------------------------------------------------------
@@ -443,7 +466,7 @@ public sealed class SkipNonSpeechSettingTests
     }
 
     [Fact]
-    public async Task TheCorrectionModelChoiceIsOffByDefaultSavedAndKept()
+    public async Task TheCorrectionModelChoiceIsOnByDefaultSavedAndKept()
     {
         var root = NewRoot();
         try
@@ -452,17 +475,17 @@ public sealed class SkipNonSpeechSettingTests
             {
                 var shell = host.Services.GetRequiredService<App.ShellViewModel>();
                 await shell.InitializeAsync();
-                Assert.False(shell.UseCorrectionModel);
-                shell.UseCorrectionModel = true;
+                Assert.True(shell.UseCorrectionModel);
+                shell.UseCorrectionModel = false;
                 var store = host.Services.GetRequiredService<App.SettingsStore>();
-                await WaitForAsync(async () => (await store.LoadAsync()).UseCorrectionModel);
+                await WaitForAsync(async () => !(await store.LoadAsync()).UseCorrectionModel);
                 await WaitForSavedAsync(shell);
             }
             using (var host = App.App.CreateHost(root))
             {
                 var shell = host.Services.GetRequiredService<App.ShellViewModel>();
                 await shell.InitializeAsync();
-                Assert.True(shell.UseCorrectionModel);
+                Assert.False(shell.UseCorrectionModel);   // switching it off is remembered
                 Assert.False(shell.SkipNonSpeech);   // the two choices are independent
             }
         }

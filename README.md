@@ -32,7 +32,7 @@ Native Linux support is pending; there is currently no native Linux build.
 
 - Audio/video import with progress, cancellation and resumable jobs.
 - Whisper's 100-language catalog and independent Canary comparison for 25 languages.
-- Waveform playback and manual transcript review, with the places where the two engines disagree marked for listening. An optional local correction model can choose between them (off by default).
+- Waveform playback and manual transcript review, with the places where the two engines disagree marked for listening. A local correction model chooses between them where it is at least 90% sure (on by default; it can be switched off in Settings).
 - Removal of Whisper's runaway repetition, and an optional "Skip silence and music" setting for recordings with long quiet or noisy stretches (it removes songs, so it is off by default).
 - TXT, Markdown, JSON, CSV, SRT, VTT and DOCX export.
 - Persistent model downloads, CPU/Vulkan backends, optional compatible CUDA/ROCm runtimes and measured auto-tuning.

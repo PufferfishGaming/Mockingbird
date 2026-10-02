@@ -70,7 +70,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 throw new InvalidDataException("The source file changed. Create a new job to keep its evidence consistent.");
             var saved = File.Exists(FileFor(job.Id, "configuration.json")) ? await Read<JobConfiguration>(job.Id, "configuration.json", token) : null;
             var preferences = saved is null ? await settings.LoadAsync() : null;
-            var config = JobConfiguration.Bind(await GetConfiguration(token), saved, preferences?.SkipNonSpeech ?? false, preferences?.UseCorrectionModel ?? false);
+            var config = JobConfiguration.Bind(await GetConfiguration(token), saved, preferences?.SkipNonSpeech ?? false, preferences?.UseCorrectionModel ?? true);
             if (saved is null) await Write(job.Id, "configuration.json", config, token);
             await AudioPreparation.NormalizeAsync(audio, job.SourcePath, normalized, FileFor(job.Id, "playback.m4a"), token);
             await PlanChunksAsync(job.Id, normalized, config.WhisperThreads, token);
@@ -189,9 +189,10 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 if (File.Exists(FileFor(job.Id, "corrections.json"))) { await Read<Correction[]>(job.Id, "corrections.json", token); return; }
                 var disputes = (await Read<ComparisonResult>(job.Id, "comparison.json", token)).Disagreements;
                 var decisions = new List<Correction>();
-                if (disputes.Count > 0 && !configuration.UseCorrectionModel)
+                // The setting asks for the model; a job still runs when the model is not downloaded yet (it behaves as if the setting were off).
+                if (disputes.Count > 0 && !(configuration.UseCorrectionModel && File.Exists(paths.CorrectionModel)))
                 {
-                    // The default: no model changes anybody's words. Whisper's text stays and every disagreement is marked as needing a listen.
+                    // No model changes anybody's words. Whisper's text stays and every disagreement is marked as needing a listen.
                     decisions = disputes.Select(dispute => new Correction(dispute, new("uncertain", dispute.Whisper, 0, true), null)).ToList();
                 }
                 else if (disputes.Count > 0)

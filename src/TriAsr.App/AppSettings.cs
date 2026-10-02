@@ -5,10 +5,14 @@ using TriAsr.Application;
 
 namespace TriAsr.App;
 
-public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = 1, bool AnimateErrors = true,
+/// <remarks>Version 2 turned the correction model on by default. A file saved by version 1 holds the old default, not a choice (it was never on), so it moves to the new default once.</remarks>
+public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = AppSettings.CurrentVersion, bool AnimateErrors = true,
     bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto",
-    bool SkipNonSpeech = false, bool UseCorrectionModel = false, string SetupState = SetupPlan.Pending,
-    string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)");
+    bool SkipNonSpeech = false, bool UseCorrectionModel = true, string SetupState = SetupPlan.Pending,
+    string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)")
+{
+    public const int CurrentVersion = 2;
+}
 
 public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)
 {
@@ -28,6 +32,8 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
             var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, _json) ?? new();
             return settings with
             {
+                Version = Math.Max(settings.Version, AppSettings.CurrentVersion),
+                UseCorrectionModel = settings.Version < AppSettings.CurrentVersion || settings.UseCorrectionModel,
                 Theme = settings.Theme is "System" or "Light" or "Dark" ? settings.Theme : "System",
                 Density = settings.Density is "Comfortable" or "Compact" ? settings.Density : "Comfortable",
                 ResourceProfile = settings.ResourceProfile is "Auto" or "Quiet" or "Default" or "Max" ? settings.ResourceProfile : "Auto",

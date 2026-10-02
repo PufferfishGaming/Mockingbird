@@ -66,7 +66,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private Guid? _progressJob;
     [ObservableProperty] private TranscriptionJob? _selectedJob;
     public IReadOnlyList<LanguageOption> Languages { get; } = LanguageCatalog.All.Prepend(new LanguageOption("auto", "Auto-detect language")).ToArray();
-    /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is optional (Settings, off by default) and never listed.</summary>
+    /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is listed only while Settings ask for it, and it never blocks a transcription.</summary>
     public string Readiness
     {
         get
@@ -76,6 +76,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
                 if (!System.IO.File.Exists(path)) missing.Add($"{name} is missing. Reinstall Mockingbird Studio.");
             var models = MissingRequiredModels();
             if (models.Length > 0) missing.Add("Not downloaded yet: " + string.Join(", ", models));
+            // Not needed to start (a job without it marks disagreements for listening), but the Settings choice is on, so say what is missing.
+            if (UseCorrectionModel && !System.IO.File.Exists(runtimes.CorrectionModel)) missing.Add("The correction model is not downloaded yet; until it is, disagreements between the engines are marked for listening.");
             return string.Join("\n", missing);
         }
     }
