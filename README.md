@@ -67,6 +67,10 @@ In Studio the **Servers** page (in the sidebar, below Models) lists the servers 
 
 **Using a server.** Choose it and press *Connect*. In Studio a *Remote server* page appears in the sidebar, in the Client it fills the window: *New* sends a recording and a language to the server, *Projects* follows the recordings and their progress, and *Review* opens a transcript with its audio, the two engines' wording and your edits, which are saved on the server and can be exported. The speech programs run on the server; the client only sends and reads.
 
+### The web page
+
+Every hosted server also serves a web page at its own address, for computers that do not have Mockingbird installed. Open the address in a browser (*Open web page* in the hosting box does it for this computer), enter the password if there is one, and you can send a recording, follow the recordings on the server, review and edit a transcript with its audio, and export it: the same pages as the Client, in the five languages of the program. On the network the address starts with `https://`. The certificate is the server's own, so the browser warns the first time; compare the fingerprint in the certificate details with the one in the server's *Identity* box before you continue. The page loads nothing from any other address, sets no cookies and keeps the password only for the browser tab. A server without a password only answers requests addressed to its IP address, `localhost` or its computer's name.
+
 ### The HTTP API
 
 The same server answers programs. On this computer `http://127.0.0.1:8642` works without encryption; from the network use `https://` (a self-signed certificate, so `curl.exe -k`, or pin the fingerprint). When a password is set, every request except the health check needs it (`Authorization: Bearer <password>` or `X-Api-Key`). Recordings sent through the API are kept in the projects folder (`Api/Incoming`) and listed under Projects; the API shows only what was sent through it, and works on one recording at a time.

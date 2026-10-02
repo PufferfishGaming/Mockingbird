@@ -825,5 +825,13 @@
   "Computers on the network": "A hálózat számítógépei",
   "Starts the server with the settings below. Other computers can then send recordings to this one.": "A szervert az alábbi beállításokkal indítja. Ezután más számítógépek felvételeket küldhetnek ide.",
   "Without the network only programs on this computer can connect. With it the server announces itself on the network and every connection is encrypted. Windows may ask once whether to allow it.": "A hálózat nélkül csak az ezen a számítógépen futó programok csatlakozhatnak. A hálózattal a szerver bejelenti magát a hálózaton, és minden kapcsolat titkosított. A Windows egyszer megkérdezheti, engedélyezi-e.",
-  "Not hosting. Press Start hosting to let other computers send recordings here.": "Nem üzemel. Nyomja meg az Üzemeltetés indítása gombot, hogy más számítógépek felvételeket küldhessenek ide."
+  "Not hosting. Press Start hosting to let other computers send recordings here.": "Nem üzemel. Nyomja meg az Üzemeltetés indítása gombot, hogy más számítógépek felvételeket küldhessenek ide.",
+  "Connections are encrypted": "A kapcsolatok titkosítottak",
+  "Could not reach the server.": "A szerver nem érhető el.",
+  "Sign out": "Kijelentkezés",
+  "The password is wrong.": "A jelszó hibás.",
+  "This server is protected by a password.": "Ezt a szervert jelszó védi.",
+  "Open web page": "Weboldal megnyitása",
+  "Opens the web page of this server in your browser. The same page works from any computer that can reach the server.": "Megnyitja a szerver weboldalát a böngészőben. Ugyanez az oldal bármelyik számítógépről működik, amely eléri a szervert.",
+  "Could not open the web page": "A weboldal nem nyitható meg"
 }

@@ -131,6 +131,17 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
         catch (Exception error) { _reportError(Loc.T("Could not copy the address"), error.Message); }
     }
 
+    /// <summary>Where this server's web page is, as a program on this computer reaches it.</summary>
+    public string WebPageAddress => Addresses()[0];
+
+    [RelayCommand]
+    private void OpenWebPage()
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(WebPageAddress) { UseShellExecute = true }); }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+        { _reportError(Loc.T("Could not open the web page"), error.Message); }
+    }
+
     [RelayCommand]
     private void CopyFingerprint()
     {

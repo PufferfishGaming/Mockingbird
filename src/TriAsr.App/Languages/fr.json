@@ -825,5 +825,13 @@
  "Computers on the network": "Ordinateurs du réseau",
  "Starts the server with the settings below. Other computers can then send recordings to this one.": "Démarre le serveur avec les réglages ci-dessous. D'autres ordinateurs peuvent alors lui envoyer des enregistrements.",
  "Without the network only programs on this computer can connect. With it the server announces itself on the network and every connection is encrypted. Windows may ask once whether to allow it.": "Sans le réseau, seuls les programmes de cet ordinateur peuvent se connecter. Avec le réseau, le serveur s'annonce sur le réseau et toute connexion est chiffrée. Windows peut demander une fois s'il faut l'autoriser.",
- "Not hosting. Press Start hosting to let other computers send recordings here.": "L'hébergement est arrêté. Appuyez sur Démarrer l'hébergement pour que d'autres ordinateurs puissent envoyer des enregistrements ici."
+ "Not hosting. Press Start hosting to let other computers send recordings here.": "L'hébergement est arrêté. Appuyez sur Démarrer l'hébergement pour que d'autres ordinateurs puissent envoyer des enregistrements ici.",
+ "Connections are encrypted": "Les connexions sont chiffrées",
+ "Could not reach the server.": "Impossible de joindre le serveur.",
+ "Sign out": "Se déconnecter",
+ "The password is wrong.": "Le mot de passe est incorrect.",
+ "This server is protected by a password.": "Ce serveur est protégé par un mot de passe.",
+ "Open web page": "Ouvrir la page web",
+ "Opens the web page of this server in your browser. The same page works from any computer that can reach the server.": "Ouvre la page web de ce serveur dans le navigateur. La même page fonctionne depuis tout ordinateur qui peut joindre le serveur.",
+ "Could not open the web page": "Impossible d'ouvrir la page web"
 }

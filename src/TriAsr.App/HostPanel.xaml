@@ -27,7 +27,7 @@
       <TextBlock Text="{local:T 'Port'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
       <TextBox Text="{Binding PortText, UpdateSourceTrigger=LostFocus}" Width="100" HorizontalAlignment="Left" Padding="8" AutomationProperties.Name="{local:T 'Port'}" />
       <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,14,0,0" FontSize="12" />
-      <WrapPanel Margin="0,8,0,0"><Button Content="{local:T 'Copy address'}" Command="{Binding CopyAddressCommand}" Padding="10,6" /></WrapPanel>
+      <WrapPanel Margin="0,8,0,0"><Button Content="{local:T 'Copy address'}" Command="{Binding CopyAddressCommand}" Padding="10,6" /><Button Content="{local:T 'Open web page'}" Command="{Binding OpenWebPageCommand}" Padding="10,6" Margin="8,0,0,0" Visibility="{Binding Enabled, Converter={StaticResource BoolVisibility}}" ToolTip="{local:T 'Opens the web page of this server in your browser. The same page works from any computer that can reach the server.'}" /></WrapPanel>
       <StackPanel Visibility="{Binding HasFingerprint, Converter={StaticResource BoolVisibility}}">
         <TextBlock Text="{local:T 'Identity'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" ToolTip="{local:T 'Computers that connect for the first time are shown this fingerprint and should check that it matches. If it ever changes without your doing, do not connect.'}" />
         <TextBlock Text="{Binding Fingerprint}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />

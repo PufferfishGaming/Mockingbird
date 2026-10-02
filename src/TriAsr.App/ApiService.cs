@@ -131,6 +131,7 @@ public sealed class ApiService : IAsyncDisposable
 
     public async Task<HttpResponse> HandleAsync(HttpRequest request, CancellationToken token)
     {
+        if (WebApp.Serve(request) is { } page) return page; // the web page and its files: nothing private in them, and the API behind them asks for the password
         var segments = request.Path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length == 0) return request.Method == "GET" ? RootPage() : MethodNotAllowed("GET");
         if (segments is ["v1", "health"])
@@ -139,6 +140,7 @@ public sealed class ApiService : IAsyncDisposable
                 : MethodNotAllowed("GET");
         if (segments[0] != "v1") return NotFound();
 
+        if (CheckHost(request) is { } wrongHost) return wrongHost;
         if (await CheckPasswordAsync(request) is { } refusal) return refusal;
 
         switch (segments)
@@ -172,7 +174,14 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nSend the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+
+    // ---- who the request is for -------------------------------------------------------------------------------------------------------
+
+    /// <summary>A server without a password only answers requests addressed to its IP address, localhost or its computer's name (see <see cref="WebApp.IsExpectedHost"/>).</summary>
+    private HttpResponse? CheckHost(HttpRequest request) =>
+        _deps.GetPassword().Length > 0 || WebApp.IsExpectedHost(request.Header("Host")) ? null
+            : HttpResponse.Error(421, "unexpected_host", "This server has no password, so it only answers requests addressed to its IP address, localhost or the name of its computer. Use one of those, or set a password.");
 
     // ---- the password -----------------------------------------------------------------------------------------------------------------
 

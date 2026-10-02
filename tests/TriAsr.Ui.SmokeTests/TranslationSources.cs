@@ -73,6 +73,8 @@ internal static partial class TranslationSources
                 if (MarkupText().Match(attribute.Value) is { Success: true } match) texts.Add(Regex.Replace(match.Groups[1].Value, @"\\(.)", "$1"));
         foreach (var path in CodeFiles())
             foreach (Match match in CodeText().Matches(File.ReadAllText(path))) texts.Add(Unescape(match.Groups[1].Value));
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(AppFolder, "Web"), "*.js"))
+            foreach (Match match in WebText().Matches(File.ReadAllText(path))) texts.Add(Unescape(match.Groups[1].Value));
         foreach (var text in JsonSerializer.Deserialize<string[]>(File.ReadAllText(Path.Combine(AppFolder, "Languages", "extra-keys.json")))!) texts.Add(text);
         return texts;
     }
@@ -82,6 +84,10 @@ internal static partial class TranslationSources
 
     [GeneratedRegex(@"(?<![\w.])(?:Loc\.)?(?:T|Key)\(\s*""((?:[^""\\]|\\.)*)""")]
     private static partial Regex CodeText();
+
+    /// <summary>The texts the web page looks up: <c>t("...")</c> in its script.</summary>
+    [GeneratedRegex(@"(?<![\w.])t\(\s*""((?:[^""\\]|\\.)*)""")]
+    private static partial Regex WebText();
 
     /// <summary>The characters a C# string literal spells with a backslash.</summary>
     public static string Unescape(string literal) => Regex.Replace(literal, @"\\(u[0-9a-fA-F]{4}|.)", match => match.Groups[1].Value switch
