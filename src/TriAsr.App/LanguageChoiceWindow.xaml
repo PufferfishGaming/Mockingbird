@@ -1,0 +1,20 @@
+<Window x:Class="TriAsr.App.LanguageChoiceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mockingbird Studio" Width="520" SizeToContent="Height" ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        Icon="Assets/TriASR.ico" Background="{DynamicResource WindowBackgroundBrush}">
+  <!-- Shown before the interface has a language, so its text is written in every language at once and is not looked up. -->
+  <StackPanel Margin="36,32,36,32">
+    <TextBlock Text="Mockingbird Studio" FontSize="26" FontWeight="SemiBold" />
+    <TextBlock Text="Choose your language" FontSize="18" Margin="0,22,0,2" />
+    <TextBlock Text="Válaszd ki a nyelvet · Sprache wählen · Elige tu idioma · Choisissez votre langue" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+    <ItemsControl x:Name="Choices" Margin="0,22,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Button Content="{Binding NativeName}" Tag="{Binding Code}" Click="OnChoose" Margin="0,0,0,10" Padding="18,12" FontSize="16"
+                  HorizontalContentAlignment="Left" AutomationProperties.Name="{Binding NativeName}" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</Window>

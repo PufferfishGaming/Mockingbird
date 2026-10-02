@@ -64,6 +64,12 @@ public partial class App : System.Windows.Application
                 typeof(App).Assembly.GetName().Version, System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture);
             var shell = _host.Services.GetRequiredService<ShellViewModel>();
             await shell.InitializeAsync();
+            if (!smoke && !shell.LanguageChosen)
+            {
+                var chooser = new LanguageChoiceWindow(Loc.Detect());
+                chooser.ShowDialog();
+                shell.ChooseLanguage(chooser.SelectedCode);
+            }
             await shell.DetectHardwareCommand.ExecuteAsync(null);
             var window = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = window;
@@ -450,7 +456,7 @@ public partial class App : System.Windows.Application
         catch (Exception exception)
         {
             _host?.Services.GetService<ILogger<App>>()?.LogCritical(exception, "Application startup failed");
-            if (!smoke) MessageBox.Show(exception.Message, "Mockingbird Studio could not start", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (!smoke) MessageBox.Show(exception.Message, Loc.T("Mockingbird Studio could not start"), MessageBoxButton.OK, MessageBoxImage.Error);
             await StopHostAsync();
             Shutdown(1);
         }

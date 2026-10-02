@@ -17,7 +17,7 @@ public sealed partial class ShellViewModel
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SetupBannerVisible), nameof(SetupRunning), nameof(SetupCanStart), nameof(SetupStartLabel), nameof(SetupDismissLabel), nameof(SetupCanDismiss), nameof(ShowReadinessCard))]
     private SetupStage _setupPhase;
-    [ObservableProperty] private string _setupTitle = "Set up Mockingbird Studio";
+    [ObservableProperty] private string _setupTitle = Loc.Key("Set up Mockingbird Studio");
     [ObservableProperty] private string _setupDetail = "";
     [ObservableProperty] private double _setupPercent;
     [ObservableProperty] private bool _setupIndeterminate = true;
@@ -25,8 +25,23 @@ public sealed partial class ShellViewModel
     public bool SetupRunning => SetupPhase == SetupStage.Running;
     public bool SetupCanStart => SetupPhase is SetupStage.Offer or SetupStage.Problem;
     public bool SetupCanDismiss => SetupPhase is SetupStage.Offer or SetupStage.Problem or SetupStage.Done;
-    public string SetupStartLabel => SetupPhase == SetupStage.Problem ? "Try again" : "Set up now";
-    public string SetupDismissLabel => SetupPhase == SetupStage.Offer ? "Not now" : "Close";
+    public string SetupStartLabel => SetupPhase == SetupStage.Problem ? T("Try again") : T("Set up now");
+    public string SetupDismissLabel => SetupPhase == SetupStage.Offer ? T("Not now") : T("Close");
+    // What the banner says once setup has ended; kept as a recipe so it can be built again in another language.
+    private Func<(string Title, string Detail)>? _setupEndText;
+    private void ShowSetupEnd(SetupStage phase, Func<(string Title, string Detail)> make)
+    {
+        _setupEndText = make;
+        (SetupTitle, SetupDetail) = make();
+        SetupPhase = phase;
+    }
+    private void RefreshSetupTexts()
+    {
+        OnPropertyChanged(nameof(SetupStartLabel)); OnPropertyChanged(nameof(SetupDismissLabel));
+        if (SetupPhase == SetupStage.Offer) FillSetupOffer(RequiredModelsMissing());
+        else if (SetupPhase is SetupStage.Done or SetupStage.Problem && _setupEndText is { } make) (SetupTitle, SetupDetail) = make();
+        else if (SetupPhase == SetupStage.Running) SetupTitle = _setupStepText?.Invoke() ?? SetupTitle;
+    }
 
     private void RestoreSetupSettings(AppSettings settings) => _setupState = SetupPlan.Normalize(settings.SetupState);
 
@@ -43,23 +58,23 @@ public sealed partial class ShellViewModel
         if (SetupPhase is SetupStage.Running or SetupStage.Problem or SetupStage.Done) return;
         var offer = SetupPlan.ShouldOffer(_setupState, requiredModelsMissing, tuned);
         SetupPhase = offer ? SetupStage.Offer : SetupStage.Hidden;
-        if (offer)
-        {
-            SetupTitle = "Set up Mockingbird Studio";
-            SetupDetail = (requiredModelsMissing ? "Downloads the speech models recommended for this computer" + RecommendedSetupDownloadText() + " and measures" : "Measures") +
-                " its speed with a short test recording, so transcriptions start with the best settings. Everything stays on this computer.";
-        }
+        if (offer) FillSetupOffer(requiredModelsMissing);
     }
 
-    private string RecommendedSetupDownloadText()
+    private void FillSetupOffer(bool requiredModelsMissing)
     {
+        SetupTitle = T("Set up Mockingbird Studio");
         var cards = ModelCards.Where(card => SetupWants(card) && !File.Exists(card.Location)).ToArray();
-        return cards.Length == 0 ? "" : $" (about {cards.Sum(card => card.Entry.Bytes) / 1073741824d:0.0} GiB)";
+        SetupDetail = requiredModelsMissing && cards.Length > 0
+            ? T("Downloads the speech models recommended for this computer (about {0:0.0} GiB) and measures its speed with a short test recording, so transcriptions start with the best settings. Everything stays on this computer.", cards.Sum(card => card.Entry.Bytes) / 1073741824d)
+            : T("Measures its speed with a short test recording, so transcriptions start with the best settings. Everything stays on this computer.");
     }
 
+    private Func<string>? _setupStepText;
     private void ShowSetupStep(int step, string label, bool indeterminate)
     {
-        SetupTitle = $"Setting up · step {step} of {SetupSteps} · {label}";
+        _setupStepText = () => T("Setting up · step {0} of {1} · {2}", step, SetupSteps, T(label));
+        SetupTitle = _setupStepText();
         SetupIndeterminate = indeterminate;
         if (indeterminate) SetupDetail = "";
         SetupPercent = 0;
@@ -75,9 +90,9 @@ public sealed partial class ShellViewModel
         using var awake = SleepGuard.Begin("Mockingbird Studio is setting up");
         try
         {
-            ShowSetupStep(1, "Checking your computer", true);
+            ShowSetupStep(1, Loc.Key("Checking your computer"), true);
             await DetectHardwareAsync();
-            if (Hardware is null) throw new InvalidOperationException("The system check did not finish. " + SystemSummary);
+            if (Hardware is null) throw new InvalidOperationException(T("The system check did not finish. {0}", SystemSummary));
             token.ThrowIfCancellationRequested();
             ApplySelection(RecommendedSelection());
             await PersistSelectionAsync();
@@ -86,46 +101,40 @@ public sealed partial class ShellViewModel
             bool Complete(ModelCard card) { var state = models.Inspect(card.Entry); return state.Installed && !state.WrongSize; }
             if (!required.All(Complete))
             {
-                ShowSetupStep(2, "Downloading speech models", false);
+                ShowSetupStep(2, Loc.Key("Downloading speech models"), false);
                 using var finished = new CancellationTokenSource();
                 var watching = WatchSetupDownloadAsync(required, finished.Token);
                 try { await DownloadCardsAsync(required); }
                 finally { finished.Cancel(); await watching; }
                 token.ThrowIfCancellationRequested();
-                if (!required.All(Complete)) throw new InvalidOperationException("The models did not finish downloading. " + ModelProgress);
+                if (!required.All(Complete)) throw new InvalidOperationException(T("The models did not finish downloading. {0}", ModelProgress));
             }
 
-            ShowSetupStep(3, "Preparing a short test recording", true);
+            ShowSetupStep(3, Loc.Key("Preparing a short test recording"), true);
             var sample = await TestSpeech.CreateAsync(processes, Path.Combine(storage.Root, "Setup"), token);
-            string? tuningNote = null;
-            if (sample is null) tuningNote = "No Windows voice was found for the test recording, so speed tuning was skipped. Safe defaults are used; open Benchmark and choose a speech recording to tune later.";
+            Func<string>? tuningNote = null;
+            if (sample is null) tuningNote = () => T("No Windows voice was found for the test recording, so speed tuning was skipped. Safe defaults are used; open Benchmark and choose a speech recording to tune later.");
             else
             {
-                ShowSetupStep(4, "Measuring speed", true);
+                ShowSetupStep(4, Loc.Key("Measuring speed"), true);
                 if (await RunTuningAsync(sample)) await ApplyBestSettingsAsync();
                 else if (token.IsCancellationRequested) throw new OperationCanceledException(token);
-                else tuningNote = "Speed tuning did not finish" + (_tuningError is null ? "" : ": " + _tuningError) + " Safe defaults are used; you can run it again from Benchmark.";
+                else { var reason = _tuningError; tuningNote = () => reason is null ? T("Speed tuning did not finish. Safe defaults are used; you can run it again from Benchmark.") : T("Speed tuning did not finish: {0} Safe defaults are used; you can run it again from Benchmark.", reason); }
             }
 
             _setupState = SetupPlan.Done;
             Persist();
-            SetupTitle = "Setup complete";
-            SetupDetail = tuningNote ?? "The models are downloaded and the speed settings are saved. You can start transcribing.";
             SetupIndeterminate = false; SetupPercent = 100;
-            SetupPhase = SetupStage.Done;
+            ShowSetupEnd(SetupStage.Done, () => (T("Setup complete"), tuningNote?.Invoke() ?? T("The models are downloaded and the speed settings are saved. You can start transcribing.")));
         }
         catch (OperationCanceledException)
         {
-            SetupTitle = "Setup paused";
-            SetupDetail = "Nothing is lost: downloaded models are kept and a partial download resumes where it stopped.";
-            SetupPhase = SetupStage.Problem;
+            ShowSetupEnd(SetupStage.Problem, () => (T("Setup paused"), T("Nothing is lost: downloaded models are kept and a partial download resumes where it stopped.")));
         }
         catch (Exception error)
         {
-            SetupTitle = "Setup could not finish";
-            SetupDetail = error.Message + " Downloaded models are kept.";
             logger.LogWarning(error, "First-run setup failed: {ErrorType}", error.GetType().Name);
-            SetupPhase = SetupStage.Problem;
+            ShowSetupEnd(SetupStage.Problem, () => (T("Setup could not finish"), T("{0} Downloaded models are kept.", error.Message)));
         }
         finally { _setupCancellation?.Dispose(); _setupCancellation = null; }
     }

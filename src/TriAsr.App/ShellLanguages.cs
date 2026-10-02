@@ -9,11 +9,12 @@ public sealed partial class ShellViewModel
 {
     [ObservableProperty] private LanguageOption? _selectedExpansionLanguage = LanguageCatalog.All.First(language => language.Code == "fr");
     [ObservableProperty] private string _languageSearch = "";
-    [ObservableProperty] private string _languageSetupStatus = "Choose a language and download its shared multilingual models. Existing models are reused; there is no duplicate download per language.";
+    [ObservableProperty] private string _languageSetupStatus = Loc.Key("Choose a language and download its shared multilingual models. Existing models are reused; there is no duplicate download per language.");
     public IReadOnlyList<LanguageOption> ExpansionLanguages => LanguageCatalog.All.Where(language => string.IsNullOrWhiteSpace(LanguageSearch)
-        || language.Display.Contains(LanguageSearch, StringComparison.CurrentCultureIgnoreCase)).ToArray();
-    public string LanguageCoverage => SelectedExpansionLanguage?.Coverage ?? "Select a language";
-    [ObservableProperty] private string _savedLanguageSummary = "No language setup shortcuts saved yet. Installed multilingual models still cover all their languages.";
+        || language.Display.Contains(LanguageSearch, StringComparison.CurrentCultureIgnoreCase)
+        || LanguageText.Of(language).Contains(LanguageSearch, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+    public string LanguageCoverage => SelectedExpansionLanguage is { } language ? T(language.Coverage) : T("Select a language");
+    [ObservableProperty] private string _savedLanguageSummary = Loc.Key("No language setup shortcuts saved yet. Installed multilingual models still cover all their languages.");
     private async Task LoadLanguageExpansionsAsync()
     {
         var path = Path.Combine(storage.Root, "Config", "language-expansions.json");
@@ -21,9 +22,16 @@ public sealed partial class ShellViewModel
         try
         {
             var codes = JsonSerializer.Deserialize<HashSet<string>>(await File.ReadAllTextAsync(path)) ?? [];
-            SavedLanguageSummary = "Saved language setups: " + string.Join(", ", LanguageCatalog.All.Where(language => codes.Contains(language.Code)).Select(language => language.Display));
+            _savedLanguageCodes = codes;
+            ShowSavedLanguages();
         }
-        catch (Exception error) { ReportError("Could not restore language setups", error.Message); }
+        catch (Exception error) { ReportError(T("Could not restore language setups"), error.Message); }
+    }
+    private HashSet<string> _savedLanguageCodes = [];
+    private void ShowSavedLanguages()
+    {
+        if (_savedLanguageCodes.Count == 0) return;
+        SavedLanguageSummary = T("Saved language setups: {0}", string.Join(", ", LanguageCatalog.All.Where(language => _savedLanguageCodes.Contains(language.Code)).Select(LanguageText.Of)));
     }
     public bool IsLanguagesPage => SelectedPage?.Name == "Languages";
     partial void OnLanguageSearchChanged(string value) => OnPropertyChanged(nameof(ExpansionLanguages));
@@ -45,15 +53,15 @@ public sealed partial class ShellViewModel
             await File.WriteAllTextAsync(path + ".tmp", JsonSerializer.Serialize(codes)); File.Move(path + ".tmp", path, true);
             await LoadLanguageExpansionsAsync();
             SelectedLanguage = language.Code;
-            LanguageSetupStatus = language.Display + " is ready offline. The shared Whisper model can auto-detect all 100 listed languages. " + language.Coverage + ".";
-            Status = "Language support ready · " + language.Display;
+            LanguageSetupStatus = T("{0} is ready offline. The shared Whisper model can auto-detect all 100 listed languages. {1}.", LanguageText.Of(language), T(language.Coverage));
+            Status = T("Language support ready · {0}", LanguageText.Of(language));
         }
-        catch (Exception error) { ReportError("Language setup failed", error.Message); }
+        catch (Exception error) { ReportError(T("Language setup failed"), error.Message); }
     }
     [RelayCommand] private void UseExpansionLanguage()
     {
         if (SelectedExpansionLanguage is null) return;
         SelectedLanguage = SelectedExpansionLanguage.Code;
-        Status = "Speech language: " + SelectedExpansionLanguage.Display;
+        Status = T("Speech language: {0}", LanguageText.Of(SelectedExpansionLanguage));
     }
 }

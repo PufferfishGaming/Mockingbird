@@ -10,15 +10,6 @@ public static class AppInfo
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown";
     public static string VersionLabel => $"v{Version}";
     public static string WindowTitle => $"{Name} · v{Version}";
-    public static string PrivacyPolicy
-    {
-        get
-        {
-            using var stream = typeof(AppInfo).Assembly.GetManifestResourceStream("Mockingbird.Privacy.md")
-                ?? throw new InvalidOperationException("The privacy policy resource is missing.");
-            using var reader = new System.IO.StreamReader(stream);
-            return reader.ReadToEnd();
-        }
-    }
+    /// <summary>The privacy policy in the interface language (the English one where it has not been translated).</summary>
+    public static string PrivacyPolicy => Loc.PrivacyPolicy(Loc.Instance.Language);
 }
-

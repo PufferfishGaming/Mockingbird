@@ -15,7 +15,7 @@ public sealed record JobConfiguration(string Fingerprint, string WhisperBackend,
     {
         if (saved is null) return current with { SkipNonSpeech = skipNonSpeechSetting, UseCorrectionModel = useCorrectionModelSetting };
         if (saved != current with { SkipNonSpeech = saved.SkipNonSpeech, UseCorrectionModel = saved.UseCorrectionModel })
-            throw new InvalidDataException("Runtime, model or hardware configuration changed. Create a new job before processing again.");
+            throw new InvalidDataException(Loc.T("Runtime, model or hardware configuration changed. Create a new job before processing again."));
         return saved;
     }
 }

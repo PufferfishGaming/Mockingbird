@@ -41,7 +41,7 @@ public static class BackendRuntimes
     public static async Task InstallArchivesAsync(RuntimePaths paths, string engine, string backend, ModelStore store, IProgress<DownloadProgress>? progress, CancellationToken token)
     {
         var assets = DownloadAssets(engine, backend);
-        if (assets.Count == 0) throw new InvalidOperationException("No pinned Windows package is provided for this engine/backend. Import a compatible build instead; Canary requires ABI 0.2.4.");
+        if (assets.Count == 0) throw new InvalidOperationException(Loc.T("No pinned Windows package is provided for this engine/backend. Import a compatible build instead; Canary requires ABI 0.2.4."));
         var target = Folder(paths, engine, backend);
         var staging = target + ".install-" + Guid.NewGuid().ToString("N"); Directory.CreateDirectory(staging);
         foreach (var asset in assets)
@@ -56,7 +56,7 @@ public static class BackendRuntimes
                 {
                     var name = Path.GetFileName(entry.Name.Replace('/', Path.DirectorySeparatorChar));
                     if (Path.GetExtension(name) is not (".dll" or ".exe") || entry.DataStream is null) continue;
-                    if (entry.Length > 2L * 1024 * 1024 * 1024) throw new InvalidDataException("Unexpected runtime archive entry size.");
+                    if (entry.Length > 2L * 1024 * 1024 * 1024) throw new InvalidDataException(Loc.T("Unexpected runtime archive entry size."));
                     var destination = Path.Combine(staging, name);
                     if (File.Exists(destination)) continue;
                     await using var output = File.Create(destination); await entry.DataStream.CopyToAsync(output, token);
@@ -67,29 +67,29 @@ public static class BackendRuntimes
             foreach (var entry in archive.Entries.Where(entry => Path.GetExtension(entry.Name) is ".dll" or ".exe"))
             {
                 token.ThrowIfCancellationRequested();
-                if (entry.Length > 2L * 1024 * 1024 * 1024) throw new InvalidDataException("Unexpected runtime archive entry size.");
+                if (entry.Length > 2L * 1024 * 1024 * 1024) throw new InvalidDataException(Loc.T("Unexpected runtime archive entry size."));
                 var destination = Path.Combine(staging, entry.Name);
                 if (File.Exists(destination)) continue;
                 await using var input = entry.Open(); await using var output = File.Create(destination);
                 await input.CopyToAsync(output, token);
             }
         }
-        if (!File.Exists(Path.Combine(staging, FileName(engine)))) throw new InvalidDataException("Archive did not contain the required engine executable.");
-        if (Directory.Exists(target)) throw new IOException("A backend is already installed. Existing runtime files are preserved.");
+        if (!File.Exists(Path.Combine(staging, FileName(engine)))) throw new InvalidDataException(Loc.T("Archive did not contain the required engine executable."));
+        if (Directory.Exists(target)) throw new IOException(Loc.T("A backend is already installed. Existing runtime files are preserved."));
         Directory.Move(staging, target);
     }
     public static async Task ImportAsync(RuntimePaths paths, string engine, string backend, string source, CancellationToken token)
     {
-        if (backend is not ("cuda" or "rocm")) throw new InvalidOperationException("CPU and Vulkan are bundled. Import CUDA or ROCm runtime builds only.");
-        if (!File.Exists(Path.Combine(source, FileName(engine)))) throw new InvalidDataException("Choose the folder containing " + FileName(engine) + " and its dependencies.");
+        if (backend is not ("cuda" or "rocm")) throw new InvalidOperationException(Loc.T("CPU and Vulkan are bundled. Import CUDA or ROCm runtime builds only."));
+        if (!File.Exists(Path.Combine(source, FileName(engine)))) throw new InvalidDataException(Loc.T("Choose the folder containing {0} and its dependencies.", FileName(engine)));
         var target = Folder(paths, engine, backend);
-        if (Directory.Exists(target)) throw new IOException("This backend already has an installed runtime. Existing files are preserved.");
+        if (Directory.Exists(target)) throw new IOException(Loc.T("This backend already has an installed runtime. Existing files are preserved."));
         var staging = target + ".import-" + Guid.NewGuid().ToString("N"); Directory.CreateDirectory(staging);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             token.ThrowIfCancellationRequested();
             var destination = Path.GetFullPath(Path.Combine(staging, Path.GetRelativePath(source, file)));
-            if (!destination.StartsWith(staging + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid runtime path.");
+            if (!destination.StartsWith(staging + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException(Loc.T("Invalid runtime path."));
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             await using var input = File.OpenRead(file); await using var output = File.Create(destination); await input.CopyToAsync(output, token);
         }

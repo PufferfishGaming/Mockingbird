@@ -6,7 +6,7 @@ namespace TriAsr.App;
 public sealed partial class ShellViewModel
 {
     [ObservableProperty] private bool _hasError;
-    [ObservableProperty] private string _errorTitle = "Something needs attention";
+    [ObservableProperty] private string _errorTitle = Loc.Key("Something needs attention");
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool _animateErrors = true;
     public bool PulseError => HasError && AnimateErrors && System.Windows.SystemParameters.ClientAreaAnimation
@@ -17,6 +17,7 @@ public sealed partial class ShellViewModel
     public void ReportError(string title, string message)
     {
         HasError = false;
+        title = Loc.T(title); message = Loc.T(message); // texts from the layers below are English and may have a translation
         ErrorTitle = title;
         ErrorMessage = message;
         Status = title + ": " + message;

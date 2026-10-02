@@ -2,6 +2,11 @@
   <PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><OutputType>WinExe</OutputType><RuntimeIdentifier>win-x64</RuntimeIdentifier><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets/TriASR.ico</ApplicationIcon></PropertyGroup>
   <ItemGroup><Content Include="Assets/TriASR.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /><EmbeddedResource Include="../../PRIVACY.md" LogicalName="Mockingbird.Privacy.md" /></ItemGroup>
   <ItemGroup>
+    <!-- Interface translations: Languages/xx.json maps the English text to the text in language xx; Languages/privacy/xx.md is the privacy policy in that language. -->
+    <EmbeddedResource Include="Languages/??.json" LogicalName="Mockingbird.Lang.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Languages/privacy/??.md" LogicalName="Mockingbird.Privacy.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../TriAsr.Application/TriAsr.Application.csproj" /><ProjectReference Include="../TriAsr.Infrastructure/TriAsr.Infrastructure.csproj" /><ProjectReference Include="../TriAsr.Persistence/TriAsr.Persistence.csproj" />
     <ProjectReference Include="../TriAsr.Audio/TriAsr.Audio.csproj" /><ProjectReference Include="../TriAsr.Engine.Whisper/TriAsr.Engine.Whisper.csproj" /><ProjectReference Include="../TriAsr.Engine.Canary/TriAsr.Engine.Canary.csproj" /><ProjectReference Include="../TriAsr.Engine.Llm/TriAsr.Engine.Llm.csproj" />
     <ProjectReference Include="../TriAsr.Alignment/TriAsr.Alignment.csproj" /><ProjectReference Include="../TriAsr.Fusion/TriAsr.Fusion.csproj" /><ProjectReference Include="../TriAsr.Hardware/TriAsr.Hardware.csproj" /><ProjectReference Include="../TriAsr.Benchmark/TriAsr.Benchmark.csproj" /><ProjectReference Include="../TriAsr.Export/TriAsr.Export.csproj" />

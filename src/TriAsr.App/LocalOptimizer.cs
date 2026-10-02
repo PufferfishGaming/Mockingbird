@@ -24,16 +24,16 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
         foreach (var path in correctionInstalled ? new[] { paths.WhisperModel, paths.CanaryModel, paths.CorrectionModel } : [paths.WhisperModel, paths.CanaryModel])
         {
             var entry = ModelManifest.Entries.First(item => models.PathFor(item) == path);
-            progress?.Report("Verifying " + entry.Name);
-            if (!await models.VerifyCachedAsync(entry, token)) throw new InvalidDataException($"Model checksum failed: {entry.Name} {entry.Quantization}");
+            progress?.Report(Loc.T("Verifying {0}", entry.Name));
+            if (!await models.VerifyCachedAsync(entry, token)) throw new InvalidDataException(Loc.T("Model checksum failed: {0} {1}", entry.Name, entry.Quantization));
         }
         var normalized = Path.Combine(directory, "normalized.wav");
         await normalizer.NormalizeAsync(source, normalized, token);
         var sample = Path.Combine(directory, "sample.wav");
         var cut = await runner.RunAsync(new(paths.Ffmpeg, ["-nostdin", "-v", "error", "-n", "-threads", "2", "-i", normalized, "-t", "8", "-c:a", "pcm_s16le", sample], directory, TimeSpan.FromMinutes(1)), token);
-        if (cut.ExitCode != 0) throw new InvalidOperationException("Benchmark sample extraction failed.");
+        if (cut.ExitCode != 0) throw new InvalidOperationException(Loc.T("Benchmark sample extraction failed."));
         var seconds = WaveAudio.Inspect(sample).DurationSeconds;
-        if (seconds < 3) throw new InvalidDataException("Choose at least three seconds of speech for optimization.");
+        if (seconds < 3) throw new InvalidDataException(Loc.T("Choose at least three seconds of speech for optimization."));
         var budget = governor.For(ResourceProfile.Default).Threads; // tuning never tests more threads than a normal job may use
         var defaultThreads = Math.Clamp(hardware.Topology.PerformanceCores ?? hardware.Topology.LogicalProcessors / 2, 1, Math.Min(12, budget));
         var vram = hardware.Gpus.MaxBy(gpu => gpu.DedicatedBytes)?.DedicatedBytes ?? 0;
@@ -46,11 +46,11 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
             .DetectLanguageAsync(sample, seconds, Path.Combine(directory, "language"), detectionBackend, paths.Ffmpeg, token); }
         catch (Exception error) when (error is not OperationCanceledException && detectionBackend != "cpu")
         {
-            progress?.Report("GPU language check failed; retrying on CPU. GPU benchmark candidates will still be tested independently.");
+            progress?.Report(Loc.T("GPU language check failed; retrying on CPU. GPU benchmark candidates will still be tested independently."));
             language = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, defaultThreads)
                 .DetectLanguageAsync(sample, seconds, Path.Combine(directory, "language-cpu"), "cpu", paths.Ffmpeg, token);
         }
-        if (!TriAsr.Domain.LanguageCatalog.CanaryCodes.Contains(language.Language)) throw new InvalidDataException("Choose a tuning recording in one of Canary’s 25 languages to measure both engines. Transcription still supports Whisper’s full language catalog.");
+        if (!TriAsr.Domain.LanguageCatalog.CanaryCodes.Contains(language.Language)) throw new InvalidDataException(Loc.T("Choose a tuning recording in one of Canary’s 25 languages to measure both engines. Transcription still supports Whisper’s full language catalog."));
         var results = new List<BenchmarkRow>();
         var runId = 0;
         async Task<Measurement> Whisper(string backend, int threads, CancellationToken ct)
@@ -66,9 +66,9 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
             await File.WriteAllTextAsync(request, JsonSerializer.Serialize(new CanaryRequest(paths.CanaryFor(backend), paths.CanaryModel, sample, language.Language, backend, threads, output)), ct);
             var run = await runner.RunAsync(new(paths.CanaryWorker, ["--canary", request], Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromMinutes(5)), ct);
             await File.WriteAllTextAsync(Path.Combine(directory, $"canary-{id}.stderr.txt"), run.StandardError, ct);
-            if (run.ExitCode != 0) throw new InvalidOperationException("Canary benchmark failed: " + run.StandardError[^Math.Min(run.StandardError.Length, 500)..]);
+            if (run.ExitCode != 0) throw new InvalidOperationException(Loc.T("Canary benchmark failed: {0}", run.StandardError[^Math.Min(run.StandardError.Length, 500)..]));
             var native = JsonSerializer.Deserialize<CanaryNative.Result>(await File.ReadAllTextAsync(output, ct))!;
-            if (native.Transcript.ActualBackend != backend) throw new InvalidDataException("Canary benchmark backend mismatch.");
+            if (native.Transcript.ActualBackend != backend) throw new InvalidDataException(Loc.T("Canary benchmark backend mismatch."));
             return new(run.Seconds, native.Transcript.LoadSeconds, run.PeakRamBytes, CpuSeconds: run.CpuSeconds);
         }
         foreach (var backend in backends)
@@ -79,7 +79,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
                 foreach (var engine in new[] { "Whisper", "Canary" })
                 {
                     if (!BackendRuntimes.Candidates(paths, hardware, engine).Contains(backend)) continue;
-                    progress?.Report($"{engine} · {backend} · {count} threads · warmup + 3 measurements");
+                    progress?.Report(Loc.T("{0} · {1} · {2} threads · warmup + 3 measurements", Loc.T(engine), backend, count));
                     var row = await BenchmarkSession.MeasureAsync(engine, engine == "Whisper" ? Path.GetFileName(paths.WhisperModel) : Path.GetFileName(paths.CanaryModel), backend, count, "single", seconds,
                         (_, ct) => engine == "Whisper" ? Whisper(backend, count, ct) : Canary(backend, count, ct), token);
                     results.Add(row); measurements?.Report(row); await SaveResults(directory, results, token);
@@ -87,9 +87,9 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
             }
         }
         var whisperBest = results.Where(row => row.Engine == "Whisper" && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds)
-            ?? throw new InvalidOperationException("No Whisper configuration passed its benchmark.");
+            ?? throw new InvalidOperationException(Loc.T("No Whisper configuration passed its benchmark."));
         var canaryBest = results.Where(row => row.Engine == "Canary" && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds)
-            ?? throw new InvalidOperationException("No Canary configuration passed its benchmark.");
+            ?? throw new InvalidOperationException(Loc.T("No Canary configuration passed its benchmark."));
         foreach (var backend in backends)
         {
             foreach (var candidate in ModelManifest.Entries.Where(item => item.Family == "Correction" && File.Exists(models.PathFor(item))))
@@ -97,7 +97,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
                 if (!BackendRuntimes.Candidates(paths, hardware, "Correction").Contains(backend)) continue;
                 if (!await models.VerifyCachedAsync(candidate, token)) continue;
                 if (backend != "cpu" && !GpuMemoryPlanner.Fits(vram, (ulong)candidate.Bytes, 1024UL * 1024 * 1024, 512UL * 1024 * 1024, 1024UL * 1024 * 1024)) continue;
-                progress?.Report($"Correction · {candidate.Quantization} · {backend} · warmup + 3 measurements");
+                progress?.Report(Loc.T("Correction · {0} · {1} · warmup + 3 measurements", candidate.Quantization, backend));
                 await using var arbiter = new LlamaArbiter(runner, paths.CorrectionFor(backend), models.PathFor(candidate), backend, defaultThreads);
                 var row = await BenchmarkSession.MeasureAsync("Correction", candidate.Id, backend, defaultThreads, "persistent", seconds,
                     async (iteration, ct) =>
@@ -111,14 +111,14 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
             }
         }
         var correctionBest = results.Where(row => row.Engine == "Correction" && row.Model == ModelManifest.Entries.First(item => models.PathFor(item) == paths.CorrectionModel).Id && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds);
-        if (correctionBest is null && correctionInstalled) throw new InvalidOperationException("No correction configuration passed. The previous tuning profile is preserved.");
+        if (correctionBest is null && correctionInstalled) throw new InvalidOperationException(Loc.T("No correction configuration passed. The previous tuning profile is preserved."));
         var (correctionBackend, correctionThreads) = correctionBest is null ? ("cpu", defaultThreads) : (correctionBest.Backend, correctionBest.Threads);
         var combinedWeights = (ulong)(new FileInfo(paths.WhisperModel).Length + new FileInfo(paths.CanaryModel).Length);
         var parallelSafe = hardware.RamBytes >= 16UL * 1024 * 1024 * 1024 &&
             (whisperBest.Backend == "cpu" || canaryBest.Backend == "cpu" || GpuMemoryPlanner.Fits(vram, combinedWeights, 3UL * 1024 * 1024 * 1024, 0, 2UL * 1024 * 1024 * 1024));
         foreach (var parallel in parallelSafe ? new[] { false, true } : [false])
         {
-            progress?.Report($"Dual ASR · {(parallel ? "parallel" : "sequential")} · warmup + 3 measurements");
+            progress?.Report(Loc.T("Dual ASR · {0} · warmup + 3 measurements", parallel ? Loc.T("parallel") : Loc.T("sequential")));
             var row = await BenchmarkSession.MeasureAsync("Dual ASR", "selected models", "mixed", 0, parallel ? "parallel" : "sequential", seconds,
                 async (_, ct) =>
                 {
@@ -130,7 +130,7 @@ public sealed class LocalOptimizer(RuntimePaths paths, IStoragePaths storage, IP
             results.Add(row); measurements?.Report(row); await SaveResults(directory, results, token);
         }
         var strategy = results.Where(row => row.Engine == "Dual ASR" && row.MedianSeconds.HasValue).MinBy(row => row.MedianSeconds)
-            ?? throw new InvalidOperationException("No dual-engine strategy passed. The previous tuning profile is preserved.");
+            ?? throw new InvalidOperationException(Loc.T("No dual-engine strategy passed. The previous tuning profile is preserved."));
         var profile = new ExecutionProfile(fingerprint, whisperBest.Backend, whisperBest.Threads, canaryBest.Backend, canaryBest.Threads,
             correctionBackend, correctionThreads, strategy.Strategy == "parallel", DateTimeOffset.UtcNow, results);
         await File.WriteAllTextAsync(Path.Combine(directory, "profile.json"), JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true }), token);

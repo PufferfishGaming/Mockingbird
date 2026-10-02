@@ -28,7 +28,7 @@ public static class ShellSmoke
                 shell.SelectedPage = page;
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 if (window.DataContext != shell) throw new InvalidOperationException("Navigation data context lost.");
-                var title = FindText(window, page.Title);
+                var title = FindText(window, Loc.T(page.Title));
                 if (title is null) throw new InvalidOperationException($"Page title missing: {page.Name}");
             }
             shell.SelectedPage = shell.Navigation[0];
@@ -54,6 +54,7 @@ public static class ShellSmoke
             Capture(window, Path.Combine(output, $"{page}-{width:0}.png"), width, 1000, 1);
             count++;
         }
+        count += await LanguageRendersAsync(window, shell, output);
         shell.ReportError("Download needs attention", "The download host is unavailable. Your downloaded models and partial files are retained. Retry when the connection is restored.");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (!shell.HasError || FindText(window, shell.ErrorTitle) is null) throw new InvalidOperationException("Error alert did not appear.");
@@ -62,6 +63,39 @@ public static class ShellSmoke
         shell.DismissErrorCommand.Execute(null);
         if (shell.HasError) throw new InvalidOperationException("Error alert did not dismiss.");
         return count + 2;
+    }
+
+    /// <summary>Every language, live: the window changes language without a restart, and the pages with the most text are rendered for a look at the layout.</summary>
+    private static async Task<int> LanguageRendersAsync(MainWindow window, ShellViewModel shell, string output)
+    {
+        var count = 0;
+        shell.SelectedTheme = "Light";
+        window.Width = 1220;
+        foreach (var language in Loc.Languages)
+        {
+            shell.Language = language.Code;
+            foreach (var name in new[] { "New Transcription", "Models", "Benchmark", "Backends", "Settings" })
+            {
+                var page = shell.Navigation.First(item => item.Name == name);
+                shell.SelectedPage = page;
+                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (FindText(window, Loc.T(page.Title)) is null) throw new InvalidOperationException($"The title of {name} is not shown in {language.Code}.");
+                if (FindText(window, Loc.T("Settings")) is null) throw new InvalidOperationException($"The sidebar is not shown in {language.Code}.");
+                if (name == "New Transcription" && FindText(window, Loc.T("Select file")) is null) throw new InvalidOperationException($"The buttons are not shown in {language.Code}.");
+                Capture(window, Path.Combine(output, $"lang-{language.Code}-{name.Replace(' ', '-')}.png"), 1220, 1100, 1);
+                count++;
+            }
+        }
+        // The window that asks for the language on the first start.
+        var chooser = new LanguageChoiceWindow(Loc.Detect()) { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
+        chooser.Show();
+        await chooser.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Capture(chooser, Path.Combine(output, "language-choice.png"), 520, 460, 1);
+        chooser.Close();
+        count++;
+        shell.Language = Loc.English;
+        shell.SelectedPage = shell.Navigation[0];
+        return count;
     }
 
     /// <summary>The sidebar lists only the main pages until "Advanced" is opened, but never hides the page that is open.</summary>
@@ -96,7 +130,7 @@ public static class ShellSmoke
         return null;
     }
 
-    public static void Capture(MainWindow window, string path, double width, double height, double scale)
+    public static void Capture(Window window, string path, double width, double height, double scale)
     {
         var content = (FrameworkElement)window.Content;
         content.Measure(new Size(width, height));

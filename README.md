@@ -37,6 +37,7 @@ Native Linux support is pending; there is currently no native Linux build.
 - TXT, Markdown, JSON, CSV, SRT, VTT and DOCX export.
 - Persistent model downloads, CPU/Vulkan backends, optional compatible CUDA/ROCm runtimes and measured auto-tuning.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.
+- The interface in English, Hungarian, German, Spanish and French: chosen on the first start, switchable in Settings without a restart.
 - In-app update checks with a verified one-click update.
 
 Recognition can be wrong, particularly with music, noise or silence. Review important transcripts. Readable export normalizes spacing without rewriting wording.

@@ -14,14 +14,14 @@ public sealed partial class ShellViewModel : IDisposable
     private readonly List<string> _commandHistory = [];
     private int _historyPosition;
     public bool IsTerminalPage => SelectedPage?.Name == "Terminal";
-    public IReadOnlyList<string> TerminalViews { get; } = ["Activity", "PowerShell"];
+    public IReadOnlyList<string> TerminalViews { get; } = [Loc.Key("Activity"), "PowerShell"];
     [ObservableProperty] private string _terminalView = "Activity";
     [ObservableProperty] private string _terminalInput = "";
     [ObservableProperty] private bool _terminalAutoScroll = true;
     [ObservableProperty] private bool _terminalSubmitting;
-    [ObservableProperty] private string _terminalStatus = "PowerShell is stopped. Run a command or press Start PowerShell.";
+    [ObservableProperty] private string _terminalStatus = Loc.Key("PowerShell is stopped. Run a command or press Start PowerShell.");
     [ObservableProperty] private string _terminalDirectory = "";
-    [ObservableProperty] private string _terminalSendLabel = "Run command";
+    [ObservableProperty] private string _terminalSendLabel = Loc.Key("Run command");
     public string TerminalOutput => TerminalView == "PowerShell" ? _consoleText : _activityText;
     partial void OnTerminalViewChanged(string value) { OnPropertyChanged(nameof(TerminalOutput)); RefreshTerminal(); }
     partial void OnTerminalInputChanged(string value) => SubmitTerminalCommand.NotifyCanExecuteChanged();
@@ -32,7 +32,7 @@ public sealed partial class ShellViewModel : IDisposable
         PropertyChanged += ObserveActivity;
         _terminalTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(200) };
         _terminalTimer.Tick += (_, _) => RefreshTerminal(); _terminalTimer.Start();
-        activity.Append("app", "Workspace: " + storage.Root + " · model repository: " + runtimes.ModelRoot);
+        activity.Append("app", T("Workspace: {0} · model repository: {1}", storage.Root, runtimes.ModelRoot));
     }
     private void ObserveActivity(object? sender, PropertyChangedEventArgs args)
     {
@@ -47,8 +47,8 @@ public sealed partial class ShellViewModel : IDisposable
     public void RefreshTerminal()
     {
         TerminalDirectory = string.IsNullOrEmpty(terminal.CurrentDirectory) ? storage.Root : terminal.CurrentDirectory;
-        TerminalStatus = terminal.IsRunning ? terminal.IsBusy ? "Command running · send input if it requests a response" : "PowerShell ready · variables and current folder are preserved" : "PowerShell stopped · start a new session";
-        TerminalSendLabel = terminal.IsBusy ? "Send input" : "Run command";
+        TerminalStatus = terminal.IsRunning ? terminal.IsBusy ? T("Command running · send input if it requests a response") : T("PowerShell ready · variables and current folder are preserved") : T("PowerShell stopped · start a new session");
+        TerminalSendLabel = terminal.IsBusy ? T("Send input") : T("Run command");
         if (!IsTerminalPage) return;
         if (_lastActivitySequence != activity.Sequence)
         {
@@ -77,18 +77,18 @@ public sealed partial class ShellViewModel : IDisposable
                 await terminal.RunCommandAsync(command);
             }
         }
-        catch (Exception error) { ReportError("Terminal command failed", error.Message); }
+        catch (Exception error) { ReportError(T("Terminal command failed"), error.Message); }
         finally { TerminalSubmitting = false; RefreshTerminal(); }
     }
     [RelayCommand] private async Task StartTerminalAsync()
     {
         try { TerminalView = "PowerShell"; await terminal.StartAsync(storage.Root); RefreshTerminal(); }
-        catch (Exception error) { ReportError("PowerShell could not start", error.Message); }
+        catch (Exception error) { ReportError(T("PowerShell could not start"), error.Message); }
     }
     [RelayCommand] private async Task StopTerminalAsync()
     {
         try { await terminal.StopAsync(); RefreshTerminal(); }
-        catch (Exception error) { ReportError("PowerShell could not stop", error.Message); }
+        catch (Exception error) { ReportError(T("PowerShell could not stop"), error.Message); }
     }
     [RelayCommand] private void ClearTerminal()
     {
@@ -99,7 +99,7 @@ public sealed partial class ShellViewModel : IDisposable
     [RelayCommand] private void CopyTerminal()
     {
         try { if (TerminalOutput.Length > 0) Clipboard.SetText(TerminalOutput); }
-        catch (Exception error) { ReportError("Could not copy terminal output", error.Message); }
+        catch (Exception error) { ReportError(T("Could not copy terminal output"), error.Message); }
     }
     public void RecallTerminalCommand(int direction)
     {

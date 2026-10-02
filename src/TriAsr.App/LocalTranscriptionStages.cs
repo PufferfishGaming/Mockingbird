@@ -67,7 +67,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             await using var stream = File.OpenRead(job.SourcePath);
             var digest = Convert.ToHexString(await SHA256.HashDataAsync(stream, token));
             if (source.RootElement.TryGetProperty("Sha256", out var hash) && hash.GetString() != digest)
-                throw new InvalidDataException("The source file changed. Create a new job to keep its evidence consistent.");
+                throw new InvalidDataException(Loc.T("The source file changed. Create a new job to keep its evidence consistent."));
             var saved = File.Exists(FileFor(job.Id, "configuration.json")) ? await Read<JobConfiguration>(job.Id, "configuration.json", token) : null;
             var preferences = saved is null ? await settings.LoadAsync() : null;
             var config = JobConfiguration.Bind(await GetConfiguration(token), saved, preferences?.SkipNonSpeech ?? false, preferences?.UseCorrectionModel ?? true);
@@ -96,11 +96,11 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 catch (Exception error) when (error is not OperationCanceledException && configuration.WhisperBackend != "cpu")
                 {
                     await Write(job.Id, "Language/fallback.json", new { Error = error.Message, Requested = configuration.WhisperBackend, Retry = "cpu" }, token);
-                    Issue("GPU language detection failed", "Retrying on CPU. " + error.Message);
+                    Issue(Loc.T("GPU language detection failed"), Loc.T("Retrying on CPU. {0}", error.Message));
                     detected = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)).DetectLanguageAsync(normalized, seconds, FileFor(job.Id, "LanguageCpu"), "cpu", paths.Ffmpeg, token, sampleStarts);
                 }
-                if (!LanguageCatalog.Supports(detected.Language)) throw new InvalidDataException($"Detected unsupported language '{detected.Language}'. Choose a language listed in Languages.");
-                if (detected.Confidence < .65) throw new InvalidDataException("Language detection is uncertain. Create a job with an explicit speech language.");
+                if (!LanguageCatalog.Supports(detected.Language)) throw new InvalidDataException(Loc.T("Detected unsupported language '{0}'. Choose a language listed in Languages.", detected.Language));
+                if (detected.Confidence < .65) throw new InvalidDataException(Loc.T("Language detection is uncertain. Create a job with an explicit speech language."));
                 await Write(job.Id, "language.json", detected, token); break;
             case JobState.RunningWhisper:
                 if (File.Exists(FileFor(job.Id, "whisper.json"))) { await Read<EngineTranscript>(job.Id, "whisper.json", token); return; }
@@ -111,7 +111,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 catch (Exception error) when (error is not OperationCanceledException && configuration.WhisperBackend != "cpu")
                 {
                     await Write(job.Id, "Whisper/fallback.json", new { Error = error.Message, Requested = configuration.WhisperBackend, Retry = "cpu" }, token);
-                    Issue("Whisper GPU attempt failed", "Retrying on CPU. " + error.Message);
+                    Issue(Loc.T("Whisper GPU attempt failed"), Loc.T("Retrying on CPU. {0}", error.Message));
                     first = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)).TranscribeAsync(normalized, seconds, language, FileFor(job.Id, "WhisperCpu"), "cpu", token, value => Report(job.Id, stage, value), vadModel);
                 }
                 first = await RemoveLoopsAsync(job.Id, first, configuration.SkipNonSpeech, token);
@@ -126,7 +126,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 }
                 var raw = FileFor(job.Id, "Canary/raw.json"); Directory.CreateDirectory(Path.GetDirectoryName(raw)!);
                 if (!File.Exists(paths.CanaryModel))
-                    throw new FileNotFoundException($"Selected Canary model {Path.GetFileName(paths.CanaryModel)} is not downloaded. Open Models and download it, or choose the Balanced preset to use the installed Q8 model.", paths.CanaryModel);
+                    throw new FileNotFoundException(Loc.T("Selected Canary model {0} is not downloaded. Open Models and download it, or choose the Balanced preset to use the installed Q8 model.", Path.GetFileName(paths.CanaryModel)), paths.CanaryModel);
                 // A job that skips silence and music gives Canary the speech windows of its chunk plan (cut in real pauses, finished windows
                 // are kept for a restart). Every other job reads the whole file exactly as before, so its result does not change.
                 IReadOnlyList<CanaryWindow>? windows = null;
@@ -145,7 +145,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 if (result.ExitCode != 0 && configuration.CanaryBackend != "cpu")
                 {
                     await Write(job.Id, "Canary/fallback.json", new { Error = result.StandardError, Requested = configuration.CanaryBackend, Retry = "cpu" }, token);
-                    Issue("Canary GPU attempt failed", "Retrying on CPU. The attempt output is saved in the job folder.");
+                    Issue(Loc.T("Canary GPU attempt failed"), Loc.T("Retrying on CPU. The attempt output is saved in the job folder."));
                     request = request with { RuntimeDirectory = paths.CanaryRuntime, Backend = "cpu", Output = FileFor(job.Id, "CanaryCpu/raw.json") };
                     Directory.CreateDirectory(FileFor(job.Id, "CanaryCpu"));
                     await Write(job.Id, "CanaryCpu/request.json", request, token);
@@ -153,17 +153,17 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                         Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromHours(12), line => CanaryProgress(job.Id, line)), token);
                     await File.WriteAllTextAsync(FileFor(job.Id, "CanaryCpu/runtime.stderr.txt"), result.StandardError, token);
                 }
-                if (result.ExitCode != 0) throw new InvalidOperationException("Canary failed. Whisper evidence is saved; resume after fixing the runtime. " + result.StandardError[^Math.Min(500, result.StandardError.Length)..]);
+                if (result.ExitCode != 0) throw new InvalidOperationException(Loc.T("Canary failed. Whisper evidence is saved; resume after fixing the runtime. {0}", result.StandardError[^Math.Min(500, result.StandardError.Length)..]));
                 var second = await Read<CanaryNative.Result>(job.Id, request.Backend == "cpu" && configuration.CanaryBackend != "cpu" ? "CanaryCpu/raw.json" : "Canary/raw.json", token);
-                if (second.Transcript.ActualBackend != request.Backend) throw new InvalidDataException("Canary backend mismatch.");
+                if (second.Transcript.ActualBackend != request.Backend) throw new InvalidDataException(Loc.T("Canary backend mismatch."));
                 await Write(job.Id, "canary.json", second, token); break;
             case JobState.Aligning:
                 if (File.Exists(FileFor(job.Id, "comparison.json"))) { await Read<ComparisonResult>(job.Id, "comparison.json", token); return; }
                 if (!File.Exists(FileFor(job.Id, "whisper.json")))
                 {
-                    if (!File.Exists(FileFor(job.Id, "canary.json"))) throw new InvalidOperationException("Both speech engines failed. Their failure evidence is retained in the job folder.");
+                    if (!File.Exists(FileFor(job.Id, "canary.json"))) throw new InvalidOperationException(Loc.T("Both speech engines failed. Their failure evidence is retained in the job folder."));
                     var survivingCanary = (await Read<CanaryNative.Result>(job.Id, "canary.json", token)).Transcript;
-                    if (string.IsNullOrWhiteSpace(survivingCanary.Text)) throw new InvalidOperationException("Whisper failed and Canary returned no speech text. No transcript can be finalized.");
+                    if (string.IsNullOrWhiteSpace(survivingCanary.Text)) throw new InvalidOperationException(Loc.T("Whisper failed and Canary returned no speech text. No transcript can be finalized."));
                     var untimedRegion = new FinalRegion(0, 0, survivingCanary.Text, "", survivingCanary.Text,
                         "single-asr-needs-listening", Confidence: 0, NativeTimestamps: false);
                     await Write(job.Id, "comparison.json", new ComparisonResult([untimedRegion], [],
@@ -201,7 +201,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                     try
                     {
                         var correctionEntry = ModelManifest.Entries.First(item => models.PathFor(item) == paths.CorrectionModel);
-                        if (!await models.VerifyCachedAsync(correctionEntry, token)) throw new InvalidDataException("Correction model is missing or fails its checksum. Disputes require listening.");
+                        if (!await models.VerifyCachedAsync(correctionEntry, token)) throw new InvalidDataException(Loc.T("Correction model is missing or fails its checksum. Disputes require listening."));
                         await arbiter.StartAsync(token);
                         foreach (var dispute in disputes)
                         {
@@ -210,14 +210,14 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                             if (File.Exists(FileFor(job.Id, checkpoint))) { decisions.Add(await Read<Correction>(job.Id, checkpoint, token)); continue; }
                             Correction decision;
                             try { decision = new(dispute, await arbiter.ResolveAsync(dispute.Whisper, dispute.Canary, dispute.Before, dispute.After, token), null); }
-                            catch (Exception error) when (error is not OperationCanceledException) { decision = new(dispute, new("uncertain", dispute.Whisper, 0, true), error.Message); Issue("Correction needs listening", "A disagreement could not be resolved and is marked uncertain. " + error.Message); }
+                            catch (Exception error) when (error is not OperationCanceledException) { decision = new(dispute, new("uncertain", dispute.Whisper, 0, true), error.Message); Issue(Loc.T("Correction needs listening"), Loc.T("A disagreement could not be resolved and is marked uncertain. {0}", error.Message)); }
                             decisions.Add(decision); await Write(job.Id, checkpoint, decision, token);
                             Report(job.Id, stage, (double)decisions.Count / disputes.Count);
                         }
                     }
                     catch (Exception error) when (error is not OperationCanceledException)
                     {
-                        Issue("Correction engine failed", "Disagreements are marked uncertain and require listening. " + error.Message);
+                        Issue(Loc.T("Correction engine failed"), Loc.T("Disagreements are marked uncertain and require listening. {0}", error.Message));
                         decisions = disputes.Select(dispute => new Correction(dispute, new("uncertain", dispute.Whisper, 0, true), error.Message)).ToList();
                     }
                 }
@@ -293,9 +293,9 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 + "FastRuns: lines written again at an impossible speaking speed, all with the same collapsed length (RateGuard). The first copy of each line is kept.",
             Removed = removed, Runs = runs, FastRuns = fastRuns, RawOutput = "Whisper/raw.json"
         }, token);
-        Issue("Repeated text removed", $"Whisper repeated itself: {removed} segments were removed over {minutes:0.#} minutes of the recording, a known failure over stretches without speech or at the end of a song. "
-            + "The repeats were removed and Whisper's raw output is kept in the project folder, but speech inside that stretch may be missing from the transcript."
-            + (alreadySkipping ? "" : " Turning on \"Skip silence and music\" in Settings usually avoids this and finds that speech."));
+        Issue(Loc.T("Repeated text removed"), Loc.T("Whisper repeated itself: {0} segments were removed over {1:0.#} minutes of the recording, a known failure over stretches without speech or at the end of a song.", removed, minutes)
+            + " " + Loc.T("The repeats were removed and Whisper's raw output is kept in the project folder, but speech inside that stretch may be missing from the transcript.")
+            + (alreadySkipping ? "" : " " + Loc.T("Turning on \"Skip silence and music\" in Settings usually avoids this and finds that speech.")));
         return transcript with { Segments = kept, Text = string.Join(" ", kept.Select(segment => segment.Text)) };
     }    /// <summary>
     /// Text that only Whisper wrote, in a stretch where the speech detector found no speech and Canary wrote nothing like it, is left out of the
@@ -314,7 +314,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             Removed = removed, RawOutput = "Whisper/raw.json"
         }, token);
         var words = removed.Sum(item => item.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length);
-        Issue("Unsupported text left out", $"{removed.Count} segments ({words} words) that only Whisper wrote, in stretches where no speech was detected and that Canary did not hear, were left out of the transcript. They are kept in the project folder.");
+        Issue(Loc.T("Unsupported text left out"), Loc.T("{0} segments ({1} words) that only Whisper wrote, in stretches where no speech was detected and that Canary did not hear, were left out of the transcript. They are kept in the project folder.", removed.Count, words));
         return whisper with { Segments = kept, Text = string.Join(' ', kept.Select(segment => segment.Text)) };
     }
     private async Task<ChunkPlan?> TryReadPlanAsync(Guid id, CancellationToken token)
@@ -335,7 +335,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
     private async Task SkipUnavailableAsync(Guid id, string engine, CancellationToken token)
     {
         await Write(id, engine + "/skip-unavailable.json", new { Reason = "The speech detector is not available, so nothing was skipped.", AtUtc = DateTimeOffset.UtcNow }, token);
-        Issue("Silence could not be skipped", $"The speech detector is not available for {engine}, so its whole recording is transcribed.");
+        Issue(Loc.T("Silence could not be skipped"), Loc.T("The speech detector is not available for {0}, so its whole recording is transcribed.", engine));
     }
     private async Task<JobConfiguration> GetConfiguration(CancellationToken token)
     {
@@ -350,7 +350,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
         foreach (var path in new[] { paths.WhisperModel }.Concat(File.Exists(paths.CanaryModel) ? new[] { paths.CanaryModel } : []))
         {
             var entry = ModelManifest.Entries.First(item => models.PathFor(item) == path);
-            if (!await models.VerifyCachedAsync(entry, token)) throw new InvalidDataException($"Install or verify {entry.Name} {entry.Quantization} on the Models page.");
+            if (!await models.VerifyCachedAsync(entry, token)) throw new InvalidDataException(Loc.T("Install or verify {0} {1} on the Models page.", entry.Name, entry.Quantization));
         }
         var active = await ExecutionSettingsStore.LoadAsync(storage.Root);
         if (active?.Fingerprint == hash)
@@ -368,7 +368,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
         if (stage is not (JobState.RunningCanary or JobState.RunningWhisper)) return false;
         var engine = stage == JobState.RunningCanary ? "Canary" : "Whisper";
         await Write(job.Id, engine + "/failure.json", new { Error = error.Message, AtUtc = DateTimeOffset.UtcNow, ReviewRequired = true }, token);
-        Issue(engine + " transcription failed", "The other engine will be used if it succeeds. All resulting regions require listening. " + error.Message);
+        Issue(Loc.T("{0} transcription failed", engine), Loc.T("The other engine will be used if it succeeds. All resulting regions require listening. {0}", error.Message));
         return true;
     }
     public Task<FinalTranscript> LoadFinalAsync(Guid id, CancellationToken token = default) => Read<FinalTranscript>(id, "final.json", token);

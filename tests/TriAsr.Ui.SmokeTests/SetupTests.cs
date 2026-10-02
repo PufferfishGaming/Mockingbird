@@ -72,6 +72,9 @@ public sealed class SetupTests
     public async Task TheOfferAppearsWhileSomethingIsMissingAndNotNowIsRemembered()
     {
         var root = NewRoot();
+        // An empty model folder, so that the offer names a download whether or not this computer has the models.
+        var previousModels = Environment.GetEnvironmentVariable("TRIASR_MODEL_ROOT");
+        Environment.SetEnvironmentVariable("TRIASR_MODEL_ROOT", Path.Combine(root, "models-root"));
         try
         {
             using (var host = App.App.CreateHost(root))
@@ -83,6 +86,7 @@ public sealed class SetupTests
                 Assert.True(shell.SetupCanStart);
                 Assert.Equal("Not now", shell.SetupDismissLabel);
                 Assert.Contains("Downloads the speech models", shell.SetupDetail);
+                Assert.Contains("GiB", shell.SetupDetail);
                 shell.EvaluateSetupOffer(requiredModelsMissing: false, tuned: true);
                 Assert.Equal(SetupStage.Hidden, shell.SetupPhase); // everything was done by hand meanwhile
                 shell.EvaluateSetupOffer(requiredModelsMissing: true, tuned: false);
@@ -101,7 +105,7 @@ public sealed class SetupTests
                 Assert.Equal(SetupStage.Hidden, shell.SetupPhase); // the answer survives a restart
             }
         }
-        finally { TestCleanup.Delete(root); }
+        finally { Environment.SetEnvironmentVariable("TRIASR_MODEL_ROOT", previousModels); TestCleanup.Delete(root); }
     }
 
     [Fact]

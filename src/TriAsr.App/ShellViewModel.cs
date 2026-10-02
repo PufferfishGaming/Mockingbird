@@ -23,16 +23,16 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [
-        new("New Transcription", "New transcription", "M12,3 L12,21 M3,12 L21,12"),
-        new("Projects", "Projects", "M3,6 L10,6 L12,8 L21,8 L21,20 L3,20 Z"),
-        new("Review", "Review", "M3,12 L9,18 L21,5"),
-        new("Models", "Models", "M12,2 L22,7 L22,17 L12,22 L2,17 L2,7 Z M2,7 L12,12 L22,7 M12,12 L12,22"),
-        new("Languages", "Languages", "M2,12 A10,10 0 1 0 22,12 A10,10 0 1 0 2,12 M2,12 L22,12 M12,2 C6,8 6,16 12,22 C18,16 18,8 12,2", true),
-        new("Backends", "Backends", "M5,5 L19,5 L19,19 L5,19 Z M8,2 L8,5 M16,2 L16,5 M8,19 L8,22 M16,19 L16,22 M2,8 L5,8 M19,8 L22,8 M2,16 L5,16 M19,16 L22,16", true),
-        new("Benchmark", "Benchmark", "M4,20 L4,12 M12,20 L12,4 M20,20 L20,8", true),
-        new("Diagnostics", "Diagnostics", "M2,12 L6,12 L9,4 L14,20 L18,12 L22,12", true),
-        new("Terminal", "Terminal", "M3,5 L21,5 L21,19 L3,19 Z M6,9 L10,12 L6,15 M13,15 L18,15", true),
-        new("Settings", "Settings", "M12,2 L12,6 M12,18 L12,22 M2,12 L6,12 M18,12 L22,12 M5,5 L8,8 M16,16 L19,19 M5,19 L8,16 M16,8 L19,5 M12,7 A5,5 0 1 1 11.99,7")
+        new(Loc.Key("New Transcription"), Loc.Key("New transcription"), "M12,3 L12,21 M3,12 L21,12"),
+        new(Loc.Key("Projects"), Loc.Key("Projects"), "M3,6 L10,6 L12,8 L21,8 L21,20 L3,20 Z"),
+        new(Loc.Key("Review"), Loc.Key("Review"), "M3,12 L9,18 L21,5"),
+        new(Loc.Key("Models"), Loc.Key("Models"), "M12,2 L22,7 L22,17 L12,22 L2,17 L2,7 Z M2,7 L12,12 L22,7 M12,12 L12,22"),
+        new(Loc.Key("Languages"), Loc.Key("Languages"), "M2,12 A10,10 0 1 0 22,12 A10,10 0 1 0 2,12 M2,12 L22,12 M12,2 C6,8 6,16 12,22 C18,16 18,8 12,2", true),
+        new(Loc.Key("Backends"), Loc.Key("Backends"), "M5,5 L19,5 L19,19 L5,19 Z M8,2 L8,5 M16,2 L16,5 M8,19 L8,22 M16,19 L16,22 M2,8 L5,8 M19,8 L22,8 M2,16 L5,16 M19,16 L22,16", true),
+        new(Loc.Key("Benchmark"), Loc.Key("Benchmark"), "M4,20 L4,12 M12,20 L12,4 M20,20 L20,8", true),
+        new(Loc.Key("Diagnostics"), Loc.Key("Diagnostics"), "M2,12 L6,12 L9,4 L14,20 L18,12 L22,12", true),
+        new(Loc.Key("Terminal"), Loc.Key("Terminal"), "M3,5 L21,5 L21,19 L3,19 Z M6,9 L10,12 L6,15 M13,15 L18,15", true),
+        new(Loc.Key("Settings"), Loc.Key("Settings"), "M12,2 L12,6 M12,18 L12,22 M2,12 L6,12 M18,12 L22,12 M5,5 L8,8 M16,16 L19,19 M5,19 L8,16 M16,8 L19,5 M12,7 A5,5 0 1 1 11.99,7")
     ];
     /// <summary>Whether the Advanced pages (Languages, Backends, Benchmark, Diagnostics, Terminal) are listed in the sidebar. The open page is always listed.</summary>
     [ObservableProperty] private bool _showAdvanced;
@@ -42,7 +42,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [ObservableProperty] private NavigationItem? _selectedPage;
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private string _selectedDensity = "Comfortable";
-    [ObservableProperty] private string _status = "Workspace ready · no active job";
+    [ObservableProperty] private string _status = Loc.Key("Workspace ready · no active job");
     private bool _initialized;
     public bool IsSettings => SelectedPage?.IsSettings == true;
     public bool IsNewPage => SelectedPage?.Name == "New Transcription";
@@ -51,7 +51,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     public bool IsReviewPage => SelectedPage?.Name == "Review";
     public bool IsModelsPage => SelectedPage?.Name == "Models";
     public bool IsBenchmarkPage => SelectedPage?.Name == "Benchmark";
-    [ObservableProperty] private string _diagnostics = "Detecting hardware…";
+    [ObservableProperty] private string _diagnostics = Loc.Key("Detecting hardware…");
     [ObservableProperty] private bool _hardwareChanged;
     public HardwareProfile? Hardware { get; private set; }
     public ObservableCollection<TranscriptionJob> Jobs { get; } = [];
@@ -61,23 +61,23 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [ObservableProperty] private bool _hasTranscriptionProgress;
     [ObservableProperty] private bool _isTranscriptionRunning;
     [ObservableProperty] private double _transcriptionPercent;
-    [ObservableProperty] private string _transcriptionStage = "Preparing transcription";
+    [ObservableProperty] private string _transcriptionStage = Loc.Key("Preparing transcription");
     [ObservableProperty] private string _transcriptionProgressSummary = "0% · 0/7 stages finished";
     private Guid? _progressJob;
     [ObservableProperty] private TranscriptionJob? _selectedJob;
-    public IReadOnlyList<LanguageOption> Languages { get; } = LanguageCatalog.All.Prepend(new LanguageOption("auto", "Auto-detect language")).ToArray();
+    public IReadOnlyList<LanguageOption> Languages { get; } = LanguageCatalog.All.Prepend(new LanguageOption("auto", Loc.Key("Auto-detect language"))).ToArray();
     /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is listed only while Settings ask for it, and it never blocks a transcription.</summary>
     public string Readiness
     {
         get
         {
             var missing = new List<string>();
-            foreach (var (name, path) in new[] { ("Audio converter", runtimes.Ffmpeg), ("Whisper runtime", runtimes.Whisper), ("Canary worker", runtimes.CanaryWorker) })
-                if (!System.IO.File.Exists(path)) missing.Add($"{name} is missing. Reinstall Mockingbird Studio.");
+            foreach (var (name, path) in new[] { (Loc.Key("Audio converter"), runtimes.Ffmpeg), (Loc.Key("Whisper runtime"), runtimes.Whisper), (Loc.Key("Canary worker"), runtimes.CanaryWorker) })
+                if (!System.IO.File.Exists(path)) missing.Add(T("{0} is missing. Reinstall Mockingbird Studio.", T(name)));
             var models = MissingRequiredModels();
-            if (models.Length > 0) missing.Add("Not downloaded yet: " + string.Join(", ", models));
+            if (models.Length > 0) missing.Add(T("Not downloaded yet: {0}", string.Join(", ", models)));
             // Not needed to start (a job without it marks disagreements for listening), but the Settings choice is on, so say what is missing.
-            if (UseCorrectionModel && !System.IO.File.Exists(runtimes.CorrectionModel)) missing.Add("The correction model is not downloaded yet; until it is, disagreements between the engines are marked for listening.");
+            if (UseCorrectionModel && !System.IO.File.Exists(runtimes.CorrectionModel)) missing.Add(T("The correction model is not downloaded yet; until it is, disagreements between the engines are marked for listening."));
             return string.Join("\n", missing);
         }
     }
@@ -91,28 +91,28 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [ObservableProperty] private ReviewRegion? _selectedRegion;
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private bool _uncertainOnly;
-    [ObservableProperty] private string _reviewSummary = "Open a completed project to review its transcript.";
+    [ObservableProperty] private string _reviewSummary = Loc.Key("Open a completed project to review its transcript.");
     [ObservableProperty] private Uri? _audioSource;
     [ObservableProperty] private string _normalizedAudioPath = "";
     [ObservableProperty] private string _rawWhisper = "";
     [ObservableProperty] private string _rawCanary = "";
-    public IReadOnlyList<string> ExportModes { get; } = ["Strict Verbatim", "Readable"];
+    public IReadOnlyList<string> ExportModes { get; } = [Loc.Key("Strict Verbatim"), Loc.Key("Readable")];
     [ObservableProperty] private string _selectedExportMode = "Strict Verbatim";
-    [ObservableProperty] private string _engineStatus = "Hardware detection pending";
+    [ObservableProperty] private string _engineStatus = Loc.Key("Hardware detection pending");
     private FinalTranscript? _review;
     private CancellationTokenSource? _jobCancellation;
-    public string ThemeSummary => SelectedTheme == "System" ? "Following Windows appearance" : $"{SelectedTheme} appearance";
-    public string StorageSummary => $"Projects and logs: {storage.Root}\nModels: {runtimes.ModelRoot}";
+    public string ThemeSummary => SelectedTheme == "System" ? T("Following Windows appearance") : T("{0} appearance", T(SelectedTheme));
+    public string StorageSummary => T("Projects and logs: {0}\nModels: {1}", storage.Root, runtimes.ModelRoot);
     public void SetStorageLocation(string path, bool forModels)
     {
-        if (IsProcessing || IsModelBusy || IsBenchmarking) { Status = "Finish the active operation before changing folders."; return; }
+        if (IsProcessing || IsModelBusy || IsBenchmarking) { Status = T("Finish the active operation before changing folders."); return; }
         try
         {
             var location = StorageLocations.Load();
             StorageLocations.Save(forModels ? location with { ModelRoot = System.IO.Path.GetFullPath(path) } : location with { DataRoot = System.IO.Path.GetFullPath(path), ModelRoot = location.ModelRoot ?? runtimes.ModelRoot });
-            Status = "Folder saved. Restart Mockingbird Studio to apply it. Existing files stay in their current folder.";
+            Status = T("Folder saved. Restart Mockingbird Studio to apply it. Existing files stay in their current folder.");
         }
-        catch (Exception error) { ReportError("Cannot save folder", error.Message); }
+        catch (Exception error) { ReportError(T("Cannot save folder"), error.Message); }
     }
     public double ContentSpacing => SelectedDensity == "Compact" ? 24 : 36;
     public System.Windows.Thickness ContentMargin => new(ContentSpacing, ContentSpacing, ContentSpacing, 28);
@@ -120,6 +120,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     public async Task InitializeAsync()
     {
         InitializeTerminal();
+        RegisterTranslatedDefaults();
         var settings = await store.LoadAsync();
         SelectedTheme = settings.Theme;
         SelectedDensity = settings.Density;
@@ -127,10 +128,11 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RestoreUpdateSettings(settings);
         RestoreResourceSettings(settings);
         RestoreSpeechDetectionSettings(settings);
+        RestoreLanguage(settings);
         RestoreSetupSettings(settings);
         RestoreWatchSettings(settings);
-        if (store.LastLoadError is not null) ReportError("Preferences could not be restored", "Defaults were loaded. " + store.LastLoadError);
-        if (runtimes.StorageLoadError is not null) ReportError("Saved folders could not be restored", "Existing model files have not been removed. Select your previous model repository in Settings. " + runtimes.StorageLoadError);
+        if (store.LastLoadError is not null) ReportError(T("Preferences could not be restored"), T("Defaults were loaded. {0}", store.LastLoadError));
+        if (runtimes.StorageLoadError is not null) ReportError(T("Saved folders could not be restored"), T("Existing model files have not been removed. Select your previous model repository in Settings. {0}", runtimes.StorageLoadError));
         SelectedPage = Navigation[0];
         themes.Apply(SelectedTheme);
         await repository.InitializeAsync();
@@ -138,7 +140,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         {
             var job = saved;
             if (job.State is not (JobState.Complete or JobState.Failed or JobState.Cancelled or JobState.Queued))
-            { job = job with { State = JobState.Cancelled, Error = "Previous run was interrupted. Resume to reuse completed stages." }; await repository.SaveAsync(job); }
+            { job = job with { State = JobState.Cancelled, Error = Loc.Key("Previous run was interrupted. Resume to reuse completed stages.") }; await repository.SaveAsync(job); }
             Jobs.Add(job);
         }
         await InitializeModelsAsync();
@@ -155,9 +157,9 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             var index = existing is null ? -1 : Jobs.IndexOf(existing);
             if (index >= 0) Jobs[index] = job; else Jobs.Insert(0, job);
             if (!IsWatchBusy || IsProcessing) SelectedJob = job; // a watched recording must not move the user's selection
-            Status = job.Error ?? job.State.ToString();
+            Status = job.Error is { } failure ? T(failure) : JobText.State(job.State);
             activity.Append("job", $"{job.Id:N} · {job.State}" + (job.Error is null ? "" : " · " + job.Error));
-            if (job.Error is not null) ReportError("Transcription needs attention", job.Error);
+            if (job.Error is not null) ReportError(T("Transcription needs attention"), T(job.Error));
         });
         queue.JobChanged += UpdateJob;
         pipeline.JobChanged += UpdateJob;
@@ -175,8 +177,15 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         HasTranscriptionProgress = true;
         IsTranscriptionRunning = update.IsRunning;
         TranscriptionPercent = Math.Max(TranscriptionPercent, update.Percent);
-        TranscriptionStage = update.Stage;
-        TranscriptionProgressSummary = $"{TranscriptionPercent:0}% · {update.CompletedStages}/{update.TotalStages} stages finished";
+        _lastProgress = update;
+        ShowTranscriptionProgress();
+    }
+    private TranscriptionProgress? _lastProgress;
+    private void ShowTranscriptionProgress()
+    {
+        if (_lastProgress is not { } update) return;
+        TranscriptionStage = T(update.Stage);
+        TranscriptionProgressSummary = T("{0:0}% · {1}/{2} stages finished", TranscriptionPercent, update.CompletedStages, update.TotalStages);
     }
 
     partial void OnSelectedPageChanged(NavigationItem? value)
@@ -205,10 +214,10 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     }
     private async void Persist()
     {
-        try { var settings = CurrentSettings(); await store.SaveAsync(settings); await records.SaveAsync(new("settings", "appearance", JsonSerializer.Serialize(settings))); Status = "Preferences saved locally"; }
+        try { var settings = CurrentSettings(); await store.SaveAsync(settings); await records.SaveAsync(new("settings", "appearance", JsonSerializer.Serialize(settings))); Status = T("Preferences saved locally"); }
         catch (Exception error)
         {
-            ReportError("Preferences could not be saved", "Check access to the data folder.");
+            ReportError(T("Preferences could not be saved"), T("Check access to the data folder."));
             logger.LogWarning("Preference save failed: {ErrorType}", error.GetType().Name);
         }
     }
@@ -216,12 +225,11 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private async Task PrepareAudioAsync()
     {
         if (IsProcessing || IsBenchmarking || IsModelBusy || SetupRunning) return;
-        if (!System.IO.File.Exists(SourcePath)) { ReportError("No recording selected", "Choose an existing audio or video file first."); return; }
+        if (!System.IO.File.Exists(SourcePath)) { ReportError(T("No recording selected"), T("Choose an existing audio or video file first.")); return; }
         var missing = MissingRequiredModels();
         if (missing.Length > 0)
         {
-            ReportError("Selected models are not downloaded", string.Join("\n", missing) +
-                "\nPress Download models first. Choosing a preset does not download its models.");
+            ReportError(T("Selected models are not downloaded"), T("{0}\nPress Download models first. Choosing a preset does not download its models.", string.Join("\n", missing)));
             return;
         }
         IsProcessing = true;
@@ -233,8 +241,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             job = await pipeline.RunAsync(job, _jobCancellation.Token);
             if (job.State == JobState.Complete) await OpenReviewAsync();
         }
-        catch (OperationCanceledException) { Status = "Operation cancelled."; }
-        catch (Exception error) { ReportError("Operation failed", error.Message); }
+        catch (OperationCanceledException) { Status = T("Operation cancelled."); }
+        catch (Exception error) { ReportError(T("Operation failed"), error.Message); }
         finally { _jobCancellation.Dispose(); _jobCancellation = null; IsProcessing = false; }
     }
     [RelayCommand]
@@ -244,8 +252,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         IsProcessing = true;
         _jobCancellation = new();
         try { using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing"); var job = await pipeline.RunAsync(SelectedJob, _jobCancellation.Token); if (job.State == JobState.Complete) await OpenReviewAsync(); }
-        catch (OperationCanceledException) { Status = "Operation cancelled."; }
-        catch (Exception error) { ReportError("Operation failed", error.Message); }
+        catch (OperationCanceledException) { Status = T("Operation cancelled."); }
+        catch (Exception error) { ReportError(T("Operation failed"), error.Message); }
         finally { _jobCancellation.Dispose(); _jobCancellation = null; IsProcessing = false; }
     }
     [RelayCommand] private void Cancel() => _jobCancellation?.Cancel();
@@ -259,7 +267,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             var profile = await hardware.DetectAsync(storage.Root, runtimes.Whisper);
             Hardware = profile;
             UpdateRecommendation();
-            EngineStatus = $"{profile.Topology.LogicalProcessors} CPU threads · {profile.Gpus.FirstOrDefault()?.Name ?? "CPU only"}";
+            EngineStatus = T("{0} CPU threads · {1}", profile.Topology.LogicalProcessors, profile.Gpus.FirstOrDefault()?.Name ?? T("CPU only"));
             var path = System.IO.Path.Combine(storage.Root, "Config", "hardware-profile.json");
             if (System.IO.File.Exists(path))
             {
@@ -275,22 +283,22 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             }
             await System.IO.File.WriteAllTextAsync(path, Diagnostics);
             await RefreshBackendsAsync();
-            if (HardwareChanged) Status = "Hardware configuration changed. Performance optimization should be rerun.";
+            if (HardwareChanged) Status = T("Hardware configuration changed. Performance optimization should be rerun.");
         }
-        catch (Exception error) { Hardware = null; SystemSummary = "System check failed. Retry before downloading or tuning."; Diagnostics = "Hardware detection failed: " + error.Message; ReportError("System check failed", error.Message); logger.LogWarning(error, "Hardware probe failed: {ErrorType}", error.GetType().Name); }
+        catch (Exception error) { Hardware = null; SystemSummary = T("System check failed. Retry before downloading or tuning."); Diagnostics = T("Hardware detection failed: {0}", error.Message); ReportError(T("System check failed"), error.Message); logger.LogWarning(error, "Hardware probe failed: {ErrorType}", error.GetType().Name); }
         finally { IsCheckingSystem = false; }
     }
     [RelayCommand] private void CopyDiagnostics()
     {
         try { System.Windows.Clipboard.SetText(Diagnostics); }
-        catch (Exception error) { ReportError("Could not copy diagnostics", error.Message); }
+        catch (Exception error) { ReportError(T("Could not copy diagnostics"), error.Message); }
     }
     partial void OnSearchTextChanged(string value) => ReviewItems?.Refresh();
     partial void OnUncertainOnlyChanged(bool value) => ReviewItems?.Refresh();
     [RelayCommand]
     private async Task OpenReviewAsync()
     {
-        if (SelectedJob is null) { ReportError("No project selected", "Select a completed project first."); return; }
+        if (SelectedJob is null) { ReportError(T("No project selected"), T("Select a completed project first.")); return; }
         try
         {
             _review = TriAsr.Fusion.TranscriptQuality.FlagRepetition(await stages.LoadReviewAsync(SelectedJob.Id));
@@ -300,10 +308,10 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             NormalizedAudioPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "normalized.wav");
             var listeningCopy = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "playback.m4a");
             AudioSource = new Uri(System.IO.File.Exists(listeningCopy) ? listeningCopy : NormalizedAudioPath);
-            ReviewSummary = $"{_review.Language.ToUpperInvariant()} · {Regions.Count} regions · {Regions.Count(region => region.IsUncertain)} need listening";
+            ShowReviewSummary();
             var loopRegions = Regions.Where(region => region.Original.Warnings?.Contains(TriAsr.Fusion.TranscriptQuality.RepetitionWarning) == true).ToArray();
             if (loopRegions.Length > 0)
-                ReportError("Possible transcription repetition loop", $"{loopRegions.Length} regions contain a long consecutive repeating pattern. Use Needs listening and play those regions before exporting. Repeated text is preserved because it may be genuinely sung or spoken.");
+                ReportError(T("Possible transcription repetition loop"), T("{0} regions contain a long consecutive repeating pattern. Use Needs listening and play those regions before exporting. Repeated text is preserved because it may be genuinely sung or spoken.", loopRegions.Length));
             SelectedPage = Navigation.First(item => item.Name == "Review");
             var whisperPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "whisper.json");
             var whisper = System.IO.File.Exists(whisperPath) ? JsonSerializer.Deserialize<EngineTranscript>(await System.IO.File.ReadAllTextAsync(whisperPath)) : null;
@@ -312,11 +320,16 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             RawCanary = System.IO.File.Exists(canaryPath)
                 ? JsonSerializer.Deserialize<TriAsr.Engine.Canary.CanaryNative.Result>(await System.IO.File.ReadAllTextAsync(canaryPath))?.Transcript.Text ?? ""
                 : System.IO.File.Exists(System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "Canary", "skipped-language.json"))
-                    ? "This language is outside Canary's coverage. Whisper timestamps and text are preserved; all regions require listening."
-                    : "Canary did not complete. All regions require listening.";
-            EngineStatus = whisper is null ? "Canary only · no native timestamps · listening required" : $"Whisper · {whisper.ActualBackend} · {whisper.Device}";
+                    ? T("This language is outside Canary's coverage. Whisper timestamps and text are preserved; all regions require listening.")
+                    : T("Canary did not complete. All regions require listening.");
+            EngineStatus = whisper is null ? T("Canary only · no native timestamps · listening required") : $"Whisper · {whisper.ActualBackend} · {whisper.Device}";
         }
-        catch (Exception error) { ReportError("Cannot open transcript", error.Message); }
+        catch (Exception error) { ReportError(T("Cannot open transcript"), error.Message); }
+    }
+    private void ShowReviewSummary()
+    {
+        if (_review is null) return;
+        ReviewSummary = T("{0} · {1} regions · {2} need listening", _review.Language.ToUpperInvariant(), Regions.Count, Regions.Count(region => region.IsUncertain));
     }
     public FinalTranscript? CurrentTranscript => _review is null ? null : _review with { Regions = Regions.Select(region => region.Snapshot()).ToArray() };
     [RelayCommand] private void UseWhisper() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.Whisper; }
@@ -333,19 +346,19 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private async Task SaveReviewAsync()
     {
         if (CurrentTranscript is not { } transcript) return;
-        try { await stages.SaveManualAsync(transcript); foreach (var region in Regions) region.AcceptSaved(); Status = "Edits saved with revision history"; ReviewItems.Refresh(); }
-        catch (Exception error) { ReportError("Save failed", error.Message); }
+        try { await stages.SaveManualAsync(transcript); foreach (var region in Regions) region.AcceptSaved(); Status = T("Edits saved with revision history"); ReviewItems.Refresh(); }
+        catch (Exception error) { ReportError(T("Save failed"), error.Message); }
     }
     public async Task ExportAsync(string path)
     {
-        if (CurrentTranscript is not { } transcript) { ReportError("No transcript open", "Open a transcript before exporting."); return; }
+        if (CurrentTranscript is not { } transcript) { ReportError(T("No transcript open"), T("Open a transcript before exporting.")); return; }
         try
         {
             var exported = SelectedExportMode == "Readable" ? TriAsr.Export.TranscriptExporter.ReadableCopy(transcript) : transcript;
             await TriAsr.Export.TranscriptExporter.SaveAsync(exported, path);
             await records.SaveAsync(new("exports", Guid.NewGuid().ToString("N"), JsonSerializer.Serialize(new { Path = path, Mode = SelectedExportMode, AtUtc = DateTimeOffset.UtcNow }), transcript.JobId));
-            Status = "Export saved: " + path;
+            Status = T("Export saved: {0}", path);
         }
-        catch (Exception error) { ReportError("Export failed", error.Message); }
+        catch (Exception error) { ReportError(T("Export failed"), error.Message); }
     }
 }

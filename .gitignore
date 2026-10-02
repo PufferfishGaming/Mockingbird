@@ -39,6 +39,8 @@ work/
 !/README.md
 !/PRIVACY.md
 !/THIRD_PARTY_NOTICES.md
+# The privacy policy in each interface language (embedded in the app).
+!/src/TriAsr.App/Languages/privacy/*.md
 
 # Versioned documentation: the decision log, the release process, the Claude Code project guide and its commands.
 # Everything else under docs/ (status, per-release results, notes) is a local working record.

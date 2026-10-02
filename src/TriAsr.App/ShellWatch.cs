@@ -12,6 +12,7 @@ namespace TriAsr.App;
 /// <summary>Watch folder: recordings added to a chosen folder are transcribed automatically, one after another, and saved next to the recording.</summary>
 public sealed partial class ShellViewModel
 {
+    // Stored in settings and compared as written, so the values stay English; the lists below show them translated.
     public const string WatchAsText = "Text (.txt)";
     public const string WatchAsSubtitles = "Subtitles (.srt)";
     public const string WatchProjectOnly = "Project only";
@@ -20,7 +21,7 @@ public sealed partial class ShellViewModel
     [ObservableProperty] private string _watchFolder = "";
     [ObservableProperty] private string _watchLanguage = "auto";
     [ObservableProperty] private string _watchOutput = WatchAsText;
-    [ObservableProperty] private string _watchStatus = "Off";
+    [ObservableProperty] private string _watchStatus = Loc.Key("Off");
     [ObservableProperty] private bool _isWatchBusy;
     public bool HasWatchFolder => WatchFolder.Length > 0;
     private FolderWatcher? _watcher;
@@ -54,7 +55,7 @@ public sealed partial class ShellViewModel
     [RelayCommand]
     private void OpenWatchFolder()
     {
-        if (!Directory.Exists(WatchFolder)) { ReportError("Folder not found", "The watched folder does not exist any more. Choose it again."); return; }
+        if (!Directory.Exists(WatchFolder)) { ReportError(T("Folder not found"), T("The watched folder does not exist any more. Choose it again.")); return; }
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{WatchFolder}\"") { UseShellExecute = true });
     }
 
@@ -65,8 +66,8 @@ public sealed partial class ShellViewModel
         try
         {
             if (_watcher is { } old) { _watcher = null; await old.DisposeAsync(); }
-            if (!WatchEnabled) { WatchStatus = "Off"; return; }
-            if (WatchFolder.Length == 0 || !Directory.Exists(WatchFolder)) { WatchStatus = "The folder was not found. Choose it again."; return; }
+            if (!WatchEnabled) { WatchStatus = T("Off"); return; }
+            if (WatchFolder.Length == 0 || !Directory.Exists(WatchFolder)) { WatchStatus = T("The folder was not found. Choose it again."); return; }
             var ledger = await WatchLedger.LoadAsync(Path.Combine(storage.Root, "Config", "watch-ledger.json"));
             await ledger.EnsureBaselineAsync(WatchFolder);
             var watcher = new FolderWatcher(WatchFolder, ledger, ProcessWatchedFileAsync);
@@ -77,7 +78,7 @@ public sealed partial class ShellViewModel
         }
         catch (Exception error)
         {
-            WatchStatus = "Cannot watch this folder: " + error.Message;
+            WatchStatus = T("Cannot watch this folder: {0}", error.Message);
             logger.LogWarning(error, "Watch folder could not start: {ErrorType}", error.GetType().Name);
         }
         finally { _watchGate.Release(); }
@@ -88,8 +89,10 @@ public sealed partial class ShellViewModel
         if (_watcher is null) return;
         var waiting = _watcher.Waiting;
         WatchStatus = IsWatchBusy
-            ? $"Transcribing {_watchCurrent}" + (waiting > 1 ? $" · {waiting - 1} more waiting" : "")
-            : waiting == 0 ? $"Watching {WatchFolder}" : $"Watching {WatchFolder} · {waiting} recording{(waiting == 1 ? "" : "s")} arriving";
+            ? T("Transcribing {0}", _watchCurrent) + (waiting > 1 ? " · " + T("{0} more waiting", waiting - 1) : "")
+            : waiting == 0 ? T("Watching {0}", WatchFolder)
+            : waiting == 1 ? T("Watching {0} · 1 recording arriving", WatchFolder)
+            : T("Watching {0} · {1} recordings arriving", WatchFolder, waiting);
     }
 
     private static void OnUi(Action action)
@@ -109,8 +112,8 @@ public sealed partial class ShellViewModel
             OnUi(() =>
             {
                 WatchEnabled = false;
-                WatchStatus = "Paused: a speech model is missing. Download it on Models, then switch watching back on.";
-                ReportError("Watch folder paused", $"{name} arrived, but these models are not downloaded: {string.Join(", ", missing)}.\nThe recording stays waiting and is transcribed when watching is switched on again.");
+                WatchStatus = T("Paused: a speech model is missing. Download it on Models, then switch watching back on.");
+                ReportError(T("Watch folder paused"), T("{0} arrived, but these models are not downloaded: {1}.\nThe recording stays waiting and is transcribed when watching is switched on again.", name, string.Join(", ", missing)));
             });
             return WatchOutcome.Retry;
         }
@@ -125,14 +128,14 @@ public sealed partial class ShellViewModel
             string? saved = null;
             try { saved = await ExportWatchedAsync(job, path); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
-            { OnUi(() => ReportError("Could not save the transcript next to the recording", $"{name}: {error.Message}\nThe transcript is still in Projects.")); }
-            OnUi(() => Status = $"Transcribed {name}" + (saved is null ? "" : " · saved " + Path.GetFileName(saved)));
+            { OnUi(() => ReportError(T("Could not save the transcript next to the recording"), T("{0}: {1}\nThe transcript is still in Projects.", name, error.Message))); }
+            OnUi(() => Status = saved is null ? T("Transcribed {0}", name) : T("Transcribed {0} · saved {1}", name, Path.GetFileName(saved)));
             return WatchOutcome.Done;
         }
         catch (OperationCanceledException) { return WatchOutcome.Retry; }
         catch (Exception error)
         {
-            OnUi(() => ReportError("Watched recording failed", $"{name}: {error.Message}"));
+            OnUi(() => ReportError(T("Watched recording failed"), T("{0}: {1}", name, error.Message)));
             return WatchOutcome.Failed;
         }
         finally { OnUi(() => { IsWatchBusy = false; RefreshWatchStatus(); }); }

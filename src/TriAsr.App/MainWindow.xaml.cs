@@ -20,7 +20,7 @@ public partial class MainWindow : Window
         policy.SetResourceReference(BackgroundProperty, "SurfaceBrush");
         new Window
         {
-            Owner = this, Title = $"{AppInfo.Name} · Privacy policy",
+            Owner = this, Title = Loc.T("{0} · Privacy policy", AppInfo.Name),
             Width = 760, Height = 650, MinWidth = 460, MinHeight = 320,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = policy
@@ -29,13 +29,13 @@ public partial class MainWindow : Window
 
     private async void ImportRuntimeClick(object sender, RoutedEventArgs args)
     {
-        var picker = new OpenFolderDialog { Title = "Choose a compatible engine runtime folder with its DLL dependencies" };
+        var picker = new OpenFolderDialog { Title = Loc.T("Choose a compatible engine runtime folder with its DLL dependencies") };
         if (picker.ShowDialog(this) == true) await ((ShellViewModel)DataContext).ImportBackendAsync(picker.FolderName);
     }
     private void ChooseStorageFolder(object sender, RoutedEventArgs args)
     {
         var forModels = (sender as System.Windows.Controls.Button)?.Tag?.ToString() == "models";
-        var dialog = new OpenFolderDialog { Title = forModels ? "Choose model repository" : "Choose project and log folder" };
+        var dialog = new OpenFolderDialog { Title = forModels ? Loc.T("Choose model repository") : Loc.T("Choose project and log folder") };
         if (dialog.ShowDialog(this) == true) ((ShellViewModel)DataContext).SetStorageLocation(dialog.FolderName, forModels);
     }
     private bool _playing;
@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     }
     public MainWindow(ShellViewModel viewModel)
     {
+        Language = System.Windows.Markup.XmlLanguage.GetLanguage(System.Globalization.CultureInfo.CurrentCulture.IetfLanguageTag); // numbers and dates follow the Windows regional settings
         InitializeComponent();
         DataContext = viewModel;
         viewModel.PropertyChanged += (_, change) =>
@@ -79,7 +80,7 @@ public partial class MainWindow : Window
     }
     private void SelectFileClick(object sender, RoutedEventArgs args)
     {
-        var picker = new OpenFileDialog { Filter = "Audio / Video|*.wav;*.mp3;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.mp4;*.mkv;*.mov;*.webm|All files|*.*" };
+        var picker = new OpenFileDialog { Filter = Loc.T("Audio / Video") + "|*.wav;*.mp3;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.mp4;*.mkv;*.mov;*.webm|" + Loc.T("All files") + "|*.*" };
         if (picker.ShowDialog(this) == true) ((ShellViewModel)DataContext).SourcePath = picker.FileName;
     }
     private void OnFileDrop(object sender, DragEventArgs args)
@@ -89,7 +90,7 @@ public partial class MainWindow : Window
     }
     private async void ExportClick(object sender, RoutedEventArgs args)
     {
-        var picker = new SaveFileDialog { FileName = "transcript", Filter = "Text|*.txt|SubRip subtitles|*.srt|WebVTT|*.vtt|Markdown|*.md|JSON with provenance|*.json|CSV comparison|*.csv|Word document|*.docx" };
+        var picker = new SaveFileDialog { FileName = "transcript", Filter = Loc.T("Text") + "|*.txt|" + Loc.T("SubRip subtitles") + "|*.srt|WebVTT|*.vtt|Markdown|*.md|" + Loc.T("JSON with provenance") + "|*.json|" + Loc.T("CSV comparison") + "|*.csv|" + Loc.T("Word document") + "|*.docx" };
         if (picker.ShowDialog(this) == true) await ((ShellViewModel)DataContext).ExportAsync(picker.FileName);
     }
     private void PlayRegionClick(object sender, RoutedEventArgs args)
@@ -103,7 +104,7 @@ public partial class MainWindow : Window
     private void ForwardClick(object sender, RoutedEventArgs args) => Player.Position = TimeSpan.FromSeconds(Math.Min(SeekSlider.Maximum, Player.Position.TotalSeconds + 5));
     private void OnSeek(object sender, System.Windows.Input.MouseButtonEventArgs args) => Player.Position = TimeSpan.FromSeconds(SeekSlider.Value);
     private void OnMediaOpened(object sender, RoutedEventArgs args) { if (Player.NaturalDuration.HasTimeSpan) SeekSlider.Maximum = Player.NaturalDuration.TimeSpan.TotalSeconds; }
-    private void OnMediaFailed(object sender, ExceptionRoutedEventArgs args) => ((ShellViewModel)DataContext).ReportError("Audio playback failed", args.ErrorException.Message);
+    private void OnMediaFailed(object sender, ExceptionRoutedEventArgs args) => ((ShellViewModel)DataContext).ReportError(Loc.T("Audio playback failed"), args.ErrorException.Message);
     private void OnSpeedChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs args)
     {
         if (Player is not null && SpeedPicker.SelectedItem is System.Windows.Controls.ComboBoxItem item)
@@ -119,7 +120,7 @@ public partial class MainWindow : Window
     private void ChooseWatchFolderClick(object sender, RoutedEventArgs args)
     {
         var vm = (ShellViewModel)DataContext;
-        var dialog = new OpenFolderDialog { Title = "Choose the folder to watch for new recordings", InitialDirectory = System.IO.Directory.Exists(vm.WatchFolder) ? vm.WatchFolder : null };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Choose the folder to watch for new recordings"), InitialDirectory = System.IO.Directory.Exists(vm.WatchFolder) ? vm.WatchFolder : null };
         if (dialog.ShowDialog(this) == true) vm.SetWatchFolder(dialog.FolderName);
     }
     private void WaveformSeek(object sender, System.Windows.Input.MouseButtonEventArgs args)

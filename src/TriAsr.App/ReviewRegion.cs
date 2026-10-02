@@ -9,14 +9,14 @@ public sealed partial class ReviewRegion(FinalRegion original, string? machineTe
     public FinalRegion Original { get; private set; } = original;
     public string MachineText { get; } = machineText ?? original.FinalText;
     [ObservableProperty] private string _text = original.FinalText;
-    public string Time => Original.NativeTimestamps ? TranscriptExporter.Timestamp(Original.StartMs) : "No timestamps";
+    public string Time => Original.NativeTimestamps ? TranscriptExporter.Timestamp(Original.StartMs) : Loc.T("No timestamps");
     public string Whisper => Original.WhisperText;
     public string Canary => Original.CanaryText;
-    public string CanaryHeading => Original.NativeTimestamps ? "CANARY · projected onto Whisper timing" : "CANARY · original untimed text";
+    public string CanaryHeading => Original.NativeTimestamps ? Loc.T("CANARY · projected onto Whisper timing") : Loc.T("CANARY · original untimed text");
     public string Source => Original.Source;
     public bool IsUncertain => Original.Source is "uncertain" or "single-asr-needs-listening" || Original.Warnings?.Count > 0;
-    public string Evidence => $"{Source} · {Original.LlmChoice ?? "—"} · confidence {Original.Confidence?.ToString("0.00") ?? "—"}" +
-        (Original.Warnings?.Count > 0 ? "\n" + string.Join("\n", Original.Warnings) : "");
+    public string Evidence => Loc.T("{0} · {1} · confidence {2}", Loc.T(Source), Original.LlmChoice ?? "—", Original.Confidence?.ToString("0.00") ?? "—") +
+        (Original.Warnings?.Count > 0 ? "\n" + string.Join("\n", Original.Warnings.Select(Loc.T)) : "");
     public FinalRegion Snapshot()
     {
         if (Text == Original.FinalText) return Original;

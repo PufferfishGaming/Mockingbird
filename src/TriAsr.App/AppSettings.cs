@@ -9,7 +9,7 @@ namespace TriAsr.App;
 public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = AppSettings.CurrentVersion, bool AnimateErrors = true,
     bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto",
     bool SkipNonSpeech = false, bool UseCorrectionModel = true, string SetupState = SetupPlan.Pending,
-    string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)")
+    string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)", string Language = "")
 {
     public const int CurrentVersion = 2;
 }
@@ -38,6 +38,7 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
                 Density = settings.Density is "Comfortable" or "Compact" ? settings.Density : "Comfortable",
                 ResourceProfile = settings.ResourceProfile is "Auto" or "Quiet" or "Default" or "Max" ? settings.ResourceProfile : "Auto",
                 SetupState = SetupPlan.Normalize(settings.SetupState),
+                Language = Loc.IsSupported(settings.Language) ? settings.Language : "",
                 WatchFolder = settings.WatchFolder ?? "",
                 WatchLanguage = string.IsNullOrWhiteSpace(settings.WatchLanguage) ? "auto" : settings.WatchLanguage,
                 WatchOutput = settings.WatchOutput is "Text (.txt)" or "Subtitles (.srt)" or "Project only" ? settings.WatchOutput : "Text (.txt)"
