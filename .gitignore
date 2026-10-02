@@ -13,6 +13,10 @@ Output/
 Temp/
 Logs/
 Config/
+# Folders the program creates in its data folder when that is the repository folder: uploads, fetched links, recordings.
+/Api/
+/Links/
+/Recordings/
 *.exe
 *.dll
 *.m4a
