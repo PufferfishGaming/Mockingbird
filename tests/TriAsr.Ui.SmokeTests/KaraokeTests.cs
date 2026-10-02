@@ -123,4 +123,44 @@ public sealed class KaraokeTests
         Assert.Contains("'.' or '!' or '?' or '…' => SentencePause", plan);
         Assert.Contains("',' or ';' or ':' or '–' or '—' => ClausePause", plan);
     }
+    private static string Brush(string theme, string key) =>
+        Regex.Match(File.ReadAllText(Path.Combine(TranslationSources.AppFolder, "Themes", theme + "Theme.xaml")), $"x:Key=\"{key}\" Color=\"#([0-9A-Fa-f]{{6}})\"").Groups[1].Value;
+
+    /// <summary>The WCAG contrast ratio between two colours given as six hexadecimal digits.</summary>
+    private static double Contrast(string first, string second)
+    {
+        static double Luminance(string hex)
+        {
+            static double Channel(int value) { var c = value / 255.0; return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4); }
+            return 0.2126 * Channel(Convert.ToInt32(hex[..2], 16)) + 0.7152 * Channel(Convert.ToInt32(hex[2..4], 16)) + 0.0722 * Channel(Convert.ToInt32(hex[4..], 16));
+        }
+        var (a, b) = (Luminance(first), Luminance(second));
+        return (Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05);
+    }
+
+    [Theory]
+    [InlineData("Dark", "FFFFFF")]
+    [InlineData("Light", "0A1020")]
+    public void TheWordsAlreadySaidAreTheStrongestColourOfTheThemeAndStandOutFromTheSelectedRow(string theme, string expected)
+    {
+        var said = Brush(theme, "KaraokeSaidBrush");
+        Assert.Equal(expected, said, ignoreCase: true);                               // white on the dark theme; white would vanish on the pale row of the light theme
+        Assert.NotEqual(Brush(theme, "AccentBrush").ToUpperInvariant(), said.ToUpperInvariant());        // not the colour of the words still to come in a selected row
+        Assert.True(Contrast(said, Brush(theme, "AccentSurfaceBrush")) >= 7, "against the selected row");
+        Assert.True(Contrast(said, Brush(theme, "AccentSurfaceBrush")) > Contrast(Brush(theme, "AccentBrush"), Brush(theme, "AccentSurfaceBrush")), "more than the accent text does");
+    }
+
+    [Fact]
+    public void TheWebPageColoursTheWordsAlreadySaidTheSameWay()
+    {
+        var css = File.ReadAllText(Path.Combine(TranslationSources.AppFolder, "Web", "app.css"));
+        Assert.Matches(@"--accent-surface: #e6eefc; --said: #0a1020;", css);
+        Assert.Matches(@"--accent-surface: #263552; --said: #ffffff;", css);
+        Assert.Contains(".text .said { color: var(--said); }", css);
+        Assert.Contains(".text .now { color: var(--said); font-weight: 700; }", css);
+        Assert.Equal("FFFFFF", Brush("Dark", "KaraokeSaidBrush"), ignoreCase: true);
+        Assert.Equal("0A1020", Brush("Light", "KaraokeSaidBrush"), ignoreCase: true);
+        // and the program's words follow the theme instead of keeping the colour they were built with
+        Assert.Contains("SetResourceReference(TextElement.ForegroundProperty, \"KaraokeSaidBrush\")", File.ReadAllText(Path.Combine(TranslationSources.AppFolder, "KaraokeTextBlock.cs")));
+    }
 }

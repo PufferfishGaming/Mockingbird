@@ -55,6 +55,7 @@ public static class ShellSmoke
             count++;
         }
         count += await LanguageRendersAsync(window, shell, output);
+        await KaraokeRendersAsync(window, shell, output);       // extra pictures for a look at the colours; not counted in the matrix
         shell.ReportError("Download needs attention", "The download host is unavailable. Your downloaded models and partial files are retained. Retry when the connection is restored.");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (!shell.HasError || FindText(window, shell.ErrorTitle) is null) throw new InvalidOperationException("Error alert did not appear.");
@@ -63,6 +64,28 @@ public static class ShellSmoke
         shell.DismissErrorCommand.Execute(null);
         if (shell.HasError) throw new InvalidOperationException("Error alert did not dismiss.");
         return count + 2;
+    }
+
+    /// <summary>
+    /// The selected row while the recording is at its first word, in both themes: the word being said and the words already said must stand out from the
+    /// words still to come, which have the accent colour of a selected row (ADR-0017).
+    /// </summary>
+    private static async Task KaraokeRendersAsync(MainWindow window, ShellViewModel shell, string output)
+    {
+        var before = new ReviewRegion(new TriAsr.Domain.FinalRegion(0, 4000, "Guten Tag", "Guten Tag", "guten Tag", "agreement", null, 0.9, null, true));
+        var region = new ReviewRegion(new TriAsr.Domain.FinalRegion(4000, 9000, "Auf Wiedersehen und bis bald", "Auf Wiedersehen und bis bald", "Auf Wiedersehen und bis bald", "agreement", null, 0.9, null, true));
+        shell.Regions.Add(before); shell.Regions.Add(region);
+        shell.SelectedRegion = region;
+        foreach (var requested in new[] { "Dark", "Light" })
+        {
+            shell.SelectedTheme = requested;
+            shell.SelectedPage = shell.Navigation.First(item => item.Name == "Review");
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            region.PlayProgress = 0.3;      // set only now: the player's timer clears the marks while no recording is loaded
+            Capture(window, Path.Combine(output, $"karaoke-{requested}.png"), 1220, 900, 1);
+        }
+        shell.Regions.Remove(before); shell.Regions.Remove(region);
+        shell.SelectedTheme = "Light";
     }
 
     /// <summary>Every language, live: the window changes language without a restart, and the pages with the most text are rendered for a look at the layout.</summary>

@@ -6,7 +6,7 @@ using System.Windows.Media;
 namespace TriAsr.App;
 
 /// <summary>
-/// The text of a region, with the words already said coloured and the word being said in bold, while the recording plays (ADR-0017).
+/// The text of a region, with the words already said in the theme's strongest colour (white in the dark theme) and the word being said in bold, while the recording plays (ADR-0017).
 /// <see cref="Progress"/> is how far into the region the recording is, 0 to 1; below zero (no recording playing here) the text is shown plainly.
 /// </summary>
 public sealed class KaraokeTextBlock : TextBlock
@@ -40,15 +40,14 @@ public sealed class KaraokeTextBlock : TextBlock
         if (current == _shownWord && _shownText == text) return;     // the same word is still being said
         _shownWord = current; _shownText = text;
         Inlines.Clear();
-        var said = (Brush)(TryFindResource("AccentBrush") ?? Brushes.DodgerBlue);
         var at = 0;
         for (var index = 0; index < _words.Count; index++)
         {
             var word = _words[index];
             if (word.Start > at) Inlines.Add(new Run(text[at..word.Start]));       // the space between words
             var run = new Run(text.Substring(word.Start, word.Length));
-            if (index < current) run.Foreground = said;
-            else if (index == current) { run.Foreground = said; run.FontWeight = FontWeights.Bold; }
+            if (index <= current) run.SetResourceReference(TextElement.ForegroundProperty, "KaraokeSaidBrush");     // follows a change of theme while the recording plays
+            if (index == current) run.FontWeight = FontWeights.Bold;
             Inlines.Add(run);
             at = word.Start + word.Length;
         }
