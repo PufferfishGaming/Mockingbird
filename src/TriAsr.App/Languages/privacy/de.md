@@ -15,6 +15,9 @@ Wenn Sie Modell- oder Laufzeit-Downloads anfordern, verbindet sich die App mit H
 - https://huggingface.co/privacy
 - https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
 
+### Netzwerk-API
+Standardmäßig ausgeschaltet. Wenn Sie sie in den Einstellungen einschalten, lauscht die App an einem Port Ihres Computers, damit andere Programme ihr Aufnahmen senden und Transkripte abholen können. Ohne „Andere Computer im Netzwerk zulassen“ können sich nur Programme auf diesem Computer verbinden; mit dieser Option kann jeder in Ihrem Netzwerk, der den API-Schlüssel hat, sie nutzen. Jede Anfrage braucht den Schlüssel. Die Verbindung ist nicht verschlüsselt; nutzen Sie sie nur in einem Netzwerk, dem Sie vertrauen. Auf diesem Weg gesendete Aufnahmen werden wie jedes andere Projekt in Ihrem Projektordner gespeichert. Die API beantwortet nur Anfragen; die App meldet ihre Nutzung an niemanden.
+
 ### Update-Prüfungen
 Sofern Sie dies nicht in den Einstellungen ausschalten, fragt die App beim Start, höchstens alle 12 Stunden, sowie immer dann, wenn Sie „Jetzt nach Updates suchen“ wählen, bei GitHub eine kleine Versionsdatei (latest.json) ab. GitHub erhält übliche Verbindungsinformationen wie Ihre IP-Adresse, und die Anfrage enthält den Namen und die Version der App. Es werden keine Aufnahmen, Transkripte, Projektdaten, Hardware-Details oder Kennungen gesendet. Die App installiert ein Update nie von selbst: Sie wählen „Jetzt aktualisieren“, und das heruntergeladene Installationsprogramm wird vor der Ausführung gegen seine veröffentlichte SHA256-Prüfsumme geprüft.
 

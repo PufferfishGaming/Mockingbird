@@ -15,6 +15,9 @@ Amikor modell- vagy futtatókörnyezet-letöltést kér, az alkalmazás a Huggin
 - https://huggingface.co/privacy
 - https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
 
+### Hálózati API
+Alapértelmezés szerint ki van kapcsolva. Ha a Beállításokban bekapcsolja, az alkalmazás figyel a számítógép egy portján, hogy más programok felvételeket küldhessenek neki, és lekérhessék az átiratokat. A „Más számítógépek elérésének engedélyezése a hálózaton” beállítás nélkül csak az ezen a számítógépen futó programok csatlakozhatnak; vele a hálózaton bárki használhatja, akinél megvan az API-kulcs. Minden kérésnek tartalmaznia kell a kulcsot. A kapcsolat nincs titkosítva, ezért csak megbízható hálózaton használja. Az így küldött felvételek a projektek mappájába kerülnek, mint bármelyik másik projekt. Az API csak a kérésekre válaszol; az alkalmazás senkinek sem jelenti a használatát.
+
 ### Frissítések keresése
 Hacsak ki nem kapcsolja a Beállításokban, az alkalmazás indításkor, legfeljebb 12 óránként, valamint a Frissítések keresése most lehetőség kiválasztásakor egy kis verziófájlt (latest.json) kér le a GitHubról. A GitHub a szokásos kapcsolati adatokat kapja meg, például az Ön IP-címét, a kérés pedig az alkalmazás nevét és verzióját tartalmazza. Felvételek, átiratok, projektadatok, hardveradatok vagy azonosítók nem kerülnek elküldésre. Az alkalmazás soha nem telepít frissítést magától: Ön választja a Frissítés most lehetőséget, és az alkalmazás a letöltött telepítő SHA256-ellenőrzőösszegét futtatás előtt összeveti a közzétett értékkel.
 

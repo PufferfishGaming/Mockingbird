@@ -15,6 +15,9 @@ When you request model or runtime downloads, the app connects to Hugging Face or
 - https://huggingface.co/privacy
 - https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
 
+### Network API
+Off by default. If you switch it on in Settings, the app listens on a port of your computer so that other programs can send it recordings and fetch transcripts. Without "Allow other computers on the network" only programs on this computer can connect; with it, anyone on your network who has the API key can use it. Every request needs the key. The connection is not encrypted, so use it only on a network you trust. Recordings sent this way are saved in your projects folder like any other project. The API only answers requests; the app does not report its use to anyone.
+
 ### Update checks
 Unless you turn it off in Settings, the app asks GitHub for a small version file (latest.json) when it starts, at most every 12 hours, and whenever you choose Check for updates now. GitHub receives normal connection information such as your IP address, and the request carries the app's name and version. No recordings, transcripts, project data, hardware details or identifiers are sent. The app never installs an update by itself: you choose Update now, and the downloaded installer is checked against its published SHA256 checksum before it runs.
 

@@ -314,6 +314,77 @@ public partial class App : System.Windows.Application
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "watch-smoke.json"), JsonSerializer.Serialize(new
                     { copySeconds, transcript = text.Trim(), files = Directory.GetFiles(watched).Select(Path.GetFileName).Order(), projects = shell.Jobs.Count, status = shell.WatchStatus }, new JsonSerializerOptions { WriteIndented = true }));
                 }
+                if (e.Args.Contains("--api-smoke"))
+                {
+                    // Real engines and models: a client on the loopback sends a recording over HTTP, follows it, fetches the transcript in several formats and
+                    // uses the OpenAI-style endpoint; wrong keys are refused and the window's own selection does not move.
+                    var runner = _host.Services.GetRequiredService<IProcessRunner>();
+                    var sample = await TestSpeech.CreateAsync(runner, Path.Combine(dataRoot, "Setup"), CancellationToken.None) ?? throw new InvalidOperationException("This computer has no Windows voice to make a test recording.");
+                    var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0); probe.Start();
+                    var port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+                    shell.ApiPortText = port.ToString();
+                    shell.ApiEnabled = true;
+                    for (var wait = 0; wait < 100 && !shell.ApiStatus.StartsWith("Listening"); wait++) await Task.Delay(100);
+                    if (!shell.ApiStatus.StartsWith("Listening on this computer only")) throw new InvalidOperationException("The API did not start: " + shell.ApiStatus);
+                    using var http = new System.Net.Http.HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}"), Timeout = TimeSpan.FromMinutes(10) };
+                    using var stranger = new System.Net.Http.HttpClient { BaseAddress = http.BaseAddress };
+                    if ((await stranger.GetAsync("/v1/health")).StatusCode != System.Net.HttpStatusCode.OK) throw new InvalidOperationException("The health check needs no key.");
+                    if ((await stranger.GetAsync("/v1/transcriptions")).StatusCode != System.Net.HttpStatusCode.Unauthorized) throw new InvalidOperationException("A request without the key was served.");
+                    http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", shell.ApiKey);
+
+                    var bytes = await File.ReadAllBytesAsync(sample);
+                    using var upload = await http.PostAsync("/v1/transcriptions?language=auto&name=api-meeting.wav", new System.Net.Http.ByteArrayContent(bytes));
+                    if (upload.StatusCode != System.Net.HttpStatusCode.Accepted) throw new InvalidOperationException("The upload was not accepted: " + await upload.Content.ReadAsStringAsync());
+                    var id = JsonDocument.Parse(await upload.Content.ReadAsStringAsync()).RootElement.GetProperty("id").GetString()!;
+                    var states = new List<string>(); var highest = 0;
+                    var started = DateTime.UtcNow;
+                    while (true)
+                    {
+                        var status = JsonDocument.Parse(await http.GetStringAsync($"/v1/transcriptions/{id}?wait=5")).RootElement;
+                        var state = status.GetProperty("state").GetString()!;
+                        if (states.Count == 0 || states[^1] != state) states.Add(state);
+                        highest = Math.Max(highest, status.GetProperty("percent").GetInt32());
+                        if (state is "complete" or "failed" or "cancelled") { if (state != "complete") throw new InvalidOperationException("The transcription ended as " + state + ": " + status.GetProperty("error")); break; }
+                        if (DateTime.UtcNow - started > TimeSpan.FromMinutes(15)) throw new TimeoutException("The transcription did not finish.");
+                    }
+                    var seconds = (DateTime.UtcNow - started).TotalSeconds;
+                    var text = await http.GetStringAsync($"/v1/transcriptions/{id}/transcript?format=txt");
+                    if (text.Trim().Length < 40) throw new InvalidOperationException("The transcript is nearly empty: " + text);
+                    var json = JsonDocument.Parse(await http.GetStringAsync($"/v1/transcriptions/{id}/transcript")).RootElement;
+                    if (json.GetProperty("segments").GetArrayLength() == 0 || json.GetProperty("text").GetString()!.Trim().Length < 40) throw new InvalidOperationException("The JSON transcript is empty.");
+                    var subtitles = await http.GetStringAsync($"/v1/transcriptions/{id}/transcript?format=srt");
+                    if (!subtitles.Contains("-->")) throw new InvalidOperationException("No subtitles came back.");
+
+                    // The OpenAI-style form, as a client library would send it.
+                    using var form = new System.Net.Http.MultipartFormDataContent();
+                    form.Add(new System.Net.Http.StringContent("whisper-1"), "model");
+                    form.Add(new System.Net.Http.StringContent("text"), "response_format");
+                    form.Add(new System.Net.Http.ByteArrayContent(bytes), "file", "talk.wav");
+                    using var compatible = await http.PostAsync("/v1/audio/transcriptions", form);
+                    var compatibleText = await compatible.Content.ReadAsStringAsync();
+                    if (compatible.StatusCode != System.Net.HttpStatusCode.OK || compatibleText.Trim().Length < 40) throw new InvalidOperationException("The OpenAI-style endpoint failed: " + compatibleText);
+
+                    // A recording that is cancelled right after it was sent.
+                    using var third = await http.PostAsync("/v1/transcriptions?name=cancel-me.wav", new System.Net.Http.ByteArrayContent(bytes));
+                    var thirdId = JsonDocument.Parse(await third.Content.ReadAsStringAsync()).RootElement.GetProperty("id").GetString()!;
+                    using (await http.PostAsync($"/v1/transcriptions/{thirdId}/cancel", null)) { }
+                    var cancelled = false;
+                    for (var wait = 0; wait < 600 && !cancelled; wait++) { cancelled = JsonDocument.Parse(await http.GetStringAsync($"/v1/transcriptions/{thirdId}")).RootElement.GetProperty("state").GetString() == "cancelled"; if (!cancelled) await Task.Delay(100); }
+                    if (!cancelled) throw new InvalidOperationException("The cancelled recording did not stop.");
+
+                    if (shell.Jobs.Count != 3) throw new InvalidOperationException($"Expected three projects, found {shell.Jobs.Count}.");
+                    if (shell.SelectedJob is not null) throw new InvalidOperationException("A recording sent through the API moved the selection.");
+                    window.Width = 1220;
+                    shell.SelectedPage = shell.Navigation[^1];
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    shell.ShowApiKey = false;
+                    window.ContentScroll.ScrollToVerticalOffset(1300);
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "network-api.png"), 1220, 1100, 1);
+                    await File.WriteAllTextAsync(Path.Combine(dataRoot, "api-smoke.json"), JsonSerializer.Serialize(new
+                    { seconds, states, highestPercent = highest, transcript = text.Trim(), openAiStyle = compatibleText.Trim(), projects = shell.Jobs.Count, status = shell.ApiStatus }, new JsonSerializerOptions { WriteIndented = true }));
+                    shell.StopApiForExit();
+                }
                 if (e.Args.Contains("--first-run-download-smoke"))
                 {
                     // Needs TRIASR_MODEL_ROOT to point at an empty folder: starts the real download, watches the banner follow it, cancels, and checks the partial file is kept.

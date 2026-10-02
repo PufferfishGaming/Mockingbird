@@ -39,12 +39,36 @@ Native Linux support is pending; there is currently no native Linux build.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.
 - The interface in English, Hungarian, German, Spanish and French: chosen on the first start, switchable in Settings without a restart.
 - In-app update checks with a verified one-click update.
+- An optional HTTP API, off by default, so that other programs can send recordings and fetch transcripts (see Network API below).
 
 Recognition can be wrong, particularly with music, noise or silence. Review important transcripts. Readable export normalizes spacing without rewriting wording.
 
+## Network API
+
+Settings → **Network API** → *Turn on the API* makes the app answer HTTP requests while it is open (default port 8642). Without *Allow other computers on the network* only programs on the same computer can connect; with it anyone on your network who has the key can. Every request except the health check needs the key (`Authorization: Bearer <key>` or `X-Api-Key`); *Copy key* and *New key* are in the same card. The connection is plain HTTP, so use the network option only on a network you trust. Recordings sent through the API are kept in the projects folder (`Api/Incoming`) and listed under Projects; the API shows only what was sent through it, and works on one recording at a time.
+
+```powershell
+curl.exe -H "Authorization: Bearer KEY" http://127.0.0.1:8642/v1/health
+curl.exe -X POST --data-binary "@meeting.mp3" -H "Authorization: Bearer KEY" "http://127.0.0.1:8642/v1/transcriptions?language=auto&name=meeting.mp3"
+curl.exe -H "Authorization: Bearer KEY" "http://127.0.0.1:8642/v1/transcriptions/ID?wait=60"
+curl.exe -H "Authorization: Bearer KEY" "http://127.0.0.1:8642/v1/transcriptions/ID/transcript?format=srt"
+```
+
+| Request | Answer |
+| --- | --- |
+| `GET /v1/health` | server check, no key needed |
+| `GET /v1/languages`, `GET /v1/models` | the 100 languages (and which have a second engine); an OpenAI-style model list |
+| `POST /v1/transcriptions?language=auto&name=file.mp3` | the request body is the recording; answers `202` with an `id` |
+| `GET /v1/transcriptions`, `GET /v1/transcriptions/{id}` | state (`queued`, `running`, `complete`, `failed`, `cancelled`), stage and percent; `?wait=30` waits for the end |
+| `GET /v1/transcriptions/{id}/transcript?format=json\|txt\|md\|srt\|vtt\|csv\|docx\|full-json&mode=strict\|readable` | the transcript (`json` has segments and a `needsListening` flag per segment) |
+| `POST /v1/transcriptions/{id}/cancel` | stops a waiting or running recording |
+| `POST /v1/audio/transcriptions` | OpenAI-compatible: a multipart form with `file`, `language`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`); answers when the transcript is ready, so existing tools that speak that API can use it with the base URL `http://127.0.0.1:8642/v1` |
+
+Errors are `{"error":{"code":"...","message":"...","type":"..."}}`. More in `docs/decisions/ADR-0013-network-api.md`.
+
 ## Privacy
 
-Transcription runs locally. Requested model/runtime downloads and the update check (which can be turned off) contact their providers. Terminal commands can access the network. Projects and logs can contain private information. See [PRIVACY.md](PRIVACY.md), also available in Settings.
+Transcription runs locally. Requested model/runtime downloads and the update check (which can be turned off) contact their providers. The network API listens only when you switch it on. Terminal commands can access the network. Projects and logs can contain private information. See [PRIVACY.md](PRIVACY.md), also available in Settings.
 
 ## Build
 

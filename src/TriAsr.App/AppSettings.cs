@@ -9,7 +9,8 @@ namespace TriAsr.App;
 public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = AppSettings.CurrentVersion, bool AnimateErrors = true,
     bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto",
     bool SkipNonSpeech = false, bool UseCorrectionModel = true, string SetupState = SetupPlan.Pending,
-    string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)", string Language = "")
+    string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)", string Language = "",
+    bool ApiEnabled = false, int ApiPort = 8642, bool ApiAllowNetwork = false, string ApiKey = "")
 {
     public const int CurrentVersion = 2;
 }
@@ -41,7 +42,9 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
                 Language = Loc.IsSupported(settings.Language) ? settings.Language : "",
                 WatchFolder = settings.WatchFolder ?? "",
                 WatchLanguage = string.IsNullOrWhiteSpace(settings.WatchLanguage) ? "auto" : settings.WatchLanguage,
-                WatchOutput = settings.WatchOutput is "Text (.txt)" or "Subtitles (.srt)" or "Project only" ? settings.WatchOutput : "Text (.txt)"
+                WatchOutput = settings.WatchOutput is "Text (.txt)" or "Subtitles (.srt)" or "Project only" ? settings.WatchOutput : "Text (.txt)",
+                ApiPort = settings.ApiPort is >= 1024 and <= 65535 ? settings.ApiPort : 8642,
+                ApiKey = settings.ApiKey ?? ""
             };
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)

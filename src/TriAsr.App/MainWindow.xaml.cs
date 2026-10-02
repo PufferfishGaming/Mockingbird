@@ -116,6 +116,7 @@ public partial class MainWindow : Window
         if (vm.IsProcessing) vm.CancelCommand.Execute(null);
         vm.CancelModelCommand.Execute(null); vm.CancelBenchmarkCommand.Execute(null);
         vm.StopWatchingForExit();
+        vm.StopApiForExit();
     }
     private void ChooseWatchFolderClick(object sender, RoutedEventArgs args)
     {

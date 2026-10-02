@@ -58,7 +58,8 @@ public sealed partial class ShellViewModel
         CheckForUpdates: AutoCheckUpdates, SkippedUpdateVersion: _skippedUpdateVersion, LastUpdateCheckUtc: _lastUpdateCheck, ResourceProfile: SelectedResourceProfile,
         SkipNonSpeech: SkipNonSpeech, UseCorrectionModel: UseCorrectionModel, SetupState: _setupState,
         WatchFolder: WatchFolder, WatchEnabled: WatchEnabled, WatchLanguage: WatchLanguage, WatchOutput: WatchOutput,
-        Language: LanguageChosen ? Language : "");
+        Language: LanguageChosen ? Language : "",
+        ApiEnabled: ApiEnabled, ApiPort: ApiPort == 0 ? DefaultApiPort : ApiPort, ApiAllowNetwork: ApiAllowNetwork, ApiKey: ApiKey);
 
     private void RestoreUpdateSettings(AppSettings settings)
     {

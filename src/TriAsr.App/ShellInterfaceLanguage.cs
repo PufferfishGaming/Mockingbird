@@ -95,7 +95,7 @@ public sealed partial class ShellViewModel
         ShowReviewSummary(); ShowTranscriptionProgress(); ShowSavedLanguages();
         foreach (var card in ModelCards) card.NotifyLanguageChanged();
         if (!IsModelBusy) foreach (var card in ModelCards) card.Refresh(models.Inspect(card.Entry));
-        RefreshWatchStatus(); RefreshSetupTexts(); RefreshUpdateTexts(); RefreshTerminal();
+        RefreshWatchStatus(); RefreshApiStatus(); RefreshSetupTexts(); RefreshUpdateTexts(); RefreshTerminal();
         if (Hardware is not null) _ = RefreshBackendsAsync();
     }
 }

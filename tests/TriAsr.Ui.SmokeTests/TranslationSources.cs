@@ -51,12 +51,12 @@ internal static partial class TranslationSources
         "ErrorTitle", "ErrorMessage", "UpdateTitle", "UpdateDetail", "UpdateStatusText", "SetupTitle", "SetupDetail", "TranscriptionStage", "TranscriptionProgressSummary",
         "TerminalStatus", "Readiness", "ModelProgress", "WatchStatus", "ReviewSummary", "SystemSummary", "Recommendation", "RecommendedDownloadSummary",
         "BenchmarkProgress", "BenchmarkSummary", "SavedLanguageSummary", "LanguageCoverage", "LanguageSetupStatus", "BackendProgress", "ActiveBackendSummary",
-        "ThemeSummary", "ResourceSummary", "StorageSummary", "EngineStatus", "Status", "Title", "Details", "SetupStartLabel", "SetupDismissLabel", "TerminalSendLabel",
+        "ThemeSummary", "ResourceSummary", "StorageSummary", "EngineStatus", "Status", "Title", "Details", "SetupStartLabel", "SetupDismissLabel", "TerminalSendLabel", "ApiStatus",
         // a review region's texts, announced again by ReviewRegion.NotifyLanguageChanged
         "Time", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
         // the user's own words, program output, paths and numbers
         "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Location",
-        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend",
+        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "ApiPortText", "ApiKeyShown", "ApiExample",
         // the name of a language in that language
         "NativeName"
     };

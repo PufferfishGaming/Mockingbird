@@ -134,6 +134,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RestoreLanguage(settings);
         RestoreSetupSettings(settings);
         RestoreWatchSettings(settings);
+        RestoreApiSettings(settings);
         if (store.LastLoadError is not null) ReportError(T("Preferences could not be restored"), T("Defaults were loaded. {0}", store.LastLoadError));
         if (runtimes.StorageLoadError is not null) ReportError(T("Saved folders could not be restored"), T("Existing model files have not been removed. Select your previous model repository in Settings. {0}", runtimes.StorageLoadError));
         SelectedPage = Navigation[0];
@@ -159,11 +160,12 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             var existing = Jobs.FirstOrDefault(item => item.Id == job.Id);
             var index = existing is null ? -1 : Jobs.IndexOf(existing);
             if (index >= 0) Jobs[index] = job; else Jobs.Insert(0, job);
-            if (!IsWatchBusy || IsProcessing) SelectedJob = job; // a watched recording must not move the user's selection
+            if ((!IsWatchBusy || IsProcessing) && !IsApiJob(job)) SelectedJob = job; // a watched or uploaded recording must not move the user's selection
             Status = job.Error is { } failure ? Loc.Describe(failure) : JobText.State(job.State);
             activity.Append("job", $"{job.Id:N} · {job.State}" + (job.Error is null ? "" : " · " + job.Error));
             if (job.Error is not null) ReportError(T("Transcription needs attention"), job.Error);
         });
+        _updateJob = job => UpdateJob(null, job);
         queue.JobChanged += UpdateJob;
         pipeline.JobChanged += UpdateJob;
         pipeline.ProgressChanged += (_, update) => System.Windows.Application.Current.Dispatcher.Invoke(() => ApplyTranscriptionProgress(update));
@@ -172,6 +174,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RefreshSetupOffer();
         _initialized = true;
         if (WatchEnabled) _ = RestartWatchAsync();
+        if (ApiEnabled) _ = RestartApiAsync();
     }
     public void ApplyTranscriptionProgress(TranscriptionProgress update)
     {

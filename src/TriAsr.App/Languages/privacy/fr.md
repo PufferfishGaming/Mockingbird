@@ -15,6 +15,9 @@ Lorsque vous demandez le téléchargement de modèles ou de runtimes, l'applicat
 - https://huggingface.co/privacy
 - https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement
 
+### API réseau
+Désactivée par défaut. Si vous l'activez dans Paramètres, l'application écoute sur un port de votre ordinateur afin que d'autres programmes puissent lui envoyer des enregistrements et récupérer les transcriptions. Sans « Autoriser les autres ordinateurs du réseau », seuls les programmes de cet ordinateur peuvent se connecter ; avec cette option, toute personne de votre réseau qui possède la clé de l'API peut l'utiliser. Chaque requête exige la clé. La connexion n'est pas chiffrée : ne l'utilisez que sur un réseau de confiance. Les enregistrements envoyés ainsi sont conservés dans votre dossier de projets comme n'importe quel autre projet. L'API se contente de répondre aux requêtes ; l'application ne signale son utilisation à personne.
+
 ### Recherche de mises à jour
 Sauf si vous la désactivez dans Paramètres, l'application demande à GitHub un petit fichier de version (latest.json) à son démarrage, au plus toutes les 12 heures, et chaque fois que vous choisissez Rechercher les mises à jour maintenant. GitHub reçoit les informations de connexion habituelles, telles que votre adresse IP, et la demande contient le nom et la version de l'application. Les enregistrements, les transcriptions, les données des projets, les informations sur le matériel et les identifiants ne sont pas envoyés. L'application n'installe jamais une mise à jour d'elle-même : c'est vous qui choisissez Mettre à jour maintenant, et l'installateur téléchargé est vérifié par rapport à sa somme de contrôle SHA256 publiée avant d'être exécuté.
 

@@ -14,7 +14,9 @@ public sealed partial class ReviewRegion(FinalRegion original, string? machineTe
     public string Canary => Original.CanaryText;
     public string CanaryHeading => Original.NativeTimestamps ? Loc.T("CANARY · projected onto Whisper timing") : Loc.T("CANARY · original untimed text");
     public string Source => Original.Source;
-    public bool IsUncertain => Original.Source is "uncertain" or "single-asr-needs-listening" || Original.Warnings?.Count > 0;
+    public bool IsUncertain => NeedsListening(Original);
+    /// <summary>Whether a region has to be listened to before it is trusted (the engines disagreed unresolved, only one engine heard it, or a check flagged it).</summary>
+    public static bool NeedsListening(FinalRegion region) => region.Source is "uncertain" or "single-asr-needs-listening" || region.Warnings?.Count > 0;
     public string Evidence => Loc.T("{0} · {1} · confidence {2}", SourceText.Of(Source), Original.LlmChoice ?? "—", Original.Confidence?.ToString("0.00") ?? "—") +
         (Original.Warnings?.Count > 0 ? "\n" + string.Join("\n", Original.Warnings.Select(Loc.T)) : "");
     /// <summary>The texts built from the interface language are read again after the language changes.</summary>

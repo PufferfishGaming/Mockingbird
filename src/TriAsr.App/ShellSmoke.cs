@@ -101,6 +101,19 @@ public static class ShellSmoke
             }
         }
         foreach (var region in regions) shell.Regions.Remove(region);
+        // The end of Settings, where the Network API card is, in every language (it holds long texts, a key and buttons).
+        foreach (var language in Loc.Languages)
+        {
+            shell.Language = language.Code;
+            shell.SelectedPage = shell.Navigation.First(item => item.Name == "Settings");
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            if (FindText(window, Loc.T("Network API")) is null) throw new InvalidOperationException($"The Network API card is not shown in {language.Code}.");
+            window.ContentScroll.ScrollToBottom();
+            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            Capture(window, Path.Combine(output, $"lang-{language.Code}-Settings-end.png"), 1220, 1100, 1);
+            window.ContentScroll.ScrollToTop();
+            count++;
+        }
         // The window that asks for the language on the first start, at the height it really takes.
         var chooser = new LanguageChoiceWindow(Loc.Detect()) { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
         chooser.Show();
