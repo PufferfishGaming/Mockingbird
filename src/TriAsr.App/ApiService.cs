@@ -22,8 +22,8 @@ namespace TriAsr.App;
 /// <param name="MissingModels">Names of the speech models a language still needs; empty when it can run.</param>
 /// <param name="CanRun">False while the program is busy with something that must not overlap (model download, tuning, setup).</param>
 /// <param name="BusyChanged">Told when the API starts and stops working on a job.</param>
-/// <param name="Links">Fetches the sound of a web address for <c>POST /v1/links</c> (ADR-0018). Null: this server does not fetch links.</param>
-/// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c> (ADR-0019). Null: this server does not delete recordings.</param>
+/// <param name="Links">Fetches the sound of a web address for <c>POST /v1/links</c>. Null: this server does not fetch links.</param>
+/// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c>. Null: this server does not delete recordings.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
@@ -34,7 +34,7 @@ public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPi
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
 
 /// <summary>
-/// The program's HTTP API (ADR-0013): upload a recording, follow its progress, fetch the transcript, and an OpenAI-compatible
+/// The program's HTTP API: upload a recording, follow its progress, fetch the transcript, and an OpenAI-compatible
 /// <c>/v1/audio/transcriptions</c> so that tools written for that API work unchanged. Every request but the two that only say the server is there
 /// needs the key. Jobs run one at a time through the same pipeline as the window's own, and the API sees only what was sent through it.
 /// </summary>
@@ -47,7 +47,7 @@ public sealed class ApiService : IAsyncDisposable
         public Guid Id { get; } = job.Id;
         public string Name { get; set; } = name;
         public TranscriptionJob Job { get; set; } = job;
-        /// <summary>A link whose sound is still being fetched: the job exists only here (as queued) until the file has arrived and the real job is made with this id (ADR-0018).</summary>
+        /// <summary>A link whose sound is still being fetched: the job exists only here (as queued) until the file has arrived and the real job is made with this id.</summary>
         public bool Fetching { get; set; }
         public double FetchPercent { get; set; }
         public TranscriptionProgress? Progress { get; set; }
@@ -313,7 +313,7 @@ public sealed class ApiService : IAsyncDisposable
     // ---- links ------------------------------------------------------------------------------------------------------------------------
 
     /// <summary>
-    /// <c>POST /v1/links</c> {"url", "language"}: this server downloads the sound of a web address and transcribes it (ADR-0018). Only a server with a password
+    /// <c>POST /v1/links</c> {"url", "language"}: this server downloads the sound of a web address and transcribes it. Only a server with a password
     /// does this, because it makes the server fetch what a client names. The address is checked at once (public hosts only); the download runs in the background
     /// and the job is listed as running while it does.
     /// </summary>
@@ -564,7 +564,7 @@ public sealed class ApiService : IAsyncDisposable
 
     /// <summary>
     /// <c>DELETE /v1/transcriptions/{id}</c>: removes a finished recording with its transcript, edits and working files, and the copy of the recording that was
-    /// uploaded (ADR-0019). One that is still being worked on is refused; it has to be cancelled first.
+    /// uploaded. One that is still being worked on is refused; it has to be cancelled first.
     /// </summary>
     private async Task<HttpResponse> DeleteRecordingAsync(string id, CancellationToken token)
     {

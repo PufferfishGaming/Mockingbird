@@ -54,7 +54,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton(runtimes);
         services.AddSingleton(new ModelStore(runtimes.ModelRoot));
         services.AddSingleton<IProcessRunner, ProcessRunner>();
-        // Fetching the sound of a link (ADR-0018). The helper program for pages is not shipped; it is downloaded into the data folder when the user asks.
+        // Fetching the sound of a link. The helper program for pages is not shipped; it is downloaded into the data folder when the user asks.
         services.AddSingleton(provider => new YtDlpTool(Path.Combine(provider.GetRequiredService<IStoragePaths>().Root, "Runtimes", "YtDlp")));
         services.AddSingleton<ILinkTool>(provider => provider.GetRequiredService<YtDlpTool>());
         services.AddSingleton<DirectLinkDownloader>();
@@ -455,7 +455,7 @@ public partial class App : System.Windows.Application
                     window.ContentScroll.ScrollToVerticalOffset(520);
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "new-link.png"), 1220, 1100, 1);
-                    // The history (ADR-0019): the Projects page lists what was sent. A client deletes one through the API (here from the remote pages): the window's list follows,
+                    // The history: the Projects page lists what was sent. A client deletes one through the API (here from the remote pages): the window's list follows,
                     // and the working files and the uploaded copy are gone from disk.
                     shell.SelectedPage = shell.Navigation.First(page => page.Name == "Projects");
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);

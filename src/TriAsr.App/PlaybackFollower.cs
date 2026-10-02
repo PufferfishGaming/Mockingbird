@@ -1,6 +1,6 @@
 namespace TriAsr.App;
 
-/// <summary>Works out which region the recording is in and how far (ADR-0017). Studio's review and the Client's both use it, from their player timers.</summary>
+/// <summary>Works out which region the recording is in and how far. Studio's review and the Client's both use it, from their player timers.</summary>
 public static class PlaybackFollower
 {
     /// <summary>

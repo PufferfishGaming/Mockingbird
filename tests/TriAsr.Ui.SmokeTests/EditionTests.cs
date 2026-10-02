@@ -6,7 +6,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>The three editions (ADR-0014): which one runs, what each is called and where it keeps its data, and that the client carries no engines.</summary>
+/// <summary>The three editions: which one runs, what each is called and where it keeps its data, and that the client carries no engines.</summary>
 public sealed class EditionTests
 {
     private static string NewRoot() => Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));

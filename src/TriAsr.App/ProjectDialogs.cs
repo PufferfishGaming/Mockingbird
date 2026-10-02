@@ -4,7 +4,7 @@ using System.Windows.Media;
 
 namespace TriAsr.App;
 
-/// <summary>What the project lists of the windows share (ADR-0019): the question before a project is deleted, and telling a click on a row from a click on a button in it.</summary>
+/// <summary>What the project lists of the windows share: the question before a project is deleted, and telling a click on a row from a click on a button in it.</summary>
 internal static class ProjectDialogs
 {
     /// <summary>Asks whether to delete a project. <paramref name="onServer"/> is true when the recording is on another computer, which then removes the copy it holds.</summary>

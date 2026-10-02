@@ -5,7 +5,7 @@ using TriAsr.Engine.Canary;
 
 namespace TriAsr.App;
 
-/// <summary>The side of hosting that needs this window's services: the transcription pipeline, the stored projects and the models (ADR-0013, ADR-0014).</summary>
+/// <summary>The side of hosting that needs this window's services: the transcription pipeline, the stored projects and the models.</summary>
 public sealed partial class ShellViewModel
 {
     /// <summary>The name of the sidebar page that shows the server this window is connected to. The page is listed only while there is a connection.</summary>

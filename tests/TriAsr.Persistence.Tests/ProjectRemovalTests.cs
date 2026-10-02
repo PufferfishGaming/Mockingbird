@@ -6,7 +6,7 @@ using TriAsr.Persistence;
 
 namespace TriAsr.Persistence.Tests;
 
-/// <summary>Deleting a project (ADR-0019) against a real database and real folders: what goes, what stays.</summary>
+/// <summary>Deleting a project against a real database and real folders: what goes, what stays.</summary>
 public sealed class ProjectRemovalTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));

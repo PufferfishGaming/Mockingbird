@@ -8,7 +8,7 @@ namespace TriAsr.Infrastructure;
 
 /// <summary>
 /// Downloads a link that leads straight to an audio or video file (an mp3 on a podcast host, a recording on a web server). It needs no helper program.
-/// A link that leads to a page returns <c>null</c> so that the page helper can have a go (ADR-0018).
+/// A link that leads to a page returns <c>null</c> so that the page helper can have a go.
 /// </summary>
 public sealed class DirectLinkDownloader : IDisposable
 {

@@ -9,7 +9,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 /// <summary>
-/// The Client edition's update check and one-click install: the same behaviour and the same banner as Studio's (ADR-0002), against the Client's own
+/// The Client edition's update check and one-click install: the same behaviour and the same banner as Studio's, against the Client's own
 /// manifest (<c>latest-client.json</c>). Nothing is installed without the user choosing Update now, and nothing is run before its SHA256 matches.
 /// </summary>
 public sealed partial class ClientViewModel

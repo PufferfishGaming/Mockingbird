@@ -6,7 +6,7 @@ namespace TriAsr.Infrastructure;
 
 /// <summary>
 /// The helper that fetches the sound of web pages: yt-dlp, a program of its own project that knows how to get a recording out of well over a thousand
-/// sites (ADR-0018). It is not shipped with Mockingbird. On the user's request it is downloaded once from the project's releases, checked against the
+/// sites. It is not shipped with Mockingbird. On the user's request it is downloaded once from the project's releases, checked against the
 /// SHA-256 the same release publishes, and kept in the program's data folder; "update" does the same again when the checksum has changed.
 /// </summary>
 public sealed class YtDlpTool : ILinkTool, IDisposable

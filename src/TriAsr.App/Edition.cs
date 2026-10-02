@@ -2,7 +2,7 @@ using System.IO;
 
 namespace TriAsr.App;
 
-/// <summary>The three programs built from this code (ADR-0014): Studio does everything on one computer, Server holds the models and serves them to other computers, Client is only the window that sends recordings to a server.</summary>
+/// <summary>The three programs built from this code: Studio does everything on one computer, Server holds the models and serves them to other computers, Client is only the window that sends recordings to a server.</summary>
 public enum AppEdition { Studio, Server, Client }
 
 /// <summary>

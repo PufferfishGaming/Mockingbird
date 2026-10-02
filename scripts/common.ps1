@@ -11,7 +11,7 @@ function Invoke-Dotnet {
     & $script:Dotnet @args
     if ($LASTEXITCODE -ne 0) { throw "dotnet failed with exit code $LASTEXITCODE" }
 }
-# The three editions (docs/decisions/ADR-0014). Studio keeps every name it has always had, so that an installed Studio updates in place; the others
+# The three editions. Studio keeps every name it has always had, so that an installed Studio updates in place; the others
 # get names, folders, installer identities and update manifests of their own. Server and Client are packaged next to the Studio package as
 # artifacts/packages/<version>-server and <version>-client.
 function Get-EditionInfo([string]$Edition) {

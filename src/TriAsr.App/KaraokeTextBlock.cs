@@ -6,7 +6,7 @@ using System.Windows.Media;
 namespace TriAsr.App;
 
 /// <summary>
-/// The text of a region, with the words already said in the theme's strongest colour (white in the dark theme) and the word being said in bold, while the recording plays (ADR-0017).
+/// The text of a region, with the words already said in the theme's strongest colour (white in the dark theme) and the word being said in bold, while the recording plays.
 /// <see cref="Progress"/> is how far into the region the recording is, 0 to 1; below zero (no recording playing here) the text is shown plainly.
 /// </summary>
 public sealed class KaraokeTextBlock : TextBlock

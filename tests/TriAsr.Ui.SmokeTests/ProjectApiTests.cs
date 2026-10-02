@@ -7,7 +7,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary><c>DELETE /v1/transcriptions/{id}</c> (ADR-0019): a finished recording goes with its transcript, edits and the uploaded copy; one that is being worked on stays.</summary>
+/// <summary><c>DELETE /v1/transcriptions/{id}</c>: a finished recording goes with its transcript, edits and the uploaded copy; one that is being worked on stays.</summary>
 public sealed class ProjectApiTests
 {
     private static string Text(JsonElement element, string name) => ApiTestData.Text(element, name);

@@ -2,7 +2,7 @@ namespace TriAsr.Application;
 
 /// <summary>
 /// The sentences the link code says to a person, in English. They come from layers that cannot translate; the app (and the web page) look them up by their
-/// wording, so each of them is also listed in <c>extra-keys.json</c> and has a translation (ADR-0018).
+/// wording, so each of them is also listed in <c>extra-keys.json</c> and has a translation.
 /// </summary>
 public static class LinkMessages
 {
@@ -40,7 +40,7 @@ public sealed record FetchedLink(string Path, string Title);
 public sealed class LinkException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>How a link is fetched: where it may lead, and how much may be taken.</summary>
-/// <param name="AllowPrivateNetwork">True for a link a person pasted on their own computer. A server that fetches for other computers leaves it false (ADR-0018).</param>
+/// <param name="AllowPrivateNetwork">True for a link a person pasted on their own computer. A server that fetches for other computers leaves it false.</param>
 /// <param name="MaxBytes">The most that may be downloaded. Zero means the default (4 GB).</param>
 public sealed record LinkFetchOptions(bool AllowPrivateNetwork = false, long MaxBytes = 0)
 {
@@ -49,7 +49,7 @@ public sealed record LinkFetchOptions(bool AllowPrivateNetwork = false, long Max
 }
 
 /// <summary>
-/// Downloads the sound of a web address so that it can be transcribed like any other recording (ADR-0018). A link straight to an audio or video file
+/// Downloads the sound of a web address so that it can be transcribed like any other recording. A link straight to an audio or video file
 /// is downloaded as it is; a link to a page (a video on one of the many sites that host them, a podcast episode) needs the helper program, see <see cref="ILinkTool"/>.
 /// </summary>
 public interface ILinkFetcher

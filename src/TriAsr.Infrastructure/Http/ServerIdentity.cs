@@ -7,7 +7,7 @@ namespace TriAsr.Infrastructure;
 /// <summary>
 /// The identity of a hosted server: a self-signed certificate made on this computer the first time it is needed and kept in the data folder
 /// (<c>server-certificate.pem</c> and <c>server-key.pem</c>). Nobody vouches for it; clients recognise a server by its fingerprint, which they
-/// are shown the first time they connect and which must be the same afterwards (ADR-0014). Making a new one is how a server "forgets" its past.
+/// are shown the first time they connect and which must be the same afterwards. Making a new one is how a server "forgets" its past.
 /// </summary>
 public sealed class ServerIdentity : IDisposable
 {

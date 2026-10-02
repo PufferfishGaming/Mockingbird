@@ -5,7 +5,7 @@ using TriAsr.Domain;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>Karaoke-style playback (ADR-0017): the time of a region shared out over its words, and the region the recording is in.</summary>
+/// <summary>Karaoke-style playback: the time of a region shared out over its words, and the region the recording is in.</summary>
 public sealed class KaraokeTests
 {
     [Fact]

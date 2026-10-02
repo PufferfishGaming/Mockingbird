@@ -4,7 +4,7 @@ using TriAsr.Application;
 namespace TriAsr.Infrastructure;
 
 /// <summary>
-/// Fetches the sound of a page with yt-dlp: a video on one of the many sites that host them, a podcast episode, a recording on a news page (ADR-0018).
+/// Fetches the sound of a page with yt-dlp: a video on one of the many sites that host them, a podcast episode, a recording on a news page.
 /// Only the best audio (or, where a site offers no audio of its own, the video) of the one page is taken; playlists are not followed.
 /// </summary>
 public sealed class YtDlpPageFetcher(YtDlpTool tool, IProcessRunner runner)

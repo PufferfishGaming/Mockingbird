@@ -8,7 +8,7 @@
   -Notes is the short plain-language summary shown in the update banner of installed apps (latest.json).
   -DryRun checks the version and the README and prints the plan without building anything.
   -Edition builds Studio (the default), Server or Client; all three share the version in Directory.Build.props. Run it once per edition, adding -SkipVerify after the first.
-  Nothing is uploaded or pushed by this script; see docs/RELEASE_PROCESS.md for the upload order.
+  Nothing is uploaded or pushed by this script. Upload the files of a package in this order: Mockingbird-<Edition>-Setup.exe, then the SHA256SUMS file, then the update manifest (latest.json, latest-server.json or latest-client.json) last, because installed apps read it to learn about a new version.
 #>
 param([string]$Notes = '', [switch]$DryRun, [ValidateSet('Studio', 'Server', 'Client')][string]$Edition = 'Studio', [switch]$SkipVerify)
 . "$PSScriptRoot/common.ps1"

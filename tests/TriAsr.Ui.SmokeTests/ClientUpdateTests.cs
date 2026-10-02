@@ -10,7 +10,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>The Client edition checks its own release file and offers its own installer (ADR-0002, ADR-0014), with the same choices as Studio: later, skip this version, not at all.</summary>
+/// <summary>The Client edition checks its own release file and offers its own installer, with the same choices as Studio: later, skip this version, not at all.</summary>
 public sealed class ClientUpdateTests
 {
     private const string ReleaseUrl = "https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Client-Setup.exe";

@@ -8,7 +8,7 @@ using TriAsr.Domain;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>The history on Studio's Projects page (ADR-0019): a click opens a finished project in Review, and a project can be deleted.</summary>
+/// <summary>The history on Studio's Projects page: a click opens a finished project in Review, and a project can be deleted.</summary>
 public sealed class ProjectTests
 {
     private static string NewRoot() => Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));

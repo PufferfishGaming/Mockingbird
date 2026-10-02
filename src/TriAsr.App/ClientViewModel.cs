@@ -7,7 +7,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 /// <summary>
-/// The window of the Client edition (ADR-0014): the servers on the network and the pages of the connected one. Nothing is transcribed on this computer:
+/// The window of the Client edition: the servers on the network and the pages of the connected one. Nothing is transcribed on this computer:
 /// there are no speech programs, no models and no hardware check here. The recording goes to a server, which runs the engines, and the transcript
 /// comes back to be read, edited and exported.
 /// </summary>

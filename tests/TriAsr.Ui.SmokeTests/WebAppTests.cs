@@ -7,7 +7,7 @@ using TriAsr.App;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>The web page of a server (ADR-0015): served to a browser without a password, locked down by its policy, translated, and the API behind it unchanged.</summary>
+/// <summary>The web page of a server: served to a browser without a password, locked down by its policy, translated, and the API behind it unchanged.</summary>
 public sealed class WebAppTests
 {
     private static HttpRequestMessage Browser(string path) => new(HttpMethod.Get, path) { Headers = { { "Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" } } };

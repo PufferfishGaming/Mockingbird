@@ -6,7 +6,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.Persistence.Tests;
 
-/// <summary>Fetching the sound of a link (ADR-0018): which addresses are allowed, the helper program's installation, direct downloads and the helper's output.</summary>
+/// <summary>Fetching the sound of a link: which addresses are allowed, the helper program's installation, direct downloads and the helper's output.</summary>
 public sealed class LinkTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));

@@ -45,7 +45,7 @@ public sealed partial class RemoteJobRow(RemoteJob job) : ObservableObject
 
 /// <summary>
 /// The pages of a connected server: send a recording, follow the recordings on the server, review and edit a transcript with its audio, and export
-/// it. Nothing is transcribed here; the recording goes to the server, which runs the speech programs, and the transcript comes back (ADR-0014).
+/// it. Nothing is transcribed here; the recording goes to the server, which runs the speech programs, and the transcript comes back.
 /// </summary>
 public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDisposable
 {
@@ -56,7 +56,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private readonly string _recordingsFolder;
     private RecorderViewModel? _recorder;
 
-    /// <summary>The link card: the server fetches the sound of a web address and transcribes it (ADR-0018).</summary>
+    /// <summary>The link card: the server fetches the sound of a web address and transcribes it.</summary>
     public RemoteLinkViewModel Link { get; }
 
     /// <summary>What the connected server said about itself last, or null when there is no connection.</summary>
@@ -74,7 +74,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     /// <summary>The server stopped answering during a call that the link card made.</summary>
     internal void LoseConnection(string message) => ConnectionLost?.Invoke(message);
 
-    /// <summary>The microphone, for sending a recording made here (ADR-0016).</summary>
+    /// <summary>The microphone, for sending a recording made here.</summary>
     public RecorderViewModel Recorder => _recorder ??= MakeRecorder();
 
     /// <summary>What recordings are made from. Only a test changes it, and before the recorder is first used.</summary>
@@ -290,7 +290,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         if (row.CanOpen) await OpenReviewAsync(row.Id);
     }
 
-    /// <summary>Deletes a finished recording on the server (the window has asked first), and lets go of its review if that is open (ADR-0019).</summary>
+    /// <summary>Deletes a finished recording on the server (the window has asked first), and lets go of its review if that is open.</summary>
     [RelayCommand]
     private async Task DeleteJobAsync(RemoteJobRow? row)
     {

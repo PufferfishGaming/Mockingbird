@@ -68,7 +68,7 @@ public static class ShellSmoke
 
     /// <summary>
     /// The selected row while the recording is at its first word, in both themes: the word being said and the words already said must stand out from the
-    /// words still to come, which have the accent colour of a selected row (ADR-0017).
+    /// words still to come, which have the accent colour of a selected row.
     /// </summary>
     private static async Task KaraokeRendersAsync(MainWindow window, ShellViewModel shell, string output)
     {

@@ -6,7 +6,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.Persistence.Tests;
 
-/// <summary>The identity of a server, the encrypted connection, and how a client recognises a server by its fingerprint (ADR-0014).</summary>
+/// <summary>The identity of a server, the encrypted connection, and how a client recognises a server by its fingerprint.</summary>
 public sealed class SecureTransportTests : IDisposable
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));

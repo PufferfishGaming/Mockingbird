@@ -2,7 +2,7 @@ using System.IO;
 
 namespace TriAsr.App;
 
-/// <summary>Transcribing a link on Studio's New transcription page (ADR-0018): the sound is fetched on this computer and becomes the file to transcribe.</summary>
+/// <summary>Transcribing a link on Studio's New transcription page: the sound is fetched on this computer and becomes the file to transcribe.</summary>
 public sealed partial class ShellViewModel
 {
     private LinkHelperViewModel? _linkHelper;

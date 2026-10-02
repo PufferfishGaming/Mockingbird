@@ -5,7 +5,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.App;
 
-/// <summary>The history on Studio's Projects page (ADR-0019): a click opens a finished project in Review, and a project can be deleted.</summary>
+/// <summary>The history on Studio's Projects page: a click opens a finished project in Review, and a project can be deleted.</summary>
 public sealed partial class ShellViewModel
 {
     /// <summary>A click on a project: a finished one opens its transcript in Review, any other is only selected (so that Resume or Cancel apply to it).</summary>

@@ -4,7 +4,7 @@ using TriAsr.Domain;
 namespace TriAsr.Infrastructure;
 
 /// <summary>
-/// Deletes a project (ADR-0019): its record and everything stored for it, the working files in the job's folder, and the copy of the recording
+/// Deletes a project: its record and everything stored for it, the working files in the job's folder, and the copy of the recording
 /// that the program itself made (a recording that another computer uploaded, the sound fetched from a link). A recording the person chose or
 /// recorded themselves is never touched.
 /// </summary>

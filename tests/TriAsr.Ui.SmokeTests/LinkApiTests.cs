@@ -9,7 +9,7 @@ using TriAsr.Infrastructure;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary><c>POST /v1/links</c> (ADR-0018): a server with a password fetches the sound of a web address for a client and transcribes it.</summary>
+/// <summary><c>POST /v1/links</c>: a server with a password fetches the sound of a web address for a client and transcribes it.</summary>
 public sealed class LinkApiTests
 {
     private static string Text(JsonElement element, string name) => ApiTestData.Text(element, name);

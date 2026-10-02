@@ -6,7 +6,7 @@ using TriAsr.Audio.Recording;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>The recorder of the New transcription page and of the Client (ADR-0016), without a microphone: a stand-in hears what the test tells it to.</summary>
+/// <summary>The recorder of the New transcription page and of the Client, without a microphone: a stand-in hears what the test tells it to.</summary>
 public sealed class RecorderTests
 {
     private sealed class Room : IMicrophone

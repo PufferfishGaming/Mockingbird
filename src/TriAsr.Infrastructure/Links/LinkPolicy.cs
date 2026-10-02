@@ -5,7 +5,7 @@ using TriAsr.Application;
 namespace TriAsr.Infrastructure;
 
 /// <summary>
-/// What may be fetched as a link (ADR-0018). A link is an http or https address of a page on the web. When the program fetches it on behalf of somebody
+/// What may be fetched as a link. A link is an http or https address of a page on the web. When the program fetches it on behalf of somebody
 /// else (a server for the computers that use it) it must not be made to reach into the network it sits in, so such links have to lead to public
 /// addresses; on the user's own computer, for a link the user pasted, that rule is not applied.
 /// </summary>

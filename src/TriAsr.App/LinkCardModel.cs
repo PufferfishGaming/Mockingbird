@@ -9,7 +9,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 /// <summary>
-/// What the link card shows (ADR-0018): a box for the address of a video or audio on the web, one button, how far it has come, and a note when something
+/// What the link card shows: a box for the address of a video or audio on the web, one button, how far it has come, and a note when something
 /// stands in the way. Studio's New page fetches the sound on this computer (<see cref="LinkViewModel"/>); the Client's New tab and Studio's Remote page ask the
 /// server to fetch it (<see cref="RemoteLinkViewModel"/>). Both cards look the same.
 /// </summary>

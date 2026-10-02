@@ -67,7 +67,7 @@ public sealed partial class ServerEntry : ObservableObject
 }
 
 /// <summary>
-/// The servers on the network and the one this window is connected to (ADR-0014): servers are heard from their announcements, remembered after a
+/// The servers on the network and the one this window is connected to: servers are heard from their announcements, remembered after a
 /// connection, or typed in by address. A connection first looks at the server without sending anything secret, asks the user to confirm its
 /// fingerprint the first time (and again, with a warning, if it changes), and only then sends the password.
 /// </summary>

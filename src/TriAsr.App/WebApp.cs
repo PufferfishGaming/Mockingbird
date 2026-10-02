@@ -9,7 +9,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 /// <summary>
-/// The web page of a server (ADR-0015): the pages of the desktop Client in a browser, from the same address as the API. The page itself holds nothing
+/// The web page of a server: the pages of the desktop Client in a browser, from the same address as the API. The page itself holds nothing
 /// private, so it is served to anyone who asks; what it shows comes from the API, which asks for the password. Three small files are embedded in the
 /// program (<c>Web/</c>), with no library and no address outside this server, which is what lets the policy below forbid everything else.
 /// </summary>

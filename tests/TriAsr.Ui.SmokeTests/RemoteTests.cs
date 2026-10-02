@@ -417,7 +417,7 @@ public sealed class RemoteTests
         }
         finally { TestCleanup.Delete(root); }
     }
-    // ---- links (ADR-0018) -------------------------------------------------------------------------------------------------------
+    // ---- links -------------------------------------------------------------------------------------------------------
 
     [Fact]
     public async Task ALinkIsSentToTheServerWhichFetchesItAndTheRecordingAppearsInTheList()
@@ -534,7 +534,7 @@ public sealed class RemoteTests
         }
         finally { Loc.Instance.SetLanguage(before); TestCleanup.Delete(root); }
     }
-    // ---- the history of recordings on a server: open on a click, delete (ADR-0019) -----------------------------------------------------
+    // ---- the history of recordings on a server: open on a click, delete -----------------------------------------------------
 
     [Fact]
     public Task AFinishedRecordingOpensInReviewWhenItIsClickedAndCanBeDeletedFromTheServer() => UiThread.RunAsync(async () =>

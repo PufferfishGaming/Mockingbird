@@ -111,7 +111,7 @@ curl.exe -H "Authorization: Bearer PASSWORD" "http://127.0.0.1:8642/v1/transcrip
 | `DELETE /v1/transcriptions/{id}` | deletes a finished, failed or cancelled recording with its transcript, edits and the uploaded copy; `409 still_running` while it is being worked on |
 | `POST /v1/audio/transcriptions` | OpenAI-compatible: a multipart form with `file`, `language`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`); answers when the transcript is ready, so existing tools that speak that API can use it with the base URL `http://127.0.0.1:8642/v1` |
 
-Errors are `{"error":{"code":"...","message":"...","type":"..."}}`. More in `docs/decisions/ADR-0013-network-api.md` and `docs/decisions/ADR-0014-editions-and-remote-servers.md`.
+Errors are `{"error":{"code":"...","message":"...","type":"..."}}`.
 
 ## Privacy
 

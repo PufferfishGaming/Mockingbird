@@ -5,7 +5,7 @@ namespace TriAsr.App;
 
 /// <summary>
 /// The servers on the network and the connection to one of them, wired together: a connection that works is handed to the pages of the server, a server
-/// that stops answering is reported back to the list. Studio and the Client edition each own one (ADR-0014).
+/// that stops answering is reported back to the list. Studio and the Client edition each own one.
 /// </summary>
 public sealed class RemoteSession
 {

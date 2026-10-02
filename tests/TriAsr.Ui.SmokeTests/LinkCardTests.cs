@@ -5,7 +5,7 @@ using TriAsr.Application;
 
 namespace TriAsr.Ui.SmokeTests;
 
-/// <summary>The link card of Studio's New transcription page and the link helper (ADR-0018), without a network: stand-ins fetch and install.</summary>
+/// <summary>The link card of Studio's New transcription page and the link helper, without a network: stand-ins fetch and install.</summary>
 public sealed class LinkCardTests
 {
     private sealed class FakeTool : ILinkTool

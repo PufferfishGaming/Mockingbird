@@ -12,7 +12,7 @@
   <SolidColorBrush x:Key="AccentHoverBrush" Color="#ABC9FF" />
   <SolidColorBrush x:Key="AccentTextBrush" Color="#142139" />
   <SolidColorBrush x:Key="AccentSurfaceBrush" Color="#263956" />
-  <!-- The words already said while a recording plays (karaoke, ADR-0017): the strongest colour of the theme, so that they stand out from the accent-coloured words still to come in the selected row. -->
+  <!-- The words already said while a recording plays (karaoke): the strongest colour of the theme, so that they stand out from the accent-coloured words still to come in the selected row. -->
   <SolidColorBrush x:Key="KaraokeSaidBrush" Color="#FFFFFF" />
   <SolidColorBrush x:Key="SuccessBrush" Color="#67D5A8" />
   <SolidColorBrush x:Key="WarningBrush" Color="#E4B768" />

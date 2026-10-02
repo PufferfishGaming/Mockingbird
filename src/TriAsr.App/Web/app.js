@@ -1,5 +1,5 @@
 "use strict";
-// Mockingbird Client Webview, the web page of a Mockingbird server (ADR-0015): send a recording, follow the recordings on the server, review and edit a transcript, export it.
+// Mockingbird Client Webview, the web page of a Mockingbird server: send a recording, follow the recordings on the server, review and edit a transcript, export it.
 // It talks to the same HTTP API as every other client, from the same address, and the transcripts are only ever put on the page as text (never as markup).
 // Every text is looked up by its English wording: t(text) (the server answers /ui/strings.json with the translations of the ones used here).
 (() => {

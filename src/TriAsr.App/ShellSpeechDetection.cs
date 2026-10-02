@@ -13,8 +13,8 @@ public sealed partial class ShellViewModel
     }
 
     /// <summary>
-    /// Whether a small AI model may choose between Whisper and Canary where they disagree. On by default (ADR-0011, the maintainer's decision):
-    /// since its redesign (ADR-0008) it never gets an answer rejected and changes Whisper's wording only at 90% or more, though no measurement has
+    /// Whether a small AI model may choose between Whisper and Canary where they disagree. On by default (the maintainer's decision):
+    /// since its redesign it never gets an answer rejected and changes Whisper's wording only at 90% or more, though no measurement has
     /// yet shown that it improves a transcript. While its model is not downloaded, jobs behave as if it were off.
     /// </summary>
     [ObservableProperty] private bool _useCorrectionModel = true;

@@ -1,7 +1,7 @@
 namespace TriAsr.App;
 
 /// <summary>
-/// When each word of a region is said, as a fraction of the region's time (ADR-0017). The transcript keeps the time of each region, not of each word,
+/// When each word of a region is said, as a fraction of the region's time. The transcript keeps the time of each region, not of each word,
 /// so the time is shared out over the words by their length, with a longer wait after a sentence than after a comma. That is close enough to follow the
 /// words by ear, it works for any text (the programs' own, a correction, the user's edit), and exact word times can replace the weights later.
 /// The web page (<c>Web/app.js</c>) uses the same weights; a test keeps the two descriptions the same.

@@ -15,7 +15,7 @@ public sealed partial class DeviceChoice(InputDevice device) : ObservableObject
 }
 
 /// <summary>
-/// Recording from the microphone in the program's own window (ADR-0016): Studio's New transcription page and the Client's New tab both show the same card.
+/// Recording from the microphone in the program's own window: Studio's New transcription page and the Client's New tab both show the same card.
 /// A finished recording is saved as a WAV file in the Recordings folder of the data folder and handed on as the file to transcribe or to send; nothing is
 /// recorded unless the button is pressed, and nothing leaves the computer from here.
 /// </summary>

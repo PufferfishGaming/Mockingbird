@@ -3,7 +3,7 @@ using TriAsr.Audio.Recording;
 
 namespace TriAsr.App;
 
-/// <summary>Recording from the microphone for Studio's New transcription page (ADR-0016): the finished recording becomes the file to transcribe.</summary>
+/// <summary>Recording from the microphone for Studio's New transcription page: the finished recording becomes the file to transcribe.</summary>
 public sealed partial class ShellViewModel
 {
     private RecorderViewModel? _recorder;

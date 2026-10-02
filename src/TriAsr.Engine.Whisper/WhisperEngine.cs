@@ -46,7 +46,7 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
         var output = Path.Combine(directory, "raw");
         // "-mc 0": each 30 s window is decoded without the previous text as context. With the context, one repeated phrase feeds itself
         // (a song scored 173% word error rate, a video 830 copies of one phrase); without it the same song scores 5.2%, speech text is
-        // unchanged, and it runs faster. See ADR-0007.
+        // unchanged, and it runs faster.
         var arguments = new List<string> { "-m", model, "-f", audio, "-l", language, "-t", threads.ToString(CultureInfo.InvariantCulture), "-mc", "0", "-ojf", "-otxt", "-of", output };
         if (vadModel is not null) arguments.AddRange(["--vad", "-vm", vadModel, .. VadSegmenter.Thresholds]);
         if (backend == "cpu") arguments.Add("-ng");

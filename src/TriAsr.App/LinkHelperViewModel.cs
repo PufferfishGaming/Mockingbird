@@ -8,7 +8,7 @@ namespace TriAsr.App;
 
 /// <summary>
 /// The helper program that fetches the sound of web pages (yt-dlp), as the person sees it: installed or not, and the one button that installs it or looks for
-/// a newer one (ADR-0018). Pressing the button is the consent to download it; the text next to it says from where and how large.
+/// a newer one. Pressing the button is the consent to download it; the text next to it says from where and how large.
 /// Studio's link card, Studio's Servers page and the Server window show it.
 /// </summary>
 public sealed partial class LinkHelperViewModel(ILinkTool tool, Action<Action> onUi) : ObservableObject, IDisposable

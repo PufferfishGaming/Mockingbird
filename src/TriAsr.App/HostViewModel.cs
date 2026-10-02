@@ -10,7 +10,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 /// <summary>
-/// Hosting this computer's transcription for others (ADR-0013, ADR-0014): a name, an optional password, whether the network may reach it, and the
+/// Hosting this computer's transcription for others: a name, an optional password, whether the network may reach it, and the
 /// port. The server speaks TLS with a certificate of its own whose fingerprint clients are shown; it announces itself on the local network only
 /// when the network is allowed. Used by Studio (in its server panel) and by the Server edition (its whole window).
 /// </summary>
@@ -59,13 +59,13 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Raised when a setting was changed by the user and should be saved.</summary>
     public event Action? SettingsChanged;
 
-    /// <summary>The helper that fetches the sound of web pages for the links other computers send (ADR-0018). Set by the window that owns the services; null where there is none.</summary>
+    /// <summary>The helper that fetches the sound of web pages for the links other computers send. Set by the window that owns the services; null where there is none.</summary>
     public LinkHelperViewModel? LinkHelper { get; set; }
 
     /// <summary>Raised when the API itself changes a job (cancelling one that never started), so that lists in the window can follow.</summary>
     public event EventHandler<TranscriptionJob>? JobChangedByApi;
 
-    /// <summary>A client deleted a recording through the API (ADR-0019); the window drops it from its list.</summary>
+    /// <summary>A client deleted a recording through the API; the window drops it from its list.</summary>
     public event EventHandler<Guid>? JobDeletedByApi;
 
     /// <summary>The window deleted a project: the API stops listing it.</summary>
