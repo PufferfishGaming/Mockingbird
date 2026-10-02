@@ -41,15 +41,15 @@ public sealed class AuthThrottleTests
     }
 
     [Fact]
-    public void KeysAreComparedWholeAndANewKeyIsLongAndAlwaysDifferent()
+    public void PasswordsAreComparedWholeAndANewOneIsEasyToTypeAndAlwaysDifferent()
     {
-        Assert.True(AuthThrottle.SecretsEqual("mbk-abc", "mbk-abc"));
-        Assert.False(AuthThrottle.SecretsEqual("mbk-abd", "mbk-abc"));
-        Assert.False(AuthThrottle.SecretsEqual("mbk-ab", "mbk-abc"));
-        Assert.False(AuthThrottle.SecretsEqual(null, "mbk-abc"));
-        Assert.False(AuthThrottle.SecretsEqual("", ""));          // no key set means nothing matches
-        var keys = Enumerable.Range(0, 200).Select(_ => AuthThrottle.NewKey()).ToArray();
-        Assert.Equal(200, keys.Distinct().Count());
-        Assert.All(keys, key => { Assert.StartsWith("mbk-", key); Assert.Equal(44, key.Length); Assert.Matches("^[A-Za-z0-9-]+$", key); });
+        Assert.True(AuthThrottle.SecretsEqual("k7m2-pq9x-w4hd", "k7m2-pq9x-w4hd"));
+        Assert.False(AuthThrottle.SecretsEqual("k7m2-pq9x-w4he", "k7m2-pq9x-w4hd"));
+        Assert.False(AuthThrottle.SecretsEqual("k7m2-pq9x", "k7m2-pq9x-w4hd"));
+        Assert.False(AuthThrottle.SecretsEqual(null, "k7m2-pq9x-w4hd"));
+        Assert.False(AuthThrottle.SecretsEqual("", ""));          // no password set means nothing matches here (the server is then open instead)
+        var passwords = Enumerable.Range(0, 200).Select(_ => AuthThrottle.NewPassword()).ToArray();
+        Assert.Equal(200, passwords.Distinct().Count());
+        Assert.All(passwords, password => Assert.Matches("^[a-hj-km-np-z2-9]{4}-[a-hj-km-np-z2-9]{4}-[a-hj-km-np-z2-9]{4}$", password));   // no letters that look alike
     }
 }

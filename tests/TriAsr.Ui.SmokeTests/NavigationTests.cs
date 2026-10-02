@@ -16,7 +16,7 @@ public sealed class NavigationTests
             using var host = App.App.CreateHost(root);
             var shell = host.Services.GetRequiredService<App.ShellViewModel>();
             await shell.InitializeAsync();
-            Assert.Equal(["New Transcription", "Projects", "Review", "Models"], shell.Navigation.Where(page => !page.Advanced && !page.IsSettings).Select(page => page.Name));
+            Assert.Equal(["New Transcription", "Projects", "Review", "Remote server", "Models"], shell.Navigation.Where(page => !page.Advanced && !page.IsSettings).Select(page => page.Name));
             Assert.Equal(["Languages", "Backends", "Benchmark", "Diagnostics", "Terminal"], shell.Navigation.Where(page => page.Advanced).Select(page => page.Name));
             Assert.Equal("New Transcription", shell.Navigation[0].Name);
             Assert.True(shell.Navigation[^1].IsSettings);

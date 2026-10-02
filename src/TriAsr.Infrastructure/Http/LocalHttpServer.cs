@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Text;
 
 namespace TriAsr.Infrastructure;
@@ -89,12 +91,50 @@ public sealed class LocalHttpServer : IAsyncDisposable
             try
             {
                 client.NoDelay = true;
-                var stream = client.GetStream();
+                Stream stream = client.GetStream();
+                SslStream? tls = null;
+                if (_options.Certificate is { } certificate)
+                {
+                    // A TLS handshake starts with the byte 0x16; anything else is a plain HTTP request.
+                    var first = new byte[1];
+                    using (var peek = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token))
+                    {
+                        peek.CancelAfter(_options.HeaderTimeoutOrDefault);
+                        try { if (await stream.ReadAsync(first, peek.Token) == 0) return; }
+                        catch (OperationCanceledException) when (!_stop.IsCancellationRequested) { return; }
+                    }
+                    stream = new PrefixedStream(first[0], stream);
+                    if (first[0] == 0x16)
+                    {
+                        tls = new SslStream(stream, false);
+                        using var handshake = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+                        handshake.CancelAfter(_options.HeaderTimeoutOrDefault);
+                        try
+                        {
+                            await tls.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+                            {
+                                ServerCertificate = certificate, EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13, ClientCertificateRequired = false
+                            }, handshake.Token);
+                        }
+                        catch (Exception error) when (error is AuthenticationException or IOException or OperationCanceledException or System.Security.Cryptography.CryptographicException) { return; } // a client that cannot speak TLS with us
+                        stream = tls;
+                    }
+                    else if (!_options.AllowPlain)
+                    {
+                        using var refusal = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                        await WriteResponseAsync(stream, HttpResponse.Error(426, "encryption_required", "This server accepts encrypted connections only. Use https://.").With("Upgrade", "TLS/1.2"), false, refusal.Token);
+                        // Let the rest of what the client sent arrive before closing, so that the answer is read instead of a reset.
+                        try { client.Client.Shutdown(SocketShutdown.Send); } catch (SocketException) { }
+                        var scratch = new byte[4096];
+                        try { while (await stream.ReadAsync(scratch, refusal.Token) > 0) { } } catch (Exception error) when (error is IOException or OperationCanceledException) { }
+                        return;
+                    }
+                }
                 HttpRequest? request;
                 RequestBodyStream? body;
                 try
                 {
-                    (request, body) = await ReadRequestAsync(stream, client);
+                    (request, body) = await ReadRequestAsync(stream, client, tls is not null);
                 }
                 catch (HttpProtocolException error)
                 {
@@ -115,13 +155,14 @@ public sealed class LocalHttpServer : IAsyncDisposable
                 // Let an upload that was refused finish arriving (up to a limit), so that the client can read the answer instead of a reset.
                 if (!body.IsComplete && !body.AwaitingContinue) await body.DrainAsync(1024 * 1024, TimeSpan.FromSeconds(2));
                 await WriteResponseAsync(stream, response, request.Method == "HEAD", _stop.Token);
+                if (tls is not null) { try { await tls.ShutdownAsync(); } catch (Exception error) when (error is IOException or InvalidOperationException) { } }
                 try { client.Client.Shutdown(SocketShutdown.Send); } catch (SocketException) { }
             }
-            catch (Exception error) when (error is IOException or SocketException or ObjectDisposedException or OperationCanceledException) { }
+            catch (Exception error) when (error is IOException or SocketException or ObjectDisposedException or OperationCanceledException or AuthenticationException or System.Security.Cryptography.CryptographicException) { }
         }
     }
 
-    private async Task<(HttpRequest?, RequestBodyStream?)> ReadRequestAsync(NetworkStream stream, TcpClient client)
+    private async Task<(HttpRequest?, RequestBodyStream?)> ReadRequestAsync(Stream stream, TcpClient client, bool secure)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
         timeout.CancelAfter(_options.HeaderTimeoutOrDefault);
@@ -209,7 +250,7 @@ public sealed class LocalHttpServer : IAsyncDisposable
         var request = new HttpRequest
         {
             Method = requestLine[0], Path = Uri.UnescapeDataString(path), Query = ParseQuery(queryText), Headers = headers,
-            ContentLength = length, Chunked = chunked, Remote = client.Client.RemoteEndPoint as IPEndPoint, Body = body
+            ContentLength = length, Chunked = chunked, Remote = client.Client.RemoteEndPoint as IPEndPoint, IsSecure = secure, Body = body
         };
         return (request, body);
     }
@@ -233,12 +274,18 @@ public sealed class LocalHttpServer : IAsyncDisposable
         head.Append("HTTP/1.1 ").Append(response.Status.ToString(CultureInfo.InvariantCulture)).Append(' ').Append(Reason(response.Status)).Append("\r\n");
         head.Append("Date: ").Append(DateTime.UtcNow.ToString("R", CultureInfo.InvariantCulture)).Append("\r\n");
         head.Append("Content-Type: ").Append(Clean(response.ContentType)).Append("\r\n");
-        head.Append("Content-Length: ").Append(response.Body.Length.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
+        var length = response.FilePath is not null ? new FileInfo(response.FilePath).Length : response.Body.Length;
+        head.Append("Content-Length: ").Append(length.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
         head.Append("Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n");
         foreach (var (name, value) in response.Headers) head.Append(Clean(name)).Append(": ").Append(Clean(value)).Append("\r\n");
         head.Append("\r\n");
         await stream.WriteAsync(Encoding.Latin1.GetBytes(head.ToString()), token);
-        if (!headOnly && response.Body.Length > 0) await stream.WriteAsync(response.Body, token);
+        if (!headOnly && response.FilePath is not null)
+        {
+            await using var file = new FileStream(response.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 256 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await file.CopyToAsync(stream, 256 * 1024, token);
+        }
+        else if (!headOnly && response.Body.Length > 0) await stream.WriteAsync(response.Body, token);
         await stream.FlushAsync(token);
     }
 
@@ -248,7 +295,7 @@ public sealed class LocalHttpServer : IAsyncDisposable
     {
         100 => "Continue", 200 => "OK", 201 => "Created", 202 => "Accepted", 204 => "No Content", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden",
         404 => "Not Found", 405 => "Method Not Allowed", 408 => "Request Timeout", 409 => "Conflict", 411 => "Length Required", 413 => "Payload Too Large",
-        415 => "Unsupported Media Type", 422 => "Unprocessable Content", 429 => "Too Many Requests", 431 => "Request Header Fields Too Large",
+        415 => "Unsupported Media Type", 426 => "Upgrade Required", 422 => "Unprocessable Content", 429 => "Too Many Requests", 431 => "Request Header Fields Too Large",
         500 => "Internal Server Error", 501 => "Not Implemented", 503 => "Service Unavailable", 505 => "HTTP Version Not Supported", 507 => "Insufficient Storage",
         _ => "Status"
     };

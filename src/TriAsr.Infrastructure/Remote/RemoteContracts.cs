@@ -1,0 +1,43 @@
+using TriAsr.Domain;
+
+namespace TriAsr.Infrastructure;
+
+// The shapes the API speaks, shared by the server that writes them and the client that reads them, so that the two cannot drift apart.
+// On the wire they are JSON with camelCase names; the extra fields the server adds (links, notes) are ignored by the client.
+
+/// <summary>The open answer of <c>GET /v1/health</c>: enough for a client to decide whether to connect, without any credentials.</summary>
+public sealed record RemoteHealth(string Status, string Name, string Edition, string Version, bool PasswordRequired, bool Encrypted);
+
+/// <summary>What a connected client learns from <c>GET /v1/server</c>: whether this server can transcribe right now and how busy it is.</summary>
+public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued);
+
+/// <param name="State"><c>queued</c>, <c>running</c>, <c>complete</c>, <c>failed</c> or <c>cancelled</c>.</param>
+public sealed record RemoteJob(Guid Id, string State, string? Stage, int Percent, string Language, string Name, DateTimeOffset CreatedUtc, string? Error)
+{
+    public bool IsFinished => State is "complete" or "failed" or "cancelled";
+}
+
+public sealed record RemoteLanguage(string Code, string Name, bool SecondEngine);
+
+public sealed record RemoteLanguages(IReadOnlyList<RemoteLanguage> Data);
+
+public sealed record RemoteJobs(IReadOnlyList<RemoteJob> Data);
+
+/// <param name="AutomaticTexts">For each region, the text the programs produced before any manual edit (what "restore automatic result" puts back).</param>
+/// <param name="RawCanaryNote">Why there is no raw Canary text, when there is none.</param>
+public sealed record RemoteReview(Guid Id, string Language, IReadOnlyList<FinalRegion> Regions, IReadOnlyList<string> AutomaticTexts, string RawWhisper, string RawCanary, string? RawCanaryNote);
+
+public sealed record RemoteEdit(int Index, string Text);
+
+public sealed record RemoteEdits(IReadOnlyList<RemoteEdit> Edits);
+
+/// <summary>A request the server refused or could not serve. <see cref="Code"/> is the server's machine-readable code (<c>unauthorized</c>, <c>models_missing</c>...).</summary>
+public sealed class RemoteException(int status, string code, string message, Exception? inner = null) : Exception(message, inner)
+{
+    public int Status { get; } = status;
+    public string Code { get; } = code;
+    public bool IsAuthentication => Status == 401 || Code is "unauthorized" or "too_many_attempts";
+    /// <summary>The server presented a different certificate than the one that was trusted.</summary>
+    public bool IsIdentityChanged => Code == "identity_changed";
+    public bool IsUnreachable => Code == "unreachable";
+}

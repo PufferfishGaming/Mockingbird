@@ -48,12 +48,14 @@ public sealed class AuthThrottle(int maxFailures = 8, TimeSpan? window = null, T
         return CryptographicOperations.FixedTimeEquals(a, b);
     }
 
-    /// <summary>A new key: 32 random bytes, written with letters and digits only so that it can be typed or pasted anywhere.</summary>
-    public static string NewKey()
+    /// <summary>
+    /// A new password that a person can read out, type and share: three groups of four letters and digits without the ones that look alike
+    /// (<c>k7m2-pq9x-w4hd</c>), about 59 bits drawn from the system's random generator.
+    /// </summary>
+    public static string NewPassword()
     {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-        var key = new StringBuilder("mbk-");
-        for (var i = 0; i < 40; i++) key.Append(alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)]);
-        return key.ToString();
+        const string alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+        var groups = Enumerable.Range(0, 3).Select(_ => new string(Enumerable.Range(0, 4).Select(_ => alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)]).ToArray()));
+        return string.Join('-', groups);
     }
 }

@@ -54,12 +54,11 @@ public sealed partial class ShellViewModel
         return Path.GetFullPath(path).StartsWith(installRoot, StringComparison.OrdinalIgnoreCase);
     }
 
-    private AppSettings CurrentSettings() => new(SelectedTheme, SelectedDensity, AnimateErrors: AnimateErrors,
+    private AppSettings CurrentSettings() => Host.Write(new AppSettings(SelectedTheme, SelectedDensity, AnimateErrors: AnimateErrors,
         CheckForUpdates: AutoCheckUpdates, SkippedUpdateVersion: _skippedUpdateVersion, LastUpdateCheckUtc: _lastUpdateCheck, ResourceProfile: SelectedResourceProfile,
         SkipNonSpeech: SkipNonSpeech, UseCorrectionModel: UseCorrectionModel, SetupState: _setupState,
         WatchFolder: WatchFolder, WatchEnabled: WatchEnabled, WatchLanguage: WatchLanguage, WatchOutput: WatchOutput,
-        Language: LanguageChosen ? Language : "",
-        ApiEnabled: ApiEnabled, ApiPort: ApiPort == 0 ? DefaultApiPort : ApiPort, ApiAllowNetwork: ApiAllowNetwork, ApiKey: ApiKey);
+        Language: LanguageChosen ? Language : ""));
 
     private void RestoreUpdateSettings(AppSettings settings)
     {

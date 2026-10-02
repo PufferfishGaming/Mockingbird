@@ -14,113 +14,10 @@ namespace TriAsr.Ui.SmokeTests;
 /// <summary>The whole API over a real socket, with fake engines: what a client sees for uploads, progress, transcripts, errors, keys and limits.</summary>
 public sealed class ApiServiceTests
 {
-    private const string Key = "mbk-test-key-0123456789";
 
-    private sealed class MemoryRepository : IJobRepository
-    {
-        public Dictionary<Guid, TranscriptionJob> Jobs { get; } = [];
-        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SaveAsync(TranscriptionJob job, CancellationToken cancellationToken = default) { lock (Jobs) Jobs[job.Id] = job; return Task.CompletedTask; }
-        public Task<IReadOnlyList<TranscriptionJob>> ListAsync(CancellationToken cancellationToken = default) { lock (Jobs) return Task.FromResult<IReadOnlyList<TranscriptionJob>>(Jobs.Values.ToArray()); }
-    }
-
-    private sealed class FakeWorkspace(string root) : IJobWorkspace
-    {
-        public string DirectoryFor(Guid jobId) => Path.Combine(root, "Jobs", jobId.ToString("N"));
-        public Task CreateAsync(TranscriptionJob job, CancellationToken cancellationToken) { Directory.CreateDirectory(DirectoryFor(job.Id)); return Task.CompletedTask; }
-    }
-
-    private sealed class FakeAudio : IAudioNormalizer
-    {
-        public Task<AudioInfo> NormalizeAsync(string source, string destination, CancellationToken cancellationToken) => Task.FromResult(new AudioInfo(16000, 1, 16, 16000));
-    }
-
-    private sealed class FakeStages : ITranscriptionStages
-    {
-        public TaskCompletionSource? Hold;
-        public string? Fail;
-        public List<Guid> Started { get; } = [];
-        public async Task ExecuteAsync(TranscriptionJob job, JobState stage, CancellationToken token)
-        {
-            if (stage == JobState.RunningWhisper)
-            {
-                lock (Started) Started.Add(job.Id);
-                if (Hold is { } hold) await hold.Task.WaitAsync(token);
-                if (Fail is { } message) throw new InvalidOperationException(message.Replace("{source}", job.SourcePath));
-            }
-        }
-        public Task<FinalTranscript> LoadFinalAsync(Guid id, CancellationToken token = default) => throw new NotSupportedException();
-        public Task SaveManualAsync(FinalTranscript transcript, CancellationToken token = default) => throw new NotSupportedException();
-    }
-
-    private sealed class Harness : IAsyncDisposable
-    {
-        public string Root { get; } = Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));
-        public MemoryRepository Repository { get; } = new();
-        public FakeStages Stages { get; } = new();
-        public Func<string, string[]> MissingModels { get; set; } = _ => [];
-        public bool Native { get; set; } = true;
-        public string CurrentKey { get; set; } = Key;
-        public ApiService Service { get; private set; } = null!;
-        public LocalHttpServer Server { get; private set; } = null!;
-        public HttpClient Client { get; private set; } = null!;
-        public string Incoming => Path.Combine(Root, "Api", "Incoming");
-        public List<bool> Busy { get; } = [];
-
-        public static async Task<Harness> StartAsync(Action<Harness>? configure = null, Func<Harness, Task>? before = null)
-        {
-            var harness = new Harness();
-            configure?.Invoke(harness);
-            Directory.CreateDirectory(harness.Root);
-            var queue = new AudioJobQueue(harness.Repository, new FakeWorkspace(harness.Root), new FakeAudio());
-            var pipeline = new TranscriptionPipeline(harness.Repository, harness.Stages);
-            harness.Service = new ApiService(new ApiServiceDependencies(queue, pipeline, harness.Repository,
-                (id, _) => Task.FromResult(Transcript(id, harness.Native)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
-                () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); }));
-            if (before is not null) await before(harness);
-            await harness.Service.StartAsync();
-            harness.Server = new LocalHttpServer(new HttpServerOptions(System.Net.IPAddress.Loopback, 0), harness.Service.HandleAsync);
-            harness.Server.Start();
-            harness.Client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{harness.Server.Port}"), Timeout = TimeSpan.FromSeconds(60) };
-            harness.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Key);
-            return harness;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            Client.Dispose();
-            await Server.DisposeAsync();
-            await Service.DisposeAsync();
-            TestCleanup.Delete(Root);
-        }
-
-        public async Task<JsonElement> UploadAsync(string query = "?language=de&name=meeting.wav", byte[]? data = null)
-        {
-            using var response = await Client.PostAsync("/v1/transcriptions" + query, new ByteArrayContent(data ?? new byte[2048]));
-            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-            Assert.StartsWith("/v1/transcriptions/", response.Headers.Location!.OriginalString);
-            return JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.Clone();
-        }
-
-        public async Task<JsonElement> WaitAsync(string id, string until = "complete")
-        {
-            for (var i = 0; i < 200; i++)
-            {
-                var status = JsonDocument.Parse(await Client.GetStringAsync($"/v1/transcriptions/{id}")).RootElement.Clone();
-                if (status.GetProperty("state").GetString() == until) return status;
-                await Task.Delay(50);
-            }
-            throw new TimeoutException($"The job never reached {until}.");
-        }
-    }
-
-    private static FinalTranscript Transcript(Guid id, bool native) => new(id, "de",
-    [
-        new FinalRegion(0, 2500, "Guten Tag, meine Damen und Herren.", "Guten Tag meine Damen und Herren", "guten Tag, meine Damen und Herren", "agreement", NativeTimestamps: native),
-        new FinalRegion(2500, 6000, "Willkommen   zur  Sitzung .", "Willkommen zur Sitzung", "willkommen zur Sitzung", "uncertain", NativeTimestamps: native)
-    ]);
-
-    private static string Text(JsonElement element, string name) => element.GetProperty(name).GetString()!;
+    private const string Key = ApiTestData.Key;
+    private static FinalTranscript Transcript(Guid id, bool native) => ApiTestData.Transcript(id, native);
+    private static string Text(JsonElement element, string name) => ApiTestData.Text(element, name);
 
     // ---- keys ---------------------------------------------------------------------------------------------------------------------
 
@@ -161,7 +58,7 @@ public sealed class ApiServiceTests
     {
         await using var api = await Harness.StartAsync();
         Assert.Equal(HttpStatusCode.OK, (await api.Client.GetAsync("/v1/languages")).StatusCode);
-        api.CurrentKey = AuthThrottle.NewKey();   // what "New key" in Settings does
+        api.CurrentKey = AuthThrottle.NewPassword();   // what "New key" in Settings does
         Assert.Equal(HttpStatusCode.Unauthorized, (await api.Client.GetAsync("/v1/languages")).StatusCode);
         using var renewed = new HttpClient { BaseAddress = api.Client.BaseAddress };
         renewed.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", api.CurrentKey);
@@ -463,5 +360,150 @@ public sealed class ApiServiceTests
         var id = Text(await api.UploadAsync("?name=long.wav", data), "id");
         await api.WaitAsync(id);
         Assert.Equal(data, await File.ReadAllBytesAsync(api.Repository.Jobs[Guid.Parse(id)].SourcePath));
+    }
+
+    // ---- a server with no password, and what a client sees of the server ------------------------------------------------------------
+
+    [Fact]
+    public async Task WithoutAPasswordTheServerIsOpenAndSaysSo()
+    {
+        await using var api = await Harness.StartAsync(configure: h => h.CurrentKey = "");
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/v1/languages")).StatusCode);
+        var health = JsonDocument.Parse(await anonymous.GetStringAsync("/v1/health")).RootElement;
+        Assert.False(health.GetProperty("passwordRequired").GetBoolean());
+        Assert.Equal("Test server", Text(health, "name"));
+        Assert.Equal("Studio", Text(health, "edition"));
+        api.CurrentKey = "k7m2-pq9x-w4hd";
+        Assert.True(JsonDocument.Parse(await anonymous.GetStringAsync("/v1/health")).RootElement.GetProperty("passwordRequired").GetBoolean());
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/v1/languages")).StatusCode);
+    }
+
+    [Fact]
+    public async Task TheServerInfoSaysWhetherItCanTranscribeAndHowBusyItIs()
+    {
+        string[] missing = [];
+        await using var api = await Harness.StartAsync(configure: h => { h.MissingModels = _ => missing; h.Stages.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); });
+        var info = JsonDocument.Parse(await api.Client.GetStringAsync("/v1/server")).RootElement;
+        Assert.True(info.GetProperty("modelsReady").GetBoolean());
+        Assert.False(info.GetProperty("busy").GetBoolean());
+        Assert.False(info.GetProperty("encrypted").GetBoolean());
+        var first = Text(await api.UploadAsync("?name=a.wav"), "id");
+        await api.UploadAsync("?name=b.wav");
+        await api.WaitAsync(first, "running");
+        info = JsonDocument.Parse(await api.Client.GetStringAsync("/v1/server")).RootElement;
+        Assert.True(info.GetProperty("busy").GetBoolean());
+        Assert.Equal(1, info.GetProperty("queued").GetInt32());
+        api.Stages.Hold!.SetResult();
+        missing = ["Whisper large-v3"];
+        info = JsonDocument.Parse(await api.Client.GetStringAsync("/v1/server")).RootElement;
+        Assert.False(info.GetProperty("modelsReady").GetBoolean());
+        Assert.Equal("Whisper large-v3", info.GetProperty("missingModels")[0].GetString());
+    }
+
+    // ---- reviewing and editing from another computer ---------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task AFinishedTranscriptCanBeReviewedEditedAndFetchedAgain()
+    {
+        await using var api = await Harness.StartAsync();
+        var id = Text(await api.UploadAsync(), "id");
+        using (var early = await api.Client.GetAsync($"/v1/transcriptions/{Guid.NewGuid()}/review")) Assert.Equal(HttpStatusCode.NotFound, early.StatusCode);
+        await api.WaitAsync(id);
+        var review = JsonDocument.Parse(await api.Client.GetStringAsync($"/v1/transcriptions/{id}/review")).RootElement;
+        Assert.Equal("de", Text(review, "language"));
+        Assert.Equal(2, review.GetProperty("regions").GetArrayLength());
+        Assert.Equal("Guten Tag, meine Damen und Herren.", Text(review.GetProperty("regions")[0], "finalText"));
+        Assert.Equal("auto: Guten Tag, meine Damen und Herren.", review.GetProperty("automaticTexts")[0].GetString());
+        Assert.Equal("raw whisper", Text(review, "rawWhisper"));
+        Assert.Equal("raw canary", Text(review, "rawCanary"));
+
+        using var edit = await api.Client.PutAsync($"/v1/transcriptions/{id}/review",
+            new StringContent("{\"edits\":[{\"index\":1,\"text\":\"Willkommen zur Sitzung.\"},{\"index\":1,\"text\":\"Willkommen zur Sitzung, alle.\"}]}", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+        var saved = api.Saved!;
+        Assert.Equal("Guten Tag, meine Damen und Herren.", saved.Regions[0].FinalText);          // untouched
+        Assert.Equal("Willkommen zur Sitzung, alle.", saved.Regions[1].FinalText);
+        Assert.Equal("manual", saved.Regions[1].Source);
+        Assert.Equal(2, saved.Regions[1].Revisions!.Count);                                       // both edits are in the history
+
+        foreach (var body in new[] { "{\"edits\":[{\"index\":7,\"text\":\"x\"}]}", "{\"edits\":[{\"index\":-1,\"text\":\"x\"}]}", "{\"edits\":null}", "not json" })
+        {
+            using var bad = await api.Client.PutAsync($"/v1/transcriptions/{id}/review", new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task TheAudioOfAJobIsServedAsTheFileItIs()
+    {
+        await using var api = await Harness.StartAsync();
+        var id = Text(await api.UploadAsync(), "id");
+        await api.WaitAsync(id);
+        using var playback = await api.Client.GetAsync($"/v1/transcriptions/{id}/audio");
+        Assert.Equal("audio/mp4", playback.Content.Headers.ContentType!.MediaType);
+        Assert.Equal(new byte[] { 9, 8, 7 }, await playback.Content.ReadAsByteArrayAsync());
+        Assert.Equal(3, playback.Content.Headers.ContentLength);
+        using var normalized = await api.Client.GetAsync($"/v1/transcriptions/{id}/audio?kind=normalized");
+        Assert.Equal("audio/wav", normalized.Content.Headers.ContentType!.MediaType);
+        Assert.Equal(new byte[] { 1, 2, 3, 4, 5, 6 }, await normalized.Content.ReadAsByteArrayAsync());
+        using var bad = await api.Client.GetAsync($"/v1/transcriptions/{id}/audio?kind=video");
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        using var unknown = await api.Client.GetAsync($"/v1/transcriptions/{Guid.NewGuid()}/audio");
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    // ---- the client library against the real thing, encrypted ----------------------------------------------------------------------------
+
+    [Fact]
+    public async Task TheClientLibraryDoesEverythingAWindowNeedsOverAnEncryptedConnection()
+    {
+        await using var api = await Harness.StartAsync();
+        var address = new Uri($"https://127.0.0.1:{api.Server.Port}");
+        var probe = await RemoteServerClient.ProbeAsync(address, default);
+        Assert.Equal(api.Identity.Fingerprint, probe.Fingerprint);
+        Assert.True(probe.Health.PasswordRequired);
+        using var client = new RemoteServerClient(address, Key, probe.Fingerprint);
+
+        var info = await client.InfoAsync(default);
+        Assert.True(info.Encrypted);
+        Assert.True(info.ModelsReady);
+        var languages = await client.LanguagesAsync(default);
+        Assert.Equal("auto", languages[0].Code);
+        Assert.Contains(languages, language => language.Code == "hu" && language.SecondEngine);
+
+        var recording = Path.Combine(api.Root, "talk.wav");
+        await File.WriteAllBytesAsync(recording, new byte[300_000]);
+        var sent = 0L;
+        var job = await client.UploadAsync(recording, "de", new Progress<long>(bytes => sent = bytes), default);
+        Assert.Equal("talk.wav", job.Name);
+        await Task.Delay(100);
+        Assert.Equal(300_000, sent);
+        job = await client.GetAsync(job.Id, default, waitSeconds: 30);
+        Assert.Equal("complete", job.State);
+        Assert.True(job.IsFinished);
+        Assert.Single(await client.ListAsync(default));
+
+        var review = await client.ReviewAsync(job.Id, default);
+        Assert.Equal(2, review.Regions.Count);
+        Assert.Equal("raw whisper", review.RawWhisper);
+        await client.SaveEditsAsync(job.Id, [new RemoteEdit(0, "Hallo zusammen.")], default);
+        Assert.Equal("Hallo zusammen.", api.Saved!.Regions[0].FinalText);
+
+        var srt = System.Text.Encoding.UTF8.GetString(await client.ExportAsync(job.Id, "srt", "strict", default));
+        Assert.Contains("-->", srt);
+        var downloaded = Path.Combine(api.Root, "downloads", "playback.m4a");
+        var received = 0L;
+        await client.DownloadAudioAsync(job.Id, "playback", downloaded, new Progress<long>(bytes => received = bytes), default);
+        Assert.Equal(new byte[] { 9, 8, 7 }, await File.ReadAllBytesAsync(downloaded));
+        Assert.False(File.Exists(downloaded + ".part"));
+
+        var missing = await Assert.ThrowsAsync<RemoteException>(() => client.GetAsync(Guid.NewGuid(), default));
+        Assert.Equal(404, missing.Status);
+        var cancel = await client.CancelAsync(job.Id, default);
+        Assert.Equal("complete", cancel.State);                                                    // a finished job stays finished
+
+        using var wrong = new RemoteServerClient(address, "wrong", probe.Fingerprint);
+        Assert.True((await Assert.ThrowsAsync<RemoteException>(() => wrong.InfoAsync(default))).IsAuthentication);
     }
 }

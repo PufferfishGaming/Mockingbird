@@ -15,6 +15,11 @@
     <Setter Property="Padding" Value="12,13" /><Setter Property="Margin" Value="0,3" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" /><Setter Property="FocusVisualStyle" Value="{StaticResource FocusIndicator}" />
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="Body" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}"><ContentPresenter /></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Body" Property="Background" Value="{DynamicResource AccentSurfaceBrush}" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Body" Property="Background" Value="{DynamicResource SurfaceSecondaryBrush}" /></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
+  <!-- A radio button drawn as a tab: the chosen one has the accent background. -->
+  <Style x:Key="TabRadio" TargetType="RadioButton">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /><Setter Property="Cursor" Value="Hand" /><Setter Property="FocusVisualStyle" Value="{StaticResource FocusIndicator}" />
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Body" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}"><ContentPresenter /></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Body" Property="Background" Value="{DynamicResource AccentSurfaceBrush}" /></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Body" Property="Background" Value="{DynamicResource SurfaceSecondaryBrush}" /></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
   <Style TargetType="Expander">
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /><Setter Property="FocusVisualStyle" Value="{StaticResource FocusIndicator}" />
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander"><DockPanel>

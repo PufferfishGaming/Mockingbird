@@ -26,6 +26,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         new(Loc.Key("New Transcription"), Loc.Key("New transcription"), "M12,3 L12,21 M3,12 L21,12"),
         new(Loc.Key("Projects"), Loc.Key("Projects"), "M3,6 L10,6 L12,8 L21,8 L21,20 L3,20 Z"),
         new(Loc.Key("Review"), Loc.Key("Review"), "M3,12 L9,18 L21,5"),
+        new(RemoteServerPage, RemoteServerPage, "M3,5 L21,5 L21,15 L3,15 Z M8,19 L16,19 M12,15 L12,19"),
         new(Loc.Key("Models"), Loc.Key("Models"), "M12,2 L22,7 L22,17 L12,22 L2,17 L2,7 Z M2,7 L12,12 L22,7 M12,12 L12,22"),
         new(Loc.Key("Languages"), Loc.Key("Languages"), "M2,12 A10,10 0 1 0 22,12 A10,10 0 1 0 2,12 M2,12 L22,12 M12,2 C6,8 6,16 12,22 C18,16 18,8 12,2", true),
         new(Loc.Key("Backends"), Loc.Key("Backends"), "M5,5 L19,5 L19,19 L5,19 Z M8,2 L8,5 M16,2 L16,5 M8,19 L8,22 M16,19 L16,22 M2,8 L5,8 M19,8 L22,8 M2,16 L5,16 M19,16 L22,16", true),
@@ -49,6 +50,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     public bool IsJobsPage => SelectedPage?.Name == "Projects";
     public bool IsDiagnosticsPage => SelectedPage?.Name == "Diagnostics";
     public bool IsReviewPage => SelectedPage?.Name == "Review";
+    public bool IsRemotePage => SelectedPage?.Name == RemoteServerPage;
     public bool IsModelsPage => SelectedPage?.Name == "Models";
     public bool IsBenchmarkPage => SelectedPage?.Name == "Benchmark";
     [ObservableProperty] private string _diagnostics = Loc.Key("Detecting hardware…");
@@ -134,7 +136,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RestoreLanguage(settings);
         RestoreSetupSettings(settings);
         RestoreWatchSettings(settings);
-        RestoreApiSettings(settings);
+        Host.Restore(settings);
+        Servers.Start();
         if (store.LastLoadError is not null) ReportError(T("Preferences could not be restored"), T("Defaults were loaded. {0}", store.LastLoadError));
         if (runtimes.StorageLoadError is not null) ReportError(T("Saved folders could not be restored"), T("Existing model files have not been removed. Select your previous model repository in Settings. {0}", runtimes.StorageLoadError));
         SelectedPage = Navigation[0];
@@ -166,6 +169,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             if (job.Error is not null) ReportError(T("Transcription needs attention"), job.Error);
         });
         _updateJob = job => UpdateJob(null, job);
+        Host.JobChangedByApi += (_, job) => _updateJob?.Invoke(job);
         queue.JobChanged += UpdateJob;
         pipeline.JobChanged += UpdateJob;
         pipeline.ProgressChanged += (_, update) => System.Windows.Application.Current.Dispatcher.Invoke(() => ApplyTranscriptionProgress(update));
@@ -174,7 +178,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         RefreshSetupOffer();
         _initialized = true;
         if (WatchEnabled) _ = RestartWatchAsync();
-        if (ApiEnabled) _ = RestartApiAsync();
+        _ = Host.StartAsync();
     }
     public void ApplyTranscriptionProgress(TranscriptionProgress update)
     {
@@ -200,7 +204,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         OnPropertyChanged(nameof(IsNewPage));
         OnPropertyChanged(nameof(IsJobsPage));
         OnPropertyChanged(nameof(IsDiagnosticsPage));
-        OnPropertyChanged(nameof(IsReviewPage));
+        OnPropertyChanged(nameof(IsReviewPage)); OnPropertyChanged(nameof(IsRemotePage));
         OnPropertyChanged(nameof(IsModelsPage));
         OnPropertyChanged(nameof(IsBenchmarkPage));
         OnPropertyChanged(nameof(IsLanguagesPage)); OnPropertyChanged(nameof(IsBackendsPage));

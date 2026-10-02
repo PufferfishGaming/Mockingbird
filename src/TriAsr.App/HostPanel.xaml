@@ -1,0 +1,26 @@
+<UserControl x:Class="TriAsr.App.HostPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: HostViewModel. Hosting this computer's transcription for other computers and programs. -->
+  <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
+    <StackPanel>
+      <TextBlock Text="{local:T 'Host a server'}" FontSize="17" FontWeight="SemiBold" />
+      <TextBlock Text="{local:T 'Other computers send their recordings here and the speech programs run on this computer. Works while the app is open.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0" FontSize="12" />
+      <CheckBox Content="{local:T 'Host a server'}" IsChecked="{Binding Enabled}" Margin="0,14,0,0" AutomationProperties.Name="{local:T 'Host a server'}" />
+      <TextBlock Text="{local:T 'Server name'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
+      <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Padding="8" AutomationProperties.Name="{local:T 'Server name'}" ToolTip="{local:T 'How this server appears to other computers. Empty uses the name of this computer.'}" />
+      <TextBlock Text="{local:T 'Password (optional)'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
+      <TextBox Text="{Binding Password, UpdateSourceTrigger=LostFocus}" Padding="8" FontFamily="Consolas" AutomationProperties.Name="{local:T 'Password (optional)'}" ToolTip="{local:T 'Without a password anyone who can reach this server may use it. Share the password only with the people who should.'}" />
+      <WrapPanel Margin="0,8,0,0"><Button Content="{local:T 'Make a password'}" Command="{Binding GeneratePasswordCommand}" Padding="10,6" /><Button Content="{local:T 'No password'}" Command="{Binding ClearPasswordCommand}" Padding="10,6" Margin="8,0,0,0" /></WrapPanel>
+      <CheckBox Content="{local:T 'Reachable from other computers on the network'}" IsChecked="{Binding AllowNetwork}" Margin="0,14,0,0" AutomationProperties.Name="{local:T 'Reachable from other computers on the network'}" ToolTip="{local:T 'Without this only programs on this computer can connect. With it the server announces itself on the network and every connection is encrypted. Windows may ask once whether to allow it.'}" />
+      <TextBlock Text="{local:T 'Port'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
+      <TextBox Text="{Binding PortText, UpdateSourceTrigger=LostFocus}" Width="100" HorizontalAlignment="Left" Padding="8" AutomationProperties.Name="{local:T 'Port'}" />
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,14,0,0" FontSize="12" />
+      <WrapPanel Margin="0,8,0,0"><Button Content="{local:T 'Copy address'}" Command="{Binding CopyAddressCommand}" Padding="10,6" /></WrapPanel>
+      <StackPanel Visibility="{Binding HasFingerprint, Converter={StaticResource BoolVisibility}}">
+        <TextBlock Text="{local:T 'Identity'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" ToolTip="{local:T 'Computers that connect for the first time are shown this fingerprint and should check that it matches. If it ever changes without your doing, do not connect.'}" />
+        <TextBlock Text="{Binding Fingerprint}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />
+        <WrapPanel Margin="0,8,0,0"><Button Content="{local:T 'Copy'}" Command="{Binding CopyFingerprintCommand}" Padding="10,6" /><Button Content="{local:T 'New identity'}" Command="{Binding NewIdentityCommand}" Padding="10,6" Margin="8,0,0,0" ToolTip="{local:T 'Makes a new certificate. Computers that trusted the old one will ask again.'}" /></WrapPanel>
+      </StackPanel>
+      <Expander Header="{local:T 'Try it from a terminal'}" Margin="0,14,0,0"><TextBox Text="{Binding Example, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" Padding="8" Margin="0,8,0,0" AutomationProperties.Name="{local:T 'Example commands'}" /></Expander>
+    </StackPanel>
+  </Border>
+</UserControl>

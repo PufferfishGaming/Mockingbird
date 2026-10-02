@@ -1,0 +1,26 @@
+<UserControl x:Class="TriAsr.App.ServerListPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: ServerBrowserViewModel. The servers on the network and the one this window is connected to. -->
+  <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
+    <StackPanel>
+      <TextBlock Text="{local:T 'Servers on your network'}" FontSize="17" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Status}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0" />
+      <ListBox ItemsSource="{Binding Servers}" SelectedItem="{Binding Selected}" MinHeight="70" MaxHeight="260" Margin="0,12,0,0" AutomationProperties.Name="{local:T 'Servers on your network'}">
+        <ListBox.ItemTemplate><DataTemplate><StackPanel>
+          <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Text="●" Foreground="{DynamicResource AccentBrush}" Margin="8,0,0,0" ToolTip="{local:T 'Connected'}" Visibility="{Binding IsConnected, Converter={StaticResource BoolVisibility}}" /></StackPanel>
+          <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0" />
+        </StackPanel></DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock Text="{local:T 'No server found yet. A server shows up here when it is hosted on this network with network access allowed. You can also add one by its address.'}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding IsEmpty, Converter={StaticResource BoolVisibility}}" />
+      <WrapPanel Margin="0,12,0,0">
+        <Button Content="{local:T 'Connect'}" Command="{Binding ConnectSelectedCommand}" Padding="12,6" />
+        <Button Content="{local:T 'Disconnect'}" Command="{Binding DisconnectCommand}" Padding="12,6" Margin="8,0,0,0" Visibility="{Binding HasConnection, Converter={StaticResource BoolVisibility}}" />
+        <Button Content="{local:T 'Forget'}" Command="{Binding ForgetCommand}" Padding="12,6" Margin="8,0,0,0" ToolTip="{local:T 'Forgets the trusted identity and the remembered password of the selected server.'}" />
+      </WrapPanel>
+      <TextBlock Text="{local:T 'Add a server by address'}" FontWeight="SemiBold" FontSize="12" Margin="0,16,0,6" />
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <TextBox Text="{Binding AddressText, UpdateSourceTrigger=PropertyChanged}" Padding="8" AutomationProperties.Name="{local:T 'Address of a server'}" ToolTip="{local:T 'For example 192.168.1.20 or kitchen:8642'}" />
+        <Button Grid.Column="1" Content="{local:T 'Add'}" Command="{Binding AddCommand}" Padding="12,6" Margin="8,0,0,0" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

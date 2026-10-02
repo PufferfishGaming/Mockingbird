@@ -10,7 +10,7 @@ public sealed record AppSettings(string Theme = "System", string Density = "Comf
     bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto",
     bool SkipNonSpeech = false, bool UseCorrectionModel = true, string SetupState = SetupPlan.Pending,
     string WatchFolder = "", bool WatchEnabled = false, string WatchLanguage = "auto", string WatchOutput = "Text (.txt)", string Language = "",
-    bool ApiEnabled = false, int ApiPort = 8642, bool ApiAllowNetwork = false, string ApiKey = "")
+    bool HostEnabled = false, string HostName = "", int HostPort = 8642, bool HostAllowNetwork = false, string HostPassword = "", string HostId = "")
 {
     public const int CurrentVersion = 2;
 }
@@ -43,8 +43,10 @@ public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> lo
                 WatchFolder = settings.WatchFolder ?? "",
                 WatchLanguage = string.IsNullOrWhiteSpace(settings.WatchLanguage) ? "auto" : settings.WatchLanguage,
                 WatchOutput = settings.WatchOutput is "Text (.txt)" or "Subtitles (.srt)" or "Project only" ? settings.WatchOutput : "Text (.txt)",
-                ApiPort = settings.ApiPort is >= 1024 and <= 65535 ? settings.ApiPort : 8642,
-                ApiKey = settings.ApiKey ?? ""
+                HostName = settings.HostName ?? "",
+                HostPort = settings.HostPort is >= 1024 and <= 65535 ? settings.HostPort : 8642,
+                HostPassword = settings.HostPassword ?? "",
+                HostId = settings.HostId ?? ""
             };
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)

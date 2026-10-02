@@ -13,13 +13,23 @@ namespace TriAsr.App;
 /// <summary>What the API needs from the program. Everything is passed in so that tests can run the whole API with fake engines.</summary>
 /// <param name="IncomingFolder">Where uploads are kept. A job whose source lies here was sent through the API; only those are visible to the API.</param>
 /// <param name="ExportFolder">Scratch space for building a transcript file in a requested format.</param>
-/// <param name="GetKey">The API key, read for every request so that a new key takes effect at once.</param>
+/// <param name="GetPassword">The password, read for every request so that a new one takes effect at once. Empty means the server is open to anyone who can reach it.</param>
+/// <param name="GetName">The name the server goes by on the network.</param>
+/// <param name="Edition">Studio or Server.</param>
+/// <param name="LoadReview">The transcript as reviewed and as the programs wrote it, with the raw engine texts, for the remote review page.</param>
+/// <param name="SaveReview">Stores an edited transcript.</param>
+/// <param name="AudioPath">The file of a job's audio (<c>playback</c> or <c>normalized</c>), or null.</param>
 /// <param name="MissingModels">Names of the speech models a language still needs; empty when it can run.</param>
 /// <param name="CanRun">False while the program is busy with something that must not overlap (model download, tuning, setup).</param>
 /// <param name="BusyChanged">Told when the API starts and stops working on a job.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
-    Func<string> GetKey, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged);
+    Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
+    Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
+    Func<Guid, string, string?> AudioPath);
+
+/// <summary>Everything the remote review page needs about a finished job.</summary>
+public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
 
 /// <summary>
 /// The program's HTTP API (ADR-0013): upload a recording, follow its progress, fetch the transcript, and an OpenAI-compatible
@@ -123,13 +133,18 @@ public sealed class ApiService : IAsyncDisposable
     {
         var segments = request.Path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length == 0) return request.Method == "GET" ? RootPage() : MethodNotAllowed("GET");
-        if (segments is ["v1", "health"]) return request.Method == "GET" ? HttpResponse.Json(200, new { status = "ok", name = "Mockingbird Studio", version = _deps.Version }) : MethodNotAllowed("GET");
+        if (segments is ["v1", "health"])
+            return request.Method == "GET"
+                ? HttpResponse.Json(200, new RemoteHealth("ok", _deps.GetName(), _deps.Edition, _deps.Version, _deps.GetPassword().Length > 0, request.IsSecure))
+                : MethodNotAllowed("GET");
         if (segments[0] != "v1") return NotFound();
 
-        if (await CheckKeyAsync(request) is { } refusal) return refusal;
+        if (await CheckPasswordAsync(request) is { } refusal) return refusal;
 
         switch (segments)
         {
+            case ["v1", "server"]:
+                return request.Method == "GET" ? Info(request) : MethodNotAllowed("GET");
             case ["v1", "models"]:
                 return request.Method == "GET" ? HttpResponse.Json(200, new { @object = "list", data = new[] { new { id = "mockingbird-studio", @object = "model", owned_by = "local" } } }) : MethodNotAllowed("GET");
             case ["v1", "languages"]:
@@ -142,6 +157,10 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "GET" ? await TranscriptAsync(id, request, token) : MethodNotAllowed("GET");
             case ["v1", "transcriptions", var id, "cancel"]:
                 return request.Method == "POST" ? await CancelAsync(id) : MethodNotAllowed("POST");
+            case ["v1", "transcriptions", var id, "review"]:
+                return request.Method switch { "GET" => await ReviewAsync(id, token), "PUT" => await SaveEditsAsync(id, request, token), _ => MethodNotAllowed("GET, PUT") };
+            case ["v1", "transcriptions", var id, "audio"]:
+                return request.Method is "GET" or "HEAD" ? Audio(id, request) : MethodNotAllowed("GET");
             case ["v1", "audio", "transcriptions"]:
                 return request.Method == "POST" ? await OpenAiTranscriptionAsync(request, token) : MethodNotAllowed("POST");
             default:
@@ -153,25 +172,27 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird Studio {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no key needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nSend the key as \"Authorization: Bearer <key>\".\n");
+        $"Mockingbird Studio {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no key needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nSend the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
-    // ---- the key ----------------------------------------------------------------------------------------------------------------------
+    // ---- the password -----------------------------------------------------------------------------------------------------------------
 
-    private async Task<HttpResponse?> CheckKeyAsync(HttpRequest request)
+    private async Task<HttpResponse?> CheckPasswordAsync(HttpRequest request)
     {
+        var expected = _deps.GetPassword();
+        if (expected.Length == 0) return null; // the owner chose a server that anyone who can reach it may use
         var address = request.Remote?.Address is { } remote ? (remote.IsIPv4MappedToIPv6 ? remote.MapToIPv4() : remote).ToString() : "unknown";
         if (_throttle.IsBlocked(address))
-            return HttpResponse.Error(429, "too_many_attempts", "Too many wrong keys from this address. Try again in a minute.").With("Retry-After", "60");
+            return HttpResponse.Error(429, "too_many_attempts", "Too many wrong passwords from this address. Try again in a minute.").With("Retry-After", "60");
         var given = request.Header("X-Api-Key");
         if (request.Header("Authorization") is { } header && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) given = header[7..].Trim();
-        if (AuthThrottle.SecretsEqual(given, _deps.GetKey()))
+        if (AuthThrottle.SecretsEqual(given, expected))
         {
             _throttle.RecordSuccess(address);
             return null;
         }
         _throttle.RecordFailure(address);
         await Task.Delay(250); // guessing is slow even before the lockout
-        return HttpResponse.Error(401, "unauthorized", "The API key is missing or wrong. Send it as \"Authorization: Bearer <key>\".").With("WWW-Authenticate", "Bearer");
+        return HttpResponse.Error(401, "unauthorized", "The password is missing or wrong. Send it as \"Authorization: Bearer <password>\".").With("WWW-Authenticate", "Bearer");
     }
 
     // ---- uploads ----------------------------------------------------------------------------------------------------------------------
@@ -349,6 +370,61 @@ public sealed class ApiService : IAsyncDisposable
         data = LanguageCatalog.All.Select(language => new { code = language.Code, name = language.Name, secondEngine = language.DualEngine }).Prepend(new { code = "auto", name = "Detect the language", secondEngine = false }).ToArray(),
         note = "secondEngine: Canary also transcribes this language and the two results are compared."
     });
+
+    private HttpResponse Info(HttpRequest request)
+    {
+        var missing = _deps.MissingModels("auto");
+        return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, _deps.GetPassword().Length > 0,
+            missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job.Job.State) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued)));
+    }
+
+    private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)
+    {
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        if (entry.Job.State != JobState.Complete) return HttpResponse.Error(409, "not_ready", $"The transcription is {StateName(entry.Job.State)}; it can be reviewed once it is complete.");
+        var bundle = await _deps.LoadReview(entry.Id, token);
+        return HttpResponse.Json(200, new RemoteReview(entry.Id, bundle.Review.Language, bundle.Review.Regions, bundle.Automatic.Regions.Select(region => region.FinalText).ToArray(),
+            bundle.RawWhisper, bundle.RawCanary, bundle.RawCanaryNote));
+    }
+
+    private async Task<HttpResponse> SaveEditsAsync(string id, HttpRequest request, CancellationToken token)
+    {
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        if (entry.Job.State != JobState.Complete) return HttpResponse.Error(409, "not_ready", "Only a finished transcription can be edited.");
+        if (request.ContentLength > 8 * 1024 * 1024) return HttpResponse.Error(413, "payload_too_large", "The edits are too large.");
+        // Read at most 8 MB, whether the client announced the length or sent the body in chunks.
+        using var buffer = new MemoryStream();
+        var piece = new byte[64 * 1024]; int read;
+        while ((read = await request.Body.ReadAsync(piece, token)) > 0)
+        {
+            if (buffer.Length + read > 8 * 1024 * 1024) return HttpResponse.Error(413, "payload_too_large", "The edits are too large.");
+            buffer.Write(piece, 0, read);
+        }
+        RemoteEdits? edits;
+        try { edits = System.Text.Json.JsonSerializer.Deserialize<RemoteEdits>(buffer.ToArray(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)); }
+        catch (System.Text.Json.JsonException) { return HttpResponse.Error(400, "bad_json", "The edits are not valid JSON."); }
+        if (edits?.Edits is not { } list) return HttpResponse.Error(400, "bad_json", "The edits are missing.");
+        var review = (await _deps.LoadReview(entry.Id, token)).Review;
+        var regions = review.Regions.ToList();
+        foreach (var edit in list)
+        {
+            if (edit.Index < 0 || edit.Index >= regions.Count || edit.Text is null || edit.Text.Length > 50_000)
+                return HttpResponse.Error(400, "bad_edit", "An edit names a region that does not exist, or its text is missing or too long.");
+            regions[edit.Index] = ReviewRegion.WithEdit(regions[edit.Index], edit.Text);
+        }
+        await _deps.SaveReview(review with { Regions = regions }, token);
+        return HttpResponse.Json(200, new { saved = list.Count });
+    }
+
+    private HttpResponse Audio(string id, HttpRequest request)
+    {
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        var kind = (request.Query.GetValueOrDefault("kind") ?? "playback").ToLowerInvariant();
+        if (kind is not ("playback" or "normalized")) return HttpResponse.Error(400, "bad_kind", "kind must be playback or normalized.");
+        var path = _deps.AudioPath(entry.Id, kind);
+        if (path is null || !File.Exists(path)) return HttpResponse.Error(404, "not_found", "That audio is not available (yet).");
+        return HttpResponse.File(path, Path.GetExtension(path).ToLowerInvariant() == ".m4a" ? "audio/mp4" : "audio/wav");
+    }
 
     private bool TryFind(string text, out ApiJob entry)
     {

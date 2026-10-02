@@ -95,25 +95,13 @@ public static class ShellSmoke
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 if (FindText(window, Loc.T(page.Title)) is null) throw new InvalidOperationException($"The title of {name} is not shown in {language.Code}.");
                 if (FindText(window, Loc.T("Settings")) is null) throw new InvalidOperationException($"The sidebar is not shown in {language.Code}.");
+                if (FindText(window, Loc.T("Host a server")) is null) throw new InvalidOperationException($"The server panel is not shown in {language.Code}.");
                 if (name == "New Transcription" && FindText(window, Loc.T("Select file")) is null) throw new InvalidOperationException($"The buttons are not shown in {language.Code}.");
                 Capture(window, Path.Combine(output, $"lang-{language.Code}-{name.Replace(' ', '-')}.png"), 1220, 1100, 1);
                 count++;
             }
         }
         foreach (var region in regions) shell.Regions.Remove(region);
-        // The end of Settings, where the Network API card is, in every language (it holds long texts, a key and buttons).
-        foreach (var language in Loc.Languages)
-        {
-            shell.Language = language.Code;
-            shell.SelectedPage = shell.Navigation.First(item => item.Name == "Settings");
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            if (FindText(window, Loc.T("Network API")) is null) throw new InvalidOperationException($"The Network API card is not shown in {language.Code}.");
-            window.ContentScroll.ScrollToBottom();
-            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            Capture(window, Path.Combine(output, $"lang-{language.Code}-Settings-end.png"), 1220, 1100, 1);
-            window.ContentScroll.ScrollToTop();
-            count++;
-        }
         // The window that asks for the language on the first start, at the height it really takes.
         var chooser = new LanguageChoiceWindow(Loc.Detect()) { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000 };
         chooser.Show();
@@ -140,12 +128,15 @@ public static class ShellSmoke
         shell.ShowAdvanced = false;
         shell.SelectedPage = shell.Navigation[0];
         foreach (var page in shell.Navigation)
+        {
+            if (page.Name == ShellViewModel.RemoteServerPage) { if (await ListedAsync(page)) throw new InvalidOperationException("The remote server page is listed without a connection."); continue; }
             if (await ListedAsync(page) == page.Advanced) throw new InvalidOperationException($"Sidebar entry {page.Name} has the wrong visibility while Advanced is closed.");
+        }
         shell.SelectedPage = advanced[0];
         if (!await ListedAsync(advanced[0])) throw new InvalidOperationException("The open advanced page disappeared from the sidebar.");
         shell.SelectedPage = shell.Navigation[0];
         shell.ShowAdvanced = true;
-        foreach (var page in shell.Navigation)
+        foreach (var page in shell.Navigation.Where(page => page.Name != ShellViewModel.RemoteServerPage))
             if (!await ListedAsync(page)) throw new InvalidOperationException($"Sidebar entry {page.Name} is hidden while Advanced is open.");
         shell.ShowAdvanced = false;
     }

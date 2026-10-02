@@ -21,11 +21,14 @@ public sealed partial class ReviewRegion(FinalRegion original, string? machineTe
         (Original.Warnings?.Count > 0 ? "\n" + string.Join("\n", Original.Warnings.Select(Loc.T)) : "");
     /// <summary>The texts built from the interface language are read again after the language changes.</summary>
     public void NotifyLanguageChanged() { OnPropertyChanged(nameof(Time)); OnPropertyChanged(nameof(CanaryHeading)); OnPropertyChanged(nameof(Evidence)); }
-    public FinalRegion Snapshot()
+    public FinalRegion Snapshot() => WithEdit(Original, Text);
+
+    /// <summary>A region with its text edited: the old text is kept in the revisions and the source becomes "manual". The same text changes nothing.</summary>
+    public static FinalRegion WithEdit(FinalRegion region, string text)
     {
-        if (Text == Original.FinalText) return Original;
-        var revisions = (Original.Revisions ?? []).Append(new ManualRevision(DateTimeOffset.UtcNow, Original.FinalText, Text)).ToArray();
-        return Original with { FinalText = Text, Source = "manual", Revisions = revisions };
+        if (text == region.FinalText) return region;
+        var revisions = (region.Revisions ?? []).Append(new ManualRevision(DateTimeOffset.UtcNow, region.FinalText, text)).ToArray();
+        return region with { FinalText = text, Source = "manual", Revisions = revisions };
     }
     public void AcceptSaved() { Original = Snapshot(); OnPropertyChanged(nameof(Source)); OnPropertyChanged(nameof(Evidence)); OnPropertyChanged(nameof(IsUncertain)); }
 }
