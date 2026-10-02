@@ -357,6 +357,7 @@ public sealed class HostTests
             Assert.Contains("Authorization: Bearer k7m2-pq9x-w4hd", shell.Host.Example);
             Assert.Contains("http://127.0.0.1:8642/v1/transcriptions", shell.Host.Example);
             Assert.Contains("/v1/audio/transcriptions", shell.Host.Example);
+            Assert.Contains("/v1/links", shell.Host.Example);                            // links need a password, so the example appears with one
             shell.Host.AllowNetwork = true;
             Assert.Contains("curl.exe -k", shell.Host.Example);                          // the certificate is the server's own
             Assert.Contains("https://", shell.Host.Example);

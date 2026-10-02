@@ -13,6 +13,8 @@ public sealed class TranscriptionProgressTracker(Guid jobId)
     private readonly HashSet<JobState> _completed = [];
     private string _stage = "Preparing transcription";
     private bool _running = true;
+    /// <summary>What a recording on a server is doing while the sound of its link is downloaded, before any stage of the transcription (ADR-0018).</summary>
+    public const string LinkStage = "Downloading the link";
     public static string StageName(JobState stage) => stage switch
     {
         JobState.Preprocessing => "Preparing audio", JobState.DetectingLanguage => "Detecting language",

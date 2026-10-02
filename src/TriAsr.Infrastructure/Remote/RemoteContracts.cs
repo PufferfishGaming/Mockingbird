@@ -9,7 +9,13 @@ namespace TriAsr.Infrastructure;
 public sealed record RemoteHealth(string Status, string Name, string Edition, string Version, bool PasswordRequired, bool Encrypted);
 
 /// <summary>What a connected client learns from <c>GET /v1/server</c>: whether this server can transcribe right now and how busy it is.</summary>
-public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued);
+/// <param name="LinksEnabled">The server fetches links for the computers that use it. It does so only when it has a password (ADR-0018).</param>
+/// <param name="LinkPages">The server can also fetch the sound of web pages, not only of links straight to a file: its link helper is installed.</param>
+public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
+    bool LinksEnabled = false, bool LinkPages = false);
+
+/// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
+public sealed record RemoteLinkRequest(string Url, string? Language);
 
 /// <param name="State"><c>queued</c>, <c>running</c>, <c>complete</c>, <c>failed</c> or <c>cancelled</c>.</param>
 public sealed record RemoteJob(Guid Id, string State, string? Stage, int Percent, string Language, string Name, DateTimeOffset CreatedUtc, string? Error)

@@ -137,6 +137,14 @@ public sealed class RemoteServerClient : IDisposable
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }
 
+    /// <summary>Asks the server to fetch the sound of a web address and transcribe it. The server downloads it; nothing is downloaded here.</summary>
+    public async Task<RemoteJob> SendLinkAsync(string url, string language, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/links") { Content = JsonContent.Create(new RemoteLinkRequest(url, language), options: Json) };
+        using var response = await SendAsync(request, 60, token);
+        return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
+    }
+
     public Task<RemoteReview> ReviewAsync(Guid id, CancellationToken token) => GetAsync<RemoteReview>($"/v1/transcriptions/{id}/review", token);
 
     public async Task SaveEditsAsync(Guid id, IReadOnlyList<RemoteEdit> edits, CancellationToken token)

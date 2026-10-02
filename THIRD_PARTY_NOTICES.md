@@ -13,6 +13,7 @@ Mockingbird Studio's own license does not replace dependency licenses.
 | Microsoft Visual C++ runtime | https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files | App-local DLLs; redistribution terms require review |
 | NuGet dependencies | Directory.Packages.props and package lock files | Package metadata inventory generated; complete notice review required |
 | Whisper / Canary / Qwen model weights | Pinned URLs in ModelStore.cs | Not bundled; respective model licenses apply to downloads |
+| yt-dlp (optional link helper) | https://github.com/yt-dlp/yt-dlp | Not bundled and not installed with Mockingbird. Downloaded on request from the project's latest release and checked against the SHA-256 published with it; the project's own code is under the Unlicense and its standalone build carries its own third-party notices; see ADR-0018 |
 
 The current notice inventory is not a completed redistribution bundle. See docs/PRE_RELEASE_CHECKLIST.md. FFmpeg requirements: https://ffmpeg.org/legal.html.
 

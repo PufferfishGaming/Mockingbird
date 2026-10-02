@@ -22,14 +22,17 @@ public static class EditionSmoke
         }
         chooseLanguage(Loc.English);
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-        // The lower part of the page, which does not fit in the window.
+        // The middle of the page (the Server edition's host panel has its Links part there), and then the lower part, which does not fit in the window.
+        foreach (var scroller in Scrollers(window).Where(item => item.ScrollableHeight > 0)) scroller.ScrollToVerticalOffset(scroller.ScrollableHeight * 0.4);
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        ShellSmoke.Capture(window, Path.Combine(output, $"{Edition.Label.ToLowerInvariant()}-middle.png"), window.Width, window.Height, 1);
         foreach (var scroller in Scrollers(window).Where(item => item.ScrollableHeight > 0)) scroller.ScrollToEnd();
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         ShellSmoke.Capture(window, Path.Combine(output, $"{Edition.Label.ToLowerInvariant()}-end.png"), window.Width, window.Height, 1);
         return count + 1;
     }
 
-    private static IEnumerable<System.Windows.Controls.ScrollViewer> Scrollers(DependencyObject parent)
+    internal static IEnumerable<System.Windows.Controls.ScrollViewer> Scrollers(DependencyObject parent)
     {
         for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++)
         {

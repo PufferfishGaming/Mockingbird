@@ -22,11 +22,12 @@ namespace TriAsr.App;
 /// <param name="MissingModels">Names of the speech models a language still needs; empty when it can run.</param>
 /// <param name="CanRun">False while the program is busy with something that must not overlap (model download, tuning, setup).</param>
 /// <param name="BusyChanged">Told when the API starts and stops working on a job.</param>
+/// <param name="Links">Fetches the sound of a web address for <c>POST /v1/links</c> (ADR-0018). Null: this server does not fetch links.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
-    Func<Guid, string, string?> AudioPath);
+    Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null);
 
 /// <summary>Everything the remote review page needs about a finished job.</summary>
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
@@ -43,8 +44,11 @@ public sealed class ApiService : IAsyncDisposable
     private sealed class ApiJob(TranscriptionJob job, string name)
     {
         public Guid Id { get; } = job.Id;
-        public string Name { get; } = name;
+        public string Name { get; set; } = name;
         public TranscriptionJob Job { get; set; } = job;
+        /// <summary>A link whose sound is still being fetched: the job exists only here (as queued) until the file has arrived and the real job is made with this id (ADR-0018).</summary>
+        public bool Fetching { get; set; }
+        public double FetchPercent { get; set; }
         public TranscriptionProgress? Progress { get; set; }
         public CancellationTokenSource? Running { get; set; }
         public bool CancelRequested { get; set; }
@@ -153,6 +157,8 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "GET" ? Languages() : MethodNotAllowed("GET");
             case ["v1", "transcriptions"]:
                 return request.Method switch { "POST" => await UploadAsync(request, token), "GET" => List(), _ => MethodNotAllowed("GET, POST") };
+            case ["v1", "links"]:
+                return request.Method == "POST" ? await LinkAsync(request, token) : MethodNotAllowed("POST");
             case ["v1", "transcriptions", var id]:
                 return request.Method == "GET" ? await StatusAsync(id, request, token) : MethodNotAllowed("GET");
             case ["v1", "transcriptions", var id, "transcript"]:
@@ -174,7 +180,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- who the request is for -------------------------------------------------------------------------------------------------------
 
@@ -261,18 +267,23 @@ public sealed class ApiService : IAsyncDisposable
         try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
     }
 
-    private async Task<(ApiJob? Job, HttpResponse? Refusal)> StartJobAsync(string path, string name, string language, CancellationToken token)
+    /// <summary>Why a new recording cannot be taken now (speech models missing, too many waiting), or null.</summary>
+    private HttpResponse? CannotStart(string language)
     {
         var missing = _deps.MissingModels(language);
         if (missing.Length > 0)
-        {
-            DeleteFolder(Path.GetDirectoryName(path)!);
-            return (null, HttpResponse.Json(409, new { error = new { code = "models_missing", message = "The speech models for this language are not downloaded yet. Download them in the Models page of the app.", type = "invalid_request_error" }, missing }));
-        }
+            return HttpResponse.Json(409, new { error = new { code = "models_missing", message = "The speech models for this language are not downloaded yet. Download them in the Models page of the app.", type = "invalid_request_error" }, missing });
         if (_jobs.Values.Count(job => job.Job.State is JobState.Queued) >= MaxPendingJobs)
+            return HttpResponse.Error(429, "queue_full", "Too many recordings are waiting. Try again when some are done.").With("Retry-After", "60");
+        return null;
+    }
+
+    private async Task<(ApiJob? Job, HttpResponse? Refusal)> StartJobAsync(string path, string name, string language, CancellationToken token)
+    {
+        if (CannotStart(language) is { } refusal)
         {
             DeleteFolder(Path.GetDirectoryName(path)!);
-            return (null, HttpResponse.Error(429, "queue_full", "Too many recordings are waiting. Try again when some are done.").With("Retry-After", "60"));
+            return (null, refusal);
         }
         var job = await _deps.Queue.EnqueueAsync(path, language, token);
         var entry = new ApiJob(job, name);
@@ -290,6 +301,87 @@ public sealed class ApiService : IAsyncDisposable
         var (job, refusal) = await StartJobAsync(upload.Path, upload.Name, language, token);
         if (refusal is not null) return refusal;
         return HttpResponse.Json(202, Describe(job!)).With("Location", $"/v1/transcriptions/{job!.Id}");
+    }
+
+    // ---- links ------------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// <c>POST /v1/links</c> {"url", "language"}: this server downloads the sound of a web address and transcribes it (ADR-0018). Only a server with a password
+    /// does this, because it makes the server fetch what a client names. The address is checked at once (public hosts only); the download runs in the background
+    /// and the job is listed as running while it does.
+    /// </summary>
+    private async Task<HttpResponse> LinkAsync(HttpRequest request, CancellationToken token)
+    {
+        if (_deps.Links is null) return HttpResponse.Error(501, "links_unavailable", "This server does not fetch links.");
+        if (_deps.GetPassword().Length == 0)
+            return HttpResponse.Error(403, "links_need_password", "This server has no password, so it does not fetch links for other computers. Set a password on the server to allow it.");
+        if (request.ContentLength > MaxLinkBody) return HttpResponse.Error(413, "payload_too_large", "The request is too large.");
+        using var buffer = new MemoryStream();
+        var piece = new byte[4096]; int read;
+        while ((read = await request.Body.ReadAsync(piece, token)) > 0)
+        {
+            if (buffer.Length + read > MaxLinkBody) return HttpResponse.Error(413, "payload_too_large", "The request is too large.");
+            buffer.Write(piece, 0, read);
+        }
+        RemoteLinkRequest? body;
+        try { body = System.Text.Json.JsonSerializer.Deserialize<RemoteLinkRequest>(buffer.ToArray(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)); }
+        catch (System.Text.Json.JsonException) { return HttpResponse.Error(400, "bad_json", "Send JSON like {\"url\": \"https://…\", \"language\": \"auto\"}."); }
+        if (body is null) return HttpResponse.Error(400, "bad_json", "Send JSON like {\"url\": \"https://…\", \"language\": \"auto\"}.");
+        if (LanguageProblem(body.Language, out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        Uri link;
+        try
+        {
+            link = LinkPolicy.Parse(body.Url);
+            await _deps.Links.CheckAsync(link, allowPrivateNetwork: false, token);
+        }
+        catch (LinkException error) { return HttpResponse.Error(400, "invalid_link", error.Message); }
+        if (CannotStart(language) is { } refusal) return refusal;
+
+        var id = Guid.NewGuid();
+        var folder = Path.Combine(_deps.IncomingFolder, id.ToString("N"));
+        var entry = new ApiJob(new TranscriptionJob(id, Path.Combine(folder, "link"), language, JobState.Queued, DateTimeOffset.UtcNow), link.IdnHost) { Fetching = true };
+        var running = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+        entry.Running = running;
+        _jobs[id] = entry;
+        _ = Task.Run(() => FetchLinkAsync(entry, link, folder, running));
+        return HttpResponse.Json(202, Describe(entry)).With("Location", $"/v1/transcriptions/{id}");
+    }
+
+    private const int MaxLinkBody = 16 * 1024;
+
+    /// <summary>Downloads the sound of a link, then makes the real job (with the id already given out) and queues it. A failure ends the entry with the reason.</summary>
+    private async Task FetchLinkAsync(ApiJob entry, Uri link, string folder, CancellationTokenSource running)
+    {
+        try
+        {
+            var fetched = await _deps.Links!.FetchAsync(link, folder, new LinkFetchOptions(AllowPrivateNetwork: false),
+                new Progress<double>(value => entry.FetchPercent = value), running.Token);
+            running.Token.ThrowIfCancellationRequested();
+            var job = await _deps.Queue.EnqueueAsync(fetched.Path, entry.Job.Language, running.Token, entry.Id);
+            entry.Name = Path.GetFileName(fetched.Path);
+            entry.Job = job;
+            entry.Fetching = false;
+            entry.Running = null;
+            _queue.Writer.TryWrite(job.Id);
+        }
+        catch (OperationCanceledException) { EndFetch(entry, folder, JobState.Cancelled, null); }
+        catch (LinkException error) { EndFetch(entry, folder, JobState.Failed, error.Message); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Net.Http.HttpRequestException or InvalidOperationException)
+        {
+            EndFetch(entry, folder, JobState.Failed, "The link could not be downloaded.");
+        }
+        finally
+        {
+            entry.Running = null;
+            running.Dispose();
+        }
+    }
+
+    private void EndFetch(ApiJob entry, string folder, JobState state, string? error)
+    {
+        entry.Job = entry.Job with { State = state, Error = error };
+        entry.Fetching = false;
+        DeleteFolder(folder);
     }
 
     private async Task<HttpResponse> OpenAiTranscriptionAsync(HttpRequest request, CancellationToken token)
@@ -360,13 +452,22 @@ public sealed class ApiService : IAsyncDisposable
     /// <summary>An error message without the location of the upload on this computer.</summary>
     private string Plain(string message) => message.Replace(Path.GetFullPath(_deps.IncomingFolder), "<uploads>", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>A link that is still being fetched counts as running: the server is working on it.</summary>
+    private static string StateName(ApiJob entry) => entry.Fetching ? "running" : StateName(entry.Job.State);
+
     private object Describe(ApiJob entry)
     {
-        var job = entry.Job; var state = StateName(job.State);
-        var percent = state switch { "complete" => 100, "running" when entry.Progress is { } progress => (int)Math.Round(progress.Percent), _ => 0 };
+        var job = entry.Job; var state = StateName(entry);
+        var percent = state switch
+        {
+            "complete" => 100,
+            "running" when entry.Fetching => (int)Math.Round(entry.FetchPercent),
+            "running" when entry.Progress is { } progress => (int)Math.Round(progress.Percent),
+            _ => 0
+        };
         return new
         {
-            id = entry.Id, state, stage = state == "running" ? TranscriptionProgressTracker.StageName(job.State) : null, percent,
+            id = entry.Id, state, stage = entry.Fetching ? TranscriptionProgressTracker.LinkStage : state == "running" ? TranscriptionProgressTracker.StageName(job.State) : null, percent,
             language = job.Language, name = entry.Name, createdUtc = job.CreatedUtc, error = job.Error is null ? null : Plain(job.Error),
             links = new { self = $"/v1/transcriptions/{entry.Id}", transcript = $"/v1/transcriptions/{entry.Id}/transcript", cancel = $"/v1/transcriptions/{entry.Id}/cancel" }
         };
@@ -383,8 +484,10 @@ public sealed class ApiService : IAsyncDisposable
     private HttpResponse Info(HttpRequest request)
     {
         var missing = _deps.MissingModels("auto");
-        return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, _deps.GetPassword().Length > 0,
-            missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job.Job.State) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued)));
+        var password = _deps.GetPassword().Length > 0;
+        return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
+            missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
+            LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

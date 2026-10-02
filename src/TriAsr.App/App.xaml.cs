@@ -37,12 +37,29 @@ public partial class App : System.Windows.Application
         return builder.Build();
     }
 
+    private static RemoteWorkspaceView? FindRemoteView(DependencyObject parent)
+    {
+        for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+            if (child is RemoteWorkspaceView view) return view;
+            if (FindRemoteView(child) is { } inner) return inner;
+        }
+        return null;
+    }
+
     private static void AddEngines(IServiceCollection services)
     {
         var runtimes = new RuntimePaths();
         services.AddSingleton(runtimes);
         services.AddSingleton(new ModelStore(runtimes.ModelRoot));
         services.AddSingleton<IProcessRunner, ProcessRunner>();
+        // Fetching the sound of a link (ADR-0018). The helper program for pages is not shipped; it is downloaded into the data folder when the user asks.
+        services.AddSingleton(provider => new YtDlpTool(Path.Combine(provider.GetRequiredService<IStoragePaths>().Root, "Runtimes", "YtDlp")));
+        services.AddSingleton<ILinkTool>(provider => provider.GetRequiredService<YtDlpTool>());
+        services.AddSingleton<DirectLinkDownloader>();
+        services.AddSingleton<YtDlpPageFetcher>();
+        services.AddSingleton<ILinkFetcher, LinkFetcher>();
         services.AddSingleton<IJobWorkspace, JobWorkspace>();
         services.AddSingleton<IJobRepository, JobRepository>();
         services.AddSingleton<IRecordRepository, RecordRepository>();
@@ -414,6 +431,10 @@ public partial class App : System.Windows.Application
                     shell.Remote.SelectedTab = "New";
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-new.png"), 1220, 1100, 1);
+                    // The link card is below the first screen: scroll the remote view's own page (the window is hidden here, so nothing is "visible").
+                    if (FindRemoteView(window) is { } remoteView) EditionSmoke.Scrollers(remoteView).First().ScrollToEnd();
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-new-link.png"), 1220, 1100, 1);
                     shell.Remote.SelectedTab = "Projects";
                     for (var wait = 0; wait < 100 && shell.Remote.Jobs.Count < 3; wait++) await Task.Delay(100);
                     if (shell.Remote.Jobs.Count != 3) throw new InvalidOperationException($"The server's project list has {shell.Remote.Jobs.Count} recordings instead of 3.");
@@ -426,6 +447,13 @@ public partial class App : System.Windows.Application
                     shell.SelectedPage = shell.Navigation.First(page => page.Name == "Servers");
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "host-panel.png"), 1220, 1100, 1);
+                    // Studio's own New transcription page with an address pasted into the link card (the helper for pages is not installed, so the card offers it).
+                    shell.SelectedPage = shell.Navigation.First(page => page.Name == "New Transcription");
+                    shell.Link.LinkText = "https://archive.org/details/testmp3testfile";
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    window.ContentScroll.ScrollToVerticalOffset(520);
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "new-link.png"), 1220, 1100, 1);
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "api-smoke.json"), JsonSerializer.Serialize(new
                     { seconds, uploadedBytes = sent, states, highestPercent = highest, transcript = text.Trim(), openAiStyle = compatibleText.Trim(), projects = shell.Jobs.Count, status = shell.Host.Status, fingerprint = shell.Host.Fingerprint }, new JsonSerializerOptions { WriteIndented = true }));
                     shell.Host.StopForExit();

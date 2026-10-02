@@ -23,7 +23,8 @@ public static partial class LowerLayerMessages
         Loc.Key("Requested {0}, actual backend is {1} ({2})."),
         Loc.Key("Canary ABI version mismatch: {0}"),
         Loc.Key("llama.cpp exited {0}: {1}"),
-        Loc.Key("The microphone could not be opened (Windows error {0}). Check that it is connected and not in use by another program.")
+        Loc.Key("The microphone could not be opened (Windows error {0}). Check that it is connected and not in use by another program."),
+        Loc.Key("The link could not be downloaded: {0}")
     ];
 
     private static readonly (Regex Pattern, string Template)[] Patterns = Templates.Select(template => (Pattern(template), template)).ToArray();

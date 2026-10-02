@@ -417,4 +417,121 @@ public sealed class RemoteTests
         }
         finally { TestCleanup.Delete(root); }
     }
+    // ---- links (ADR-0018) -------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ALinkIsSentToTheServerWhichFetchesItAndTheRecordingAppearsInTheList()
+    {
+        var root = NewRoot();
+        var links = new FakeLinks { Hold = new TaskCompletionSource() };
+        await using var api = await Harness.StartAsync(h => h.Links = links);
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var card = workspace.Link;
+            Assert.False(card.RunCommand.CanExecute(null));                                  // nothing pasted yet
+            Assert.Equal("Send link to server", card.ActionLabel);
+            card.LinkText = "  https://media.example/talk.mp3  ";
+            Assert.True(card.RunCommand.CanExecute(null));
+            workspace.SelectedLanguage = "de";
+            await card.RunCommand.ExecuteAsync(null);
+
+            Assert.Equal("Sent. The server is working on it.", card.Status);
+            Assert.Equal("", card.LinkText);
+            Assert.Equal("Projects", workspace.SelectedTab);
+            var row = Assert.Single(workspace.Jobs);
+            Assert.Same(row, workspace.SelectedJob);
+            Assert.True(row.IsRunning);
+            Assert.Equal("Downloading the link", row.StateText);
+            Assert.Equal("media.example", row.Name);
+            Assert.False(row.CanOpen);
+            Assert.Equal("https://media.example/talk.mp3", Assert.Single(links.Calls).Link.AbsoluteUri);
+
+            links.Hold.SetResult();
+            await EventuallyAsync(() => row.CanOpen ? row : null, "the recording is transcribed after the link has been fetched");
+            Assert.Equal("Fetched Talk.mp3", row.Name);
+            Assert.Equal("Complete", row.StateText);
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
+    public async Task TheLinkCardSaysWhatTheServerCanDoAndOnlyWorksWhereLinksAreAllowed()
+    {
+        var root = NewRoot();
+        var links = new FakeLinks();
+        await using var api = await Harness.StartAsync(h => h.Links = links);
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var card = workspace.Link;
+            Assert.True(card.HasNote);                                                       // files, but not yet pages
+            Assert.StartsWith("This server fetches links to audio and video files.", card.Note);
+            card.LinkText = "https://media.example/talk.mp3";
+            Assert.True(card.RunCommand.CanExecute(null));
+
+            links.PagesReady = true;
+            await EventuallyAsync(() => workspace.ServerInfo is { LinkPages: true } ? workspace.ServerInfo : null, "the poll learns that pages can be fetched");
+            Assert.False(card.HasNote);
+
+            api.CurrentKey = "";                                                              // the owner took the password away
+            await EventuallyAsync(() => workspace.ServerInfo is { LinksEnabled: false } ? workspace.ServerInfo : null, "the poll learns that links are off");
+            Assert.StartsWith("This server has no password", card.Note);
+            Assert.False(card.RunCommand.CanExecute(null));
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
+    public async Task AServerThatDoesNotKnowLinksIsToldSoAndNothingIsSent()
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync();                                    // no link support at all
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            Assert.Equal("This server does not fetch links.", workspace.Link.Note);
+            workspace.Link.LinkText = "https://media.example/talk.mp3";
+            Assert.False(workspace.Link.RunCommand.CanExecute(null));
+            Assert.Empty(workspace.Jobs);
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
+    public async Task AnAddressTheServerRefusesIsShownWithItsReasonInTheInterfaceLanguage()
+    {
+        var root = NewRoot(); var before = Loc.Instance.Language;
+        var links = new FakeLinks();
+        await using var api = await Harness.StartAsync(h => h.Links = links);
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var card = workspace.Link;
+            card.LinkText = "ftp://media.example/talk.mp3";                                   // refused here, before anything is sent
+            await card.RunCommand.ExecuteAsync(null);
+            Assert.Equal("Only web addresses (http or https) can be used as links.", card.Status);
+
+            card.LinkText = "http://192.168.1.5/talk.mp3";                                    // refused by the server
+            await card.RunCommand.ExecuteAsync(null);
+            Assert.Equal("The link could not be sent: Links to addresses inside a private network are not followed.", card.Status);
+            Assert.Equal("http://192.168.1.5/talk.mp3", card.LinkText);                        // kept, so that it can be corrected
+            Assert.Empty(workspace.Jobs);
+            Assert.Empty(links.Calls);
+
+            Loc.Instance.SetLanguage("hu");
+            workspace.Link.RefreshTexts();
+            Assert.Equal("A hivatkozás nem küldhető el: Magánhálózaton belüli címekre mutató hivatkozásokat nem követ a program.", card.Status);
+            Assert.Equal("Hivatkozás küldése a szervernek", card.ActionLabel);
+        }
+        finally { Loc.Instance.SetLanguage(before); TestCleanup.Delete(root); }
+    }
 }

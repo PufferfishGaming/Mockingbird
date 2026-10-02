@@ -172,4 +172,34 @@ public sealed class WebAppTests
         Assert.DoesNotContain("?key=", script);
         Assert.Contains("\"Authorization\"", script);
     }
+    [Fact]
+    public void ThePageAsksTheServerToFetchALinkAndNeverFetchesAnythingItself()
+    {
+        var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
+        Assert.Contains("api(\"/v1/links\", { method: \"POST\"", script);
+        Assert.Contains("JSON.stringify({ url, language: ui.language.value })", script);
+        Assert.Contains("info.linksEnabled", script);                      // the button follows what the server says it can do
+        Assert.Contains("info.linkPages", script);
+        Assert.Contains("t(job.error)", script);                           // a link that failed says why in the page's language
+        Assert.DoesNotContain("fetch(url", script);                        // the address the person typed is only ever handed to the server
+        Assert.DoesNotContain("window.open", script);
+        Assert.DoesNotContain("location.href =", script);
+    }
+
+    [Fact]
+    public async Task ThePagesTranslationsIncludeWhyALinkFailedAndWhatAServerDoesWhileItFetchesOne()
+    {
+        await using var api = await Harness.StartAsync();
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        foreach (var code in new[] { "hu", "de", "es", "fr" })
+        {
+            var table = JsonSerializer.Deserialize<Dictionary<string, string>>(await anonymous.GetStringAsync("/ui/strings.json?lang=" + code))!;
+            foreach (var message in TriAsr.Application.LinkMessages.All.Append(TriAsr.Application.TranscriptionProgressTracker.LinkStage))
+            {
+                Assert.True(table.ContainsKey(message), $"{code}: {message}");
+                Assert.NotEqual(message, table[message]);
+            }
+            foreach (var text in new[] { "Link", "Web address", "Send link to server", "The link could not be sent: {0}" }) Assert.True(table.ContainsKey(text), $"{code}: {text}");
+        }
+    }
 }

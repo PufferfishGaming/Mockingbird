@@ -61,6 +61,7 @@ Native Linux support is pending; there is currently no native Linux build.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.
 - Karaoke-style playback in the review: while the recording plays, the words already said are coloured, the word being said is bold, and the selection follows the recording (in Studio, the Client and the web page).
 - An in-app recorder: record with the microphone in Studio, in the Client or in the browser; the recording becomes the file to transcribe or to send.
+- Transcribe a link: paste the address of a video, a podcast episode or an audio file on any site (not only one video site) in Studio, in the Client or in the browser. A link straight to an audio or video file just works; for web pages Mockingbird can install a helper program (yt-dlp, downloaded once from its project and checked against its published checksum). A server fetches links for the computers that use it only when it has a password.
 - The interface in English, Hungarian, German, Spanish and French: chosen on the first start, switchable in Settings without a restart.
 - In-app update checks with a verified one-click update.
 - Three editions: Studio does everything on one computer, Server holds the models and serves them, Client is only the window (see Editions).
@@ -104,6 +105,7 @@ curl.exe -H "Authorization: Bearer PASSWORD" "http://127.0.0.1:8642/v1/transcrip
 | `GET /v1/transcriptions`, `GET /v1/transcriptions/{id}` | state (`queued`, `running`, `complete`, `failed`, `cancelled`), stage and percent; `?wait=30` waits for the end |
 | `GET /v1/transcriptions/{id}/transcript?format=json\|txt\|md\|srt\|vtt\|csv\|docx\|full-json&mode=strict\|readable` | the transcript (`json` has segments and a `needsListening` flag per segment) |
 | `GET` and `PUT /v1/transcriptions/{id}/review`, `GET .../audio` | the review as the window shows it, saving edits (with a revision history), the recording for playback |
+| `POST /v1/links` | JSON `{"url": "https://...", "language": "auto"}`: the server downloads the sound of the address and transcribes it; answers `202` like an upload (the job shows the stage "Downloading the link" first). Only on a server with a password; `GET /v1/server` has `linksEnabled` and `linkPages` |
 | `POST /v1/transcriptions/{id}/cancel` | stops a waiting or running recording |
 | `POST /v1/audio/transcriptions` | OpenAI-compatible: a multipart form with `file`, `language`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`); answers when the transcript is ready, so existing tools that speak that API can use it with the base URL `http://127.0.0.1:8642/v1` |
 

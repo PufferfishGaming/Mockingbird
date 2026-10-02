@@ -21,6 +21,7 @@ public sealed partial class ShellViewModel
     {
         var host = new HostViewModel(storage.Root, Edition.Label, AppInfo.Version, CreateApiService, (title, message) => OnUi(() => ReportError(title, message)), OnUi, logger);
         host.SettingsChanged += () => { if (_initialized) Persist(); };
+        host.LinkHelper = LinkHelper;
         return host;
     }
 
@@ -57,7 +58,7 @@ public sealed partial class ShellViewModel
         language => { var missing = Array.Empty<string>(); OnUi(() => missing = MissingRequiredModelsFor(language)); return missing; },
         () => !IsModelBusy && !IsBenchmarking && !SetupRunning && !IsCheckingSystem,
         busy => OnUi(() => host.IsBusy = busy),
-        () => host.DisplayName, Edition.Label, LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor));
+        () => host.DisplayName, Edition.Label, LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor, links));
 
     private bool IsApiJob(TranscriptionJob job) => job.SourcePath.StartsWith(IncomingFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 

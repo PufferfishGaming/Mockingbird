@@ -18,7 +18,7 @@ public sealed class StoragePaths : IStoragePaths
     {
         foreach (var relative in new[] { "Models/Whisper", "Models/Canary", "Models/Correction",
                      "Runtimes/Whisper-Vulkan", "Runtimes/Whisper-ROCm", "Runtimes/Canary",
-                     "Runtimes/Llama", "Runtimes/FFmpeg", "Jobs", "Output", "Temp", "Logs", "Config" })
+                     "Runtimes/Llama", "Runtimes/FFmpeg", "Runtimes/YtDlp", "Jobs", "Output", "Temp", "Logs", "Config" })
             Directory.CreateDirectory(Path.Combine(Root, relative));
     }
 }

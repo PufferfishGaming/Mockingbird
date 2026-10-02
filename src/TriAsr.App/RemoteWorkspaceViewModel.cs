@@ -54,6 +54,23 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private readonly string _recordingsFolder;
     private RecorderViewModel? _recorder;
 
+    /// <summary>The link card: the server fetches the sound of a web address and transcribes it (ADR-0018).</summary>
+    public RemoteLinkViewModel Link { get; }
+
+    /// <summary>What the connected server said about itself last, or null when there is no connection.</summary>
+    public RemoteServerInfo? ServerInfo => _connection?.Info;
+
+    /// <summary>Shows a recording the server took (a link it is fetching) in the project list.</summary>
+    internal void ShowSent(RemoteJob job)
+    {
+        Merge([job]);
+        SelectedJob = Jobs.FirstOrDefault(row => row.Id == job.Id);
+        SelectedTab = "Projects";
+    }
+
+    /// <summary>The server stopped answering during a call that the link card made.</summary>
+    internal void LoseConnection(string message) => ConnectionLost?.Invoke(message);
+
     /// <summary>The microphone, for sending a recording made here (ADR-0016).</summary>
     public RecorderViewModel Recorder => _recorder ??= MakeRecorder();
 
@@ -75,6 +92,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     public RemoteWorkspaceViewModel(Action<Action> onUi, Action<string, string> reportError, string tempRoot, string? recordingsFolder = null)
     {
         _onUi = onUi; _reportError = reportError; _tempRoot = tempRoot;
+        Link = new RemoteLinkViewModel(this);
         _recordingsFolder = recordingsFolder ?? System.IO.Path.Combine(tempRoot, "Recordings");
         Loc.Instance.PropertyChanged += (_, change) => { if (change.PropertyName == nameof(Loc.Version)) _onUi(RefreshTexts); };
     }
@@ -105,7 +123,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     public bool ShowPlayer => IsConnected && IsReviewTab && HasReview;
     public bool HasAudioStatus => AudioStatus.Length > 0;
 
-    partial void OnIsConnectedChanged(bool value) { OnPropertyChanged(nameof(NotConnected)); OnPropertyChanged(nameof(ShowPlayer)); UpdateCanSend(); }
+    partial void OnIsConnectedChanged(bool value) { OnPropertyChanged(nameof(NotConnected)); OnPropertyChanged(nameof(ShowPlayer)); UpdateCanSend(); Link.ServerChanged(); }
     partial void OnServerNoteChanged(string value) => OnPropertyChanged(nameof(HasServerNote));
     partial void OnAudioStatusChanged(string value) => OnPropertyChanged(nameof(HasAudioStatus));
 
@@ -131,6 +149,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         ServerNote = info is { ModelsReady: false } ? Loc.T("This server cannot transcribe yet: its speech models are missing ({0}). Set it up on the server first.", string.Join(", ", info.MissingModels)) : "";
         UpdateCanSend();
+        Link.ServerChanged();
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -139,6 +158,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         RefreshServerNote(_connection?.Info);
         _recorder?.RefreshTexts();
+        Link.RefreshTexts();
         foreach (var row in Jobs) row.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
         if (Regions.Count > 0) ShowReviewSummary();

@@ -59,6 +59,9 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     /// <summary>Raised when a setting was changed by the user and should be saved.</summary>
     public event Action? SettingsChanged;
 
+    /// <summary>The helper that fetches the sound of web pages for the links other computers send (ADR-0018). Set by the window that owns the services; null where there is none.</summary>
+    public LinkHelperViewModel? LinkHelper { get; set; }
+
     /// <summary>Raised when the API itself changes a job (cancelling one that never started), so that lists in the window can follow.</summary>
     public event EventHandler<TranscriptionJob>? JobChangedByApi;
 
@@ -258,7 +261,8 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
                 + $"{curl} -X POST --data-binary @recording.mp3{header} \"{address}/v1/transcriptions?language=auto&name=recording.mp3\"\n"
                 + $"{curl}{header} \"{address}/v1/transcriptions/ID?wait=60\"\n"
                 + $"{curl}{header} \"{address}/v1/transcriptions/ID/transcript?format=txt\"\n"
-                + $"{curl}{header} -F file=@recording.mp3 -F language=de {address}/v1/audio/transcriptions";
+                + $"{curl}{header} -F file=@recording.mp3 -F language=de {address}/v1/audio/transcriptions"
+                + (HasPassword ? $"\n{curl}{header} -H \"Content-Type: application/json\" -d \"{{\\\"url\\\":\\\"https://example.com/talk.mp3\\\",\\\"language\\\":\\\"auto\\\"}}\" {address}/v1/links" : "");
         }
     }
 

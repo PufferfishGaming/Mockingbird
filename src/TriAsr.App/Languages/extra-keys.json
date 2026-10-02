@@ -179,5 +179,22 @@
  "No microphone was found. Connect one, or check that it is enabled in the Windows sound settings.",
  "The microphone is being used by another program. Close that program, or choose another microphone.",
  "This microphone cannot record in the format the speech programs need.",
- "There is not enough free disk space to record."
+ "There is not enough free disk space to record.",
+ "Downloading the link",
+ "Paste the address of a video or an audio file.",
+ "That is not a web address.",
+ "Only web addresses (http or https) can be used as links.",
+ "An address with a user name or password in it cannot be used. Paste the plain address.",
+ "Links to addresses inside a private network are not followed.",
+ "That address could not be reached.",
+ "That address redirects too often.",
+ "The recording is larger than the limit for links.",
+ "The download was interrupted before the end.",
+ "That address leads to a web page, not to an audio or video file. To fetch the sound of pages, install the link helper first.",
+ "No sound was found at that address.",
+ "That recording needs a login or is private. Only public recordings can be fetched.",
+ "The link could not be downloaded.",
+ "The link helper could not be downloaded.",
+ "The link helper failed its checksum and was not installed.",
+ "The link helper is in use. Wait until the download that uses it has finished, then try again."
 ]

@@ -65,6 +65,34 @@ internal sealed class FakeStages : ITranscriptionStages
     public Task SaveManualAsync(FinalTranscript transcript, CancellationToken token = default) => throw new NotSupportedException();
 }
 
+/// <summary>Stands in for the program that downloads the sound of a link: it records what it was asked, can be held, can fail, and writes a small file.</summary>
+internal sealed class FakeLinks : ILinkFetcher
+{
+    public bool PagesReady { get; set; }
+    public TaskCompletionSource? Hold { get; set; }
+    public Func<Uri, Exception?>? Fail { get; set; }
+    public double[] Progress { get; set; } = [];
+    public List<(Uri Link, string Folder, LinkFetchOptions Options)> Calls { get; } = [];
+    public CancellationToken LastToken { get; private set; }
+
+    /// <summary>The real rule for addresses that are numbers or <c>localhost</c>; names are not looked up (the test machine may have no DNS), so any other name passes.</summary>
+    public Task CheckAsync(Uri link, bool allowPrivateNetwork, CancellationToken token) =>
+        link.HostNameType == UriHostNameType.Dns && !link.IdnHost.Contains("localhost", StringComparison.OrdinalIgnoreCase) ? Task.CompletedTask : LinkPolicy.EnsureAllowedAsync(link, allowPrivateNetwork, token);
+
+    public async Task<FetchedLink> FetchAsync(Uri link, string folder, LinkFetchOptions options, IProgress<double>? percent, CancellationToken token)
+    {
+        lock (Calls) Calls.Add((link, folder, options));
+        LastToken = token;
+        foreach (var value in Progress) percent?.Report(value);
+        if (Hold is { } hold) await hold.Task.WaitAsync(token);
+        if (Fail?.Invoke(link) is { } error) throw error;
+        Directory.CreateDirectory(folder);
+        var path = Path.Combine(folder, "Fetched Talk.mp3");
+        await File.WriteAllBytesAsync(path, [1, 2, 3, 4], token);
+        return new FetchedLink(path, "Fetched Talk");
+    }
+}
+
 internal sealed class Harness : IAsyncDisposable
 {
     public string Root { get; } = Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));
@@ -74,6 +102,8 @@ internal sealed class Harness : IAsyncDisposable
     public bool Native { get; set; } = true;
     public string CurrentKey { get; set; } = ApiTestData.Key;
     public string Name { get; set; } = "Test server";
+    /// <summary>Fetches the sound of links for <c>POST /v1/links</c>; null makes the server one that does not fetch links.</summary>
+    public FakeLinks? Links { get; set; }
     public FinalTranscript? Saved { get; private set; }
     public ServerIdentity Identity { get; private set; } = null!;
     public ApiService Service { get; private set; } = null!;
@@ -93,7 +123,7 @@ internal sealed class Harness : IAsyncDisposable
             (id, _) => Task.FromResult(ApiTestData.Transcript(id, harness.Native)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
             () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(ApiTestData.Transcript(id, harness.Native), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
-            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind)));
+            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();
         harness.Identity = ServerIdentity.LoadOrCreate(Path.Combine(harness.Root, "Identity"));

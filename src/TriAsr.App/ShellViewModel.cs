@@ -19,7 +19,8 @@ public sealed record NavigationItem(string Name, string Title, string Icon, bool
 public sealed partial class ShellViewModel(SettingsStore store, ThemeManager themes, ILogger<ShellViewModel> logger,
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
-    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor, IProcessRunner processes) : ObservableObject
+    ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor, IProcessRunner processes,
+    ILinkFetcher links, ILinkTool linkTool) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [

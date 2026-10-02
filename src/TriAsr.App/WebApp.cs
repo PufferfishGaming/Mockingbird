@@ -77,6 +77,8 @@ public static partial class WebApp
         foreach (var language in LanguageCatalog.All) texts.Add(language.Name);
         foreach (var stage in Enum.GetValues<JobState>()) texts.Add(TranscriptionProgressTracker.StageName(stage));
         texts.Add("Whisper and Canary transcription");
+        texts.Add(TranscriptionProgressTracker.LinkStage);               // what a recording is doing while its link is fetched
+        texts.UnionWith(LinkMessages.All);                               // why a link failed, in the words of the layers that fetch it
         texts.UnionWith(["agreement", "uncertain", "manual"]);          // how a region came about (the two others are spelled out by the script)
         texts.Add(TriAsr.Fusion.TranscriptQuality.RepetitionWarning);    // a warning the review can carry
         return [.. texts];

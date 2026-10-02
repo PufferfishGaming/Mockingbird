@@ -20,7 +20,7 @@
 
   const state = {
     health: null, info: null, password: keep.get("sessionStorage", "mb-password") || "",
-    tab: "new", jobs: [], languages: [], file: null, review: null, timer: 0, sending: false, dirty: false
+    tab: "new", jobs: [], languages: [], file: null, review: null, timer: 0, sending: false, sendingLink: false, dirty: false
   };
   const ui = {};
 
@@ -220,6 +220,14 @@
     for (const tab of ui.tabs.children) tab.setAttribute("aria-selected", String(tab.id === "tab-" + id));
     if (id === "projects") renderProjects();
     if (id === "review") renderReview();
+    if (id === "new") refreshInfo();
+  }
+
+  /** Looks at what the server says about itself again (its link helper may have been installed, its models downloaded). */
+  async function refreshInfo() {
+    try { state.info = await getJson("/v1/server"); } catch { return; }
+    updateLink();
+    if (state.tab === "new") renderInfoNotice();
   }
 
   function renderInfoNotice() {
@@ -262,8 +270,57 @@
         h("div", null, h("label", { for: "language" }, t("Language")), language),
         h("div", { class: "row" }, send),
         progress, status),
-      buildRecorder());
+      buildRecorder(),
+      buildLink());
     if (state.file) choose(state.file);
+    updateLink();
+  }
+
+  // ---- fetch a link ------------------------------------------------------------------------------------------------------------------------
+  // The server downloads the sound of the address (a video site, a podcast episode, a link to an audio file) and transcribes it; nothing is downloaded here.
+
+  function buildLink() {
+    const address = h("input", { type: "text", id: "link", inputmode: "url", autocomplete: "off", spellcheck: "false", maxlength: "2000", placeholder: "https://", "aria-label": t("Web address"),
+      onInput: () => updateLink(), onKeydown: (event) => { if (event.key === "Enter") sendLink(); } });
+    const send = h("button", { class: "btn primary", type: "button", disabled: true, onClick: () => sendLink() }, t("Send link to server"));
+    const note = h("p", { class: "note", hidden: true });
+    const status = h("p", { "aria-live": "polite" }, "");
+    Object.assign(ui, { linkInput: address, linkSend: send, linkNote: note, linkStatus: status });
+    return h("div", { class: "card stack" },
+      h("h2", null, t("Link")),
+      h("p", { class: "muted" }, t("Paste the address of a video or audio on the web: a video site, a podcast episode or a link to an audio file. The server downloads its sound and transcribes it.")),
+      h("div", null, h("label", { for: "link" }, t("Web address")), address),
+      h("div", { class: "row" }, send),
+      note, status);
+  }
+
+  /** The button and the note follow what the server said about itself: links need a password on the server, and pages need its link helper. */
+  function updateLink() {
+    if (!ui.linkSend) return;
+    const info = state.info;
+    const ready = !!info && info.linksEnabled === true && info.modelsReady !== false;
+    ui.linkSend.disabled = !ready || state.sendingLink || !ui.linkInput.value.trim();
+    let note = "";
+    if (info && info.linksEnabled !== true) note = info.passwordRequired === false ? t("This server has no password, so it does not fetch links for other computers. Set a password on the server to allow it.") : t("This server does not fetch links.");
+    else if (info && info.linkPages !== true) note = t("This server fetches links to audio and video files. To fetch the sound of web pages as well, install the link helper in Mockingbird on the server.");
+    ui.linkNote.textContent = note; ui.linkNote.hidden = !note;
+  }
+
+  async function sendLink() {
+    const url = ui.linkInput.value.trim();
+    if (!url || state.sendingLink || ui.linkSend.disabled) return;
+    state.sendingLink = true; updateLink();
+    ui.linkStatus.textContent = t("Sending to {0}…", state.health.name);
+    try {
+      const response = await api("/v1/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, language: ui.language.value }) });
+      await response.json();
+      ui.linkInput.value = ""; ui.linkStatus.textContent = t("Sent. The server is working on it.");
+      selectTab("projects"); refreshJobs();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) { signOut(t("The password is wrong.")); return; }
+      ui.linkStatus.textContent = t("The link could not be sent: {0}",
+        error instanceof ApiError && error.code === "models_missing" ? t("The server cannot transcribe this language yet: its speech models are not downloaded.") : t(error.message));
+    } finally { state.sendingLink = false; updateLink(); }
   }
 
   // ---- record with the microphone ---------------------------------------------------------------------------------------------------------
@@ -448,7 +505,7 @@
           h("div", { class: "state" + (job.state === "failed" ? " failed" : "") }, stateLabel(job)),
           job.state === "running" && h("progress", { max: "100", value: String(job.percent), "aria-label": stateLabel(job) }),
           h("div", { class: "when" }, new Date(job.createdUtc).toLocaleString(text.lang)),
-          job.error && h("div", { class: "state failed" }, job.error)),
+          job.error && h("div", { class: "state failed" }, t(job.error))),
         h("div", { class: "row" },
           job.state === "complete" && h("button", { class: "btn", type: "button", onClick: () => openReview(job.id) }, t("Open transcript")),
           (job.state === "queued" || job.state === "running") && h("button", { class: "btn", type: "button", onClick: () => cancelJob(job.id) }, t("Cancel"))))));

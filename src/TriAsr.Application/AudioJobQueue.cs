@@ -14,9 +14,10 @@ public sealed class AudioJobQueue(IJobRepository repository, IJobWorkspace works
 {
     private readonly SemaphoreSlim _execution = new(1, 1);
     public event EventHandler<TranscriptionJob>? JobChanged;
-    public async Task<TranscriptionJob> EnqueueAsync(string source, string language, CancellationToken cancellationToken = default)
+    /// <param name="id">The id the job is to have, for a job whose id was given out before its file existed (a link that is still being fetched). Otherwise a new one.</param>
+    public async Task<TranscriptionJob> EnqueueAsync(string source, string language, CancellationToken cancellationToken = default, Guid? id = null)
     {
-        var job = new TranscriptionJob(Guid.NewGuid(), source, language, JobState.Queued, DateTimeOffset.UtcNow);
+        var job = new TranscriptionJob(id ?? Guid.NewGuid(), source, language, JobState.Queued, DateTimeOffset.UtcNow);
         await workspace.CreateAsync(job, cancellationToken);
         await repository.SaveAsync(job, cancellationToken);
         JobChanged?.Invoke(this, job);
