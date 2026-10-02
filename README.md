@@ -4,7 +4,7 @@ A local transcription workstation for Windows x64, using Whisper and Canary to r
 
 Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
 
-**Version 0.1.18 — release candidate**
+**Version 0.1.19 — release candidate**
 
 <div align="center">
 
@@ -32,7 +32,8 @@ Native Linux support is pending; there is currently no native Linux build.
 
 - Audio/video import with progress, cancellation and resumable jobs.
 - Whisper's 100-language catalog and independent Canary comparison for 25 languages.
-- Local disagreement correction, waveform playback and manual transcript review.
+- Waveform playback and manual transcript review, with the places where the two engines disagree marked for listening. An optional local correction model can choose between them (off by default).
+- Removal of Whisper's runaway repetition, and an optional "Skip silence and music" setting for recordings with long quiet or noisy stretches (it removes songs, so it is off by default).
 - TXT, Markdown, JSON, CSV, SRT, VTT and DOCX export.
 - Persistent model downloads, CPU/Vulkan backends, optional compatible CUDA/ROCm runtimes and measured auto-tuning.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.

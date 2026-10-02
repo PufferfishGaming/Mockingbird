@@ -64,11 +64,12 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private Guid? _progressJob;
     [ObservableProperty] private TranscriptionJob? _selectedJob;
     public IReadOnlyList<LanguageOption> Languages { get; } = LanguageCatalog.All.Prepend(new LanguageOption("auto", "Auto-detect language")).ToArray();
+    /// <summary>The files a transcription needs. The correction model and its runtime are optional (Settings, off by default).</summary>
     public string Readiness => string.Join("\n", new[] {
-        ("Audio", runtimes.Ffmpeg), (System.IO.Path.GetFileName(runtimes.WhisperModel), runtimes.WhisperModel), (System.IO.Path.GetFileName(runtimes.CanaryModel), runtimes.CanaryModel),
-        (System.IO.Path.GetFileName(runtimes.CorrectionModel), runtimes.CorrectionModel), ("Whisper runtime", runtimes.Whisper),
-        ("Canary worker", runtimes.CanaryWorker), ("Correction runtime", runtimes.LlamaServer) }
-        .Select(item => $"{item.Item1} · {(System.IO.File.Exists(item.Item2) ? "Ready" : "Missing — open Models")}"));
+        ("Audio", runtimes.Ffmpeg, false), (System.IO.Path.GetFileName(runtimes.WhisperModel), runtimes.WhisperModel, false), (System.IO.Path.GetFileName(runtimes.CanaryModel), runtimes.CanaryModel, false),
+        (System.IO.Path.GetFileName(runtimes.CorrectionModel), runtimes.CorrectionModel, true), ("Whisper runtime", runtimes.Whisper, false),
+        ("Canary worker", runtimes.CanaryWorker, false), ("Correction runtime", runtimes.LlamaServer, true) }
+        .Select(item => $"{item.Item1} · {(System.IO.File.Exists(item.Item2) ? "Ready" : item.Item3 ? "Not installed (optional: only used if the correction model is turned on in Settings)" : "Missing — open Models")}"));
     public ObservableCollection<ReviewRegion> Regions { get; } = [];
     public System.ComponentModel.ICollectionView ReviewItems { get; private set; } = null!;
     [ObservableProperty] private ReviewRegion? _selectedRegion;
