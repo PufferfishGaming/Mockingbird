@@ -45,6 +45,8 @@ Replace the same-named assets on the `download` release, waiting for each upload
 | Server | `Mockingbird-Server-Setup.exe` | `SHA256SUMS-server.txt` | `latest-server.json` |
 | Client | `Mockingbird-Client-Setup.exe` | `SHA256SUMS-client.txt` | `latest-client.json` |
 
+`scripts/install.ps1` (the one-line install in the README) downloads exactly these installer and checksum names from the `download` release, so a new name must be changed there too; a test compares it with the package scripts.
+
 A manifest is how installed apps of that edition learn about a version (schema, version, URL, SHA256, size, notes). It must appear only after the installer it points to is available. Never edit it by hand; it carries the installer's real size and hash.
 
 ## 4. Verify what was published

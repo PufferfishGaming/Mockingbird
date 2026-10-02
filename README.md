@@ -8,9 +8,11 @@ Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishG
 
 <div align="center">
 
-[![Download for Windows](https://img.shields.io/badge/Windows-Download_the_installer-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Studio-Setup.exe)
+[![Download Mockingbird Studio](https://img.shields.io/badge/Studio-Download_for_Windows-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Studio-Setup.exe)
+[![Download Mockingbird Server](https://img.shields.io/badge/Server-Download_for_Windows-1f6feb?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Server-Setup.exe)
+[![Download Mockingbird Client](https://img.shields.io/badge/Client-Download_for_Windows-8250df?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Client-Setup.exe)
 
-One file. Download `Mockingbird-Studio-Setup.exe`, double-click it, accept the license and click **Install**. No administrator permission is needed.
+One file each. Download it, double-click it, accept the license and click **Install**. No administrator permission is needed. Studio does everything on one computer; Server and Client are for working across computers (see Editions). Or install from PowerShell in one line (Quick install, below).
 
 </div>
 
@@ -23,6 +25,16 @@ One file. Download `Mockingbird-Studio-Setup.exe`, double-click it, accept the l
 | **Mockingbird Client** | Only the window you work in. Nothing is transcribed on that computer: recordings go to a server and the transcripts come back to be read, edited and exported. | `Mockingbird-Client-Setup.exe` |
 
 Server and Client are new in the release after 0.1.19. Each edition installs, updates and keeps its data on its own (`TriASR`, `TriASR-Server`, `TriASR-Client`), and has its own checksum file (`SHA256SUMS.txt`, `SHA256SUMS-server.txt`, `SHA256SUMS-client.txt`) and update file (`latest.json`, `latest-server.json`, `latest-client.json`).
+
+## Quick install
+
+Open PowerShell (Windows 10 or 11, x64) and paste one line. It downloads the installer from this project's `download` release, checks it against the published SHA256 file, and opens the setup wizard. No administrator permission is needed.
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/PufferfishGaming/Mockingbird/main/scripts/install.ps1))) -Edition Studio
+```
+
+Use `-Edition Server` or `-Edition Client` for the other two. Add `-Quiet` to install without any window (choosing it means you accept the license, GPL-3.0-or-later), `-NoLaunch` to not start the program afterwards, or `-DownloadOnly` to stop after the check. The command runs [scripts/install.ps1](scripts/install.ps1) from this repository, so read it first if you like; it changes nothing else on the computer. The installer is not signed and a file downloaded this way is not marked as coming from the internet, so Windows SmartScreen does not warn about it: the SHA256 check is what the script gives you instead. If the checksum does not match, the file is deleted and nothing is installed.
 
 ## Install
 

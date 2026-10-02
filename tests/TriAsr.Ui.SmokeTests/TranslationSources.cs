@@ -17,7 +17,7 @@ internal static partial class TranslationSources
 
     public static string AppFolder { get; } = Path.Combine(RepositoryRoot(), "src", "TriAsr.App");
 
-    private static string RepositoryRoot()
+    public static string RepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
             if (File.Exists(Path.Combine(directory.FullName, "TriAsr.slnx"))) return directory.FullName;

@@ -119,6 +119,26 @@ public sealed class EditionTests
     }
 
     [Fact]
+    public void TheInstallScriptNamesTheSameFilesAndFoldersAsThePackageScripts()
+    {
+        var path = Path.Combine(TranslationSources.RepositoryRoot(), "scripts", "install.ps1");
+        var script = File.ReadAllText(path);
+        Assert.True(script.All(character => character < 128), "install.ps1 is read by Windows PowerShell 5.1 as it is, so it stays plain ASCII");
+        foreach (var kind in new[] { AppEdition.Studio, AppEdition.Server, AppEdition.Client })
+        {
+            using var edition = new As(kind);
+            var sums = kind == AppEdition.Studio ? "SHA256SUMS.txt" : $"SHA256SUMS-{Edition.Label.ToLowerInvariant()}.txt";
+            Assert.Contains($"{Edition.Label} = @{{ Setup = 'Mockingbird-{Edition.Label}-Setup.exe'; Sums = '{sums}';", script);
+            Assert.Contains($"Folder = '{Edition.InstallFolderName}'", script);
+        }
+        // The README offers the same three downloads and the one-line install.
+        var readme = File.ReadAllText(Path.Combine(TranslationSources.RepositoryRoot(), "README.md"));
+        foreach (var setup in new[] { "Mockingbird-Studio-Setup.exe", "Mockingbird-Server-Setup.exe", "Mockingbird-Client-Setup.exe" })
+            Assert.Contains($"releases/download/download/{setup}", readme);
+        Assert.Contains("scripts/install.ps1", readme);
+    }
+
+    [Fact]
     public async Task TheClientHasNoEnginesAndRemembersItsThemeAndLanguage()
     {
         var root = NewRoot(); var before = Loc.Instance.Language;
