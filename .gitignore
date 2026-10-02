@@ -42,12 +42,13 @@ work/
 # The privacy policy in each interface language (embedded in the app).
 !/src/TriAsr.App/Languages/privacy/*.md
 
-# Versioned documentation: the decision log, the release process, the Claude Code project guide and its commands.
+# Versioned documentation: the decision log, the release process and the Claude Code commands.
 # Everything else under docs/ (status, per-release results, notes) is a local working record.
 docs/*
 !docs/decisions/
 !docs/decisions/*.md
 !docs/RELEASE_PROCESS.md
-!/CLAUDE.md
+# Notes for Claude stay on the owner's computer and are never committed.
+/CLAUDE.md
 !.claude/skills/*/SKILL.md
 .claude/settings.local.json
