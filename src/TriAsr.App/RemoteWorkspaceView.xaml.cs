@@ -9,16 +9,22 @@ namespace TriAsr.App;
 public partial class RemoteWorkspaceView : UserControl
 {
     private bool _playing;
-    private readonly System.Windows.Threading.DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private ReviewRegion? _lastSpoken;
+    private readonly System.Windows.Threading.DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
 
     public RemoteWorkspaceView()
     {
         InitializeComponent();
         _timer.Tick += (_, _) =>
         {
-            if (Player.Source is null) return;
+            if (DataContext is not RemoteWorkspaceViewModel model) return;
+            if (Player.Source is null) { PlaybackFollower.Clear(model.Regions); _lastSpoken = null; return; }
             if (!SeekSlider.IsMouseCaptureWithin) SeekSlider.Value = Player.Position.TotalSeconds;
             PlayerTime.Text = TriAsr.Export.TranscriptExporter.Timestamp((long)Player.Position.TotalMilliseconds);
+            var spoken = PlaybackFollower.Follow(model.Regions, (long)Player.Position.TotalMilliseconds);
+            if (spoken is not null && spoken != _lastSpoken && _playing && FollowBox.IsChecked == true && !TranscriptEditor.IsKeyboardFocusWithin && model.ReviewItems.Contains(spoken))
+            { model.SelectedRegion = spoken; RegionList.ScrollIntoView(spoken); }
+            _lastSpoken = spoken;
         };
         Loaded += (_, _) => _timer.Start();
         Unloaded += (_, _) => { _timer.Stop(); Player.Close(); };

@@ -37,12 +37,18 @@ public partial class MainWindow : Window
             if (change.PropertyName == nameof(ShellViewModel.TerminalOutput) && viewModel.TerminalAutoScroll)
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { TerminalOutputBox.UpdateLayout(); TerminalOutputBox.ScrollToEnd(); }));
         };
-        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        ReviewRegion? lastSpoken = null;
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         timer.Tick += (_, _) =>
         {
-            if (Player.Source is null) return;
+            if (Player.Source is null) { PlaybackFollower.Clear(viewModel.Regions); lastSpoken = null; return; }
             if (!SeekSlider.IsMouseCaptureWithin) SeekSlider.Value = Player.Position.TotalSeconds;
             PlayerTime.Text = TriAsr.Export.TranscriptExporter.Timestamp((long)Player.Position.TotalMilliseconds);
+            var spoken = PlaybackFollower.Follow(viewModel.Regions, (long)Player.Position.TotalMilliseconds);
+            // The selection follows the recording when it enters the next region, not on every tick, so that choosing another region while it plays sticks.
+            if (spoken is not null && spoken != lastSpoken && _playing && FollowBox.IsChecked == true && !TranscriptEditor.IsKeyboardFocusWithin && viewModel.ReviewItems.Contains(spoken))
+            { viewModel.SelectedRegion = spoken; RegionList.ScrollIntoView(spoken); }
+            lastSpoken = spoken;
         };
         timer.Start(); Closed += (_, _) => { timer.Stop(); Player.Close(); };
     }

@@ -859,5 +859,7 @@
   "Record with the microphone. The recording is chosen as the recording above and is only sent when you press the button.": "Felvétel mikrofonnal. A felvétel a fenti felvételként lesz kiválasztva, és csak akkor kerül elküldésre, ha megnyomja a gombot.",
   "Recording is not available in this browser.": "Ebben a böngészőben nem érhető el a felvétel.",
   "The browser did not allow this page to use the microphone. Allow it in the address bar, then try again.": "A böngésző nem engedte, hogy ez az oldal használja a mikrofont. Engedélyezze a címsorban, majd próbálja újra.",
-  "The browser only allows recording on a secure page (https, or localhost).": "A böngésző csak biztonságos oldalon engedi a felvételt (https vagy localhost)."
+  "The browser only allows recording on a secure page (https, or localhost).": "A böngésző csak biztonságos oldalon engedi a felvételt (https vagy localhost).",
+  "Follow the playback": "Lejátszás követése",
+  "While the recording plays, the transcript moves with it: the words already said are coloured and the region being said is selected.": "Amíg a felvétel szól, az átirat vele mozog: az már elhangzott szavak színesek, és a most szóló szakasz ki van jelölve."
 }

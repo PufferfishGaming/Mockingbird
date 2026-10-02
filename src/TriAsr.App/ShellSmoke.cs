@@ -86,6 +86,7 @@ public static class ShellSmoke
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             foreach (var text in new[] { regions[0].Time, regions[0].Evidence, SourceText.Of("llm-arbitrated") })
                 if (FindText(window, text) is null) throw new InvalidOperationException($"The open review does not show \"{text}\" in {language.Code}.");
+            regions[1].PlayProgress = 0.6;   // as if the recording were part-way through the second region: its words show how far (karaoke). Set just before the capture because the player's timer clears it when nothing is loaded.
             Capture(window, Path.Combine(output, $"lang-{language.Code}-Review-open.png"), 1220, 1100, 1);
             count++;
             foreach (var name in new[] { "New Transcription", "Models", "Benchmark", "Backends", "Settings" })

@@ -470,7 +470,7 @@
       const previous = keepSelection && state.review && state.review.id === id ? state.review : null;
       state.review = {
         id, name: job ? job.name : "", data, selected: previous ? Math.min(previous.selected, data.regions.length - 1) : 0, view: previous ? previous.view : "final",
-        search: previous ? previous.search : "", only: previous ? previous.only : false, audio: previous ? previous.audio : null,
+        search: previous ? previous.search : "", only: previous ? previous.only : false, audio: previous ? previous.audio : null, follow: previous ? previous.follow : true,
         regions: data.regions.map((region, index) => ({ index, region, original: region.finalText, text: region.finalText, automatic: data.automaticTexts[index] }))
       };
       state.dirty = false;
@@ -491,6 +491,78 @@
     } catch (error) {
       if (ui.audioStatus) ui.audioStatus.textContent = t("The audio could not be fetched: {0}", error.message);
     }
+  }
+
+  // ---- karaoke: the words as they are said -----------------------------------------------------------------------------------------------
+  // A region has a start and an end, not a time for each word, so its time is shared out over the words by their length, with a longer wait after a
+  // sentence than after a comma. These numbers are the same as in KaraokePlan.cs (a test compares them).
+
+  const SENTENCE_PAUSE = 4, CLAUSE_PAUSE = 2;
+
+  function karaokeWords(text) {
+    const found = [];
+    for (const match of text.matchAll(/\S+/g)) {
+      const word = match[0];
+      const letters = (word.match(/[\p{L}\p{N}]/gu) || []).length;
+      const last = word[word.length - 1];
+      const pause = ".!?…".includes(last) ? SENTENCE_PAUSE : ",;:–—".includes(last) ? CLAUSE_PAUSE : 0;
+      found.push({ start: match.index, length: word.length, weight: Math.max(1, letters) + pause });
+    }
+    const total = found.reduce((sum, item) => sum + item.weight, 0);
+    let at = 0;
+    for (const item of found) { item.from = at; at += item.weight / total; item.to = at; }
+    if (found.length) found[found.length - 1].to = 1;
+    return found;
+  }
+
+  function wordAt(words, progress) {
+    if (!words.length) return -1;
+    const index = words.findIndex((word) => progress < word.to);
+    return index < 0 ? words.length - 1 : index;
+  }
+
+  /** Puts the text of a row on the page: plain, or with the words said so far coloured and the word being said in bold. */
+  function paintText(entry, word) {
+    const row = ui.regionList && ui.regionList.querySelector('[data-index="' + entry.index + '"] .text');
+    if (!row) return;
+    if (word < 0) { row.textContent = entry.text; return; }
+    const words = karaokeWords(entry.text);
+    const parts = [];
+    let at = 0;
+    words.forEach((item, index) => {
+      if (item.start > at) parts.push(entry.text.slice(at, item.start));
+      parts.push(h("span", { class: index < word ? "said" : index === word ? "now" : null }, entry.text.slice(item.start, item.start + item.length)));
+      at = item.start + item.length;
+    });
+    if (at < entry.text.length) parts.push(entry.text.slice(at));
+    row.replaceChildren(...parts);
+  }
+
+  /** Marks the region being played and its word; with "Follow the playback" the selection moves on when the next region begins. */
+  function updatePlayback() {
+    const review = state.review;
+    if (!review || !ui.player || !ui.player.src) return;
+    const ms = ui.player.currentTime * 1000;
+    const active = review.regions.find((entry) => entry.region.nativeTimestamps !== false && ms >= entry.region.startMs && ms < entry.region.endMs);
+    const index = active ? active.index : -1;
+    const word = active ? wordAt(karaokeWords(active.text), (ms - active.region.startMs) / Math.max(1, active.region.endMs - active.region.startMs)) : -1;
+    if (index === review.spoken && word === review.spokenWord) return;
+    const previous = review.spoken !== undefined && review.spoken !== index ? review.regions[review.spoken] : null;
+    if (previous) paintText(previous, -1);
+    if (active) paintText(active, word);
+    const entered = index !== review.spoken;
+    review.spoken = index; review.spokenWord = word;
+    const editing = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLInputElement;
+    if (active && entered && !ui.player.paused && !editing && ui.follow && ui.follow.checked && visibleRegions().includes(active)) {
+      select(index);
+      const row = ui.regionList.querySelector('[data-index="' + index + '"]');
+      if (row) row.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function tickPlayback() {
+    updatePlayback();
+    if (ui.player && !ui.player.paused) window.requestAnimationFrame(tickPlayback);
   }
 
   const needsListening = (region) => region.source === "uncertain" || region.source === "single-asr-needs-listening" || (region.warnings && region.warnings.length > 0);
@@ -522,14 +594,17 @@
     ui.regionList = h("ul", { class: "regions", role: "listbox", "aria-label": t("Transcript regions") });
     ui.editor = h("div");
     ui.audioStatus = h("p", { class: "muted", "aria-live": "polite" }, review.audio ? "" : t("Getting the audio from the server…"));
-    ui.player = h("audio", { controls: true, preload: "auto", "aria-label": t("Audio position"), onError: () => { if (ui.player.src) ui.audioStatus.textContent = t("Audio playback failed"); } });
+    ui.player = h("audio", { controls: true, preload: "auto", "aria-label": t("Audio position"), onError: () => { if (ui.player.src) ui.audioStatus.textContent = t("Audio playback failed"); },
+      onPlay: () => tickPlayback(), onSeeked: () => updatePlayback(), onPause: () => updatePlayback(), onTimeupdate: () => updatePlayback() });
+    ui.follow = h("input", { type: "checkbox", id: "follow", checked: review.follow !== false, onChange: (event) => { review.follow = event.target.checked; } });
     if (review.audio) ui.player.src = review.audio;
     ui.reviewView.replaceChildren(h("h1", null, t("Review")), summary,
       h("div", { class: "row card" }, search, h("label", { for: "only" }, only, " ", t("Needs listening")), ui.saveButton, format, mode, exportButton),
       h("div", { class: "review" }, ui.regionList, h("div", { class: "card" }, ui.editor)),
       h("div", { class: "card" }, h("div", { class: "row" },
         h("button", { class: "btn", type: "button", onClick: () => playRegion() }, t("Play region")),
-        h("button", { class: "btn", type: "button", onClick: () => ui.player.pause() }, t("Pause"))), ui.player, ui.audioStatus));
+        h("button", { class: "btn", type: "button", onClick: () => ui.player.pause() }, t("Pause")),
+        h("label", { for: "follow", title: t("While the recording plays, the transcript moves with it: the words already said are coloured and the region being said is selected.") }, ui.follow, " ", t("Follow the playback"))), ui.player, ui.audioStatus));
     renderRegionList();
     renderEditor();
   }
@@ -538,10 +613,11 @@
     const review = state.review;
     const shown = visibleRegions();
     ui.regionList.replaceChildren(...shown.map((entry) => h("li", {
-      class: "region" + (needsListening(entry.region) ? " uncertain" : "") + (entry.text !== entry.original ? " edited" : ""), role: "option", "aria-selected": String(entry.index === review.selected),
+      class: "region" + (needsListening(entry.region) ? " uncertain" : "") + (entry.text !== entry.original ? " edited" : ""), role: "option", "aria-selected": String(entry.index === review.selected), "data-index": String(entry.index),
       onClick: () => select(entry.index)
     }, h("div", null, h("div", { class: "time" }, clock(entry.region.startMs) + " – " + clock(entry.region.endMs)), h("div", { class: "source" }, sourceLabel(entry.region.source))),
       h("div", { class: "text" }, entry.text))));
+    if (review.spoken !== undefined && review.spoken >= 0) paintText(review.regions[review.spoken], review.spokenWord);
   }
 
   function select(index) {

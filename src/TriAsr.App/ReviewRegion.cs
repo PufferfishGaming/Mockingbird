@@ -9,6 +9,8 @@ public sealed partial class ReviewRegion(FinalRegion original, string? machineTe
     public FinalRegion Original { get; private set; } = original;
     public string MachineText { get; } = machineText ?? original.FinalText;
     [ObservableProperty] private string _text = original.FinalText;
+    /// <summary>How far the recording that is playing has come in this region, 0 to 1; -1 when it is not playing here (ADR-0017).</summary>
+    [ObservableProperty] private double _playProgress = -1;
     public string Time => Original.NativeTimestamps ? TranscriptExporter.Timestamp(Original.StartMs) : Loc.T("No timestamps");
     public string Whisper => Original.WhisperText;
     public string Canary => Original.CanaryText;

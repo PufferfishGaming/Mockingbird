@@ -859,5 +859,7 @@
  "Record with the microphone. The recording is chosen as the recording above and is only sent when you press the button.": "Enregistrez avec le microphone. L'enregistrement est choisi comme l'enregistrement ci-dessus et n'est envoyé que lorsque vous appuyez sur le bouton.",
  "Recording is not available in this browser.": "L'enregistrement n'est pas disponible dans ce navigateur.",
  "The browser did not allow this page to use the microphone. Allow it in the address bar, then try again.": "Le navigateur n'a pas autorisé cette page à utiliser le microphone. Autorisez-le dans la barre d'adresse, puis réessayez.",
- "The browser only allows recording on a secure page (https, or localhost).": "Le navigateur n'autorise l'enregistrement que sur une page sécurisée (https ou localhost)."
+ "The browser only allows recording on a secure page (https, or localhost).": "Le navigateur n'autorise l'enregistrement que sur une page sécurisée (https ou localhost).",
+ "Follow the playback": "Suivre la lecture",
+ "While the recording plays, the transcript moves with it: the words already said are coloured and the region being said is selected.": "Pendant la lecture de l'enregistrement, la transcription le suit : les mots déjà dits sont colorés et la région en cours est sélectionnée."
 }
