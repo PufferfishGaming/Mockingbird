@@ -12,5 +12,20 @@ public sealed partial class ShellViewModel
         if (_initialized) Persist();
     }
 
-    private void RestoreSpeechDetectionSettings(AppSettings settings) => SkipNonSpeech = settings.SkipNonSpeech;
+    /// <summary>
+    /// Whether a small AI model may choose between Whisper and Canary where they disagree. Off by default: on a song with a known
+    /// transcript every word it changed was a mistake (three of three), and a third of its answers were rejected.
+    /// </summary>
+    [ObservableProperty] private bool _useCorrectionModel;
+
+    partial void OnUseCorrectionModelChanged(bool value)
+    {
+        if (_initialized) Persist();
+    }
+
+    private void RestoreSpeechDetectionSettings(AppSettings settings)
+    {
+        SkipNonSpeech = settings.SkipNonSpeech;
+        UseCorrectionModel = settings.UseCorrectionModel;
+    }
 }

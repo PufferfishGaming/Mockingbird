@@ -69,7 +69,8 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             if (source.RootElement.TryGetProperty("Sha256", out var hash) && hash.GetString() != digest)
                 throw new InvalidDataException("The source file changed. Create a new job to keep its evidence consistent.");
             var saved = File.Exists(FileFor(job.Id, "configuration.json")) ? await Read<JobConfiguration>(job.Id, "configuration.json", token) : null;
-            var config = JobConfiguration.Bind(await GetConfiguration(token), saved, saved is null && (await settings.LoadAsync()).SkipNonSpeech);
+            var preferences = saved is null ? await settings.LoadAsync() : null;
+            var config = JobConfiguration.Bind(await GetConfiguration(token), saved, preferences?.SkipNonSpeech ?? false, preferences?.UseCorrectionModel ?? false);
             if (saved is null) await Write(job.Id, "configuration.json", config, token);
             await AudioPreparation.NormalizeAsync(audio, job.SourcePath, normalized, FileFor(job.Id, "playback.m4a"), token);
             await PlanChunksAsync(job.Id, normalized, config.WhisperThreads, token);
@@ -180,14 +181,20 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                     }, token);
                     break;
                 }
-                var comparison = DisagreementDetector.Compare(await Read<EngineTranscript>(job.Id, "whisper.json", token),
-                    (await Read<CanaryNative.Result>(job.Id, "canary.json", token)).Transcript);
+                var whisperSaved = await Read<EngineTranscript>(job.Id, "whisper.json", token);
+                var canarySaved = (await Read<CanaryNative.Result>(job.Id, "canary.json", token)).Transcript;
+                var comparison = DisagreementDetector.Compare(await DropUnsupportedAsync(job.Id, whisperSaved, canarySaved, seconds, token), canarySaved);
                 await Write(job.Id, "comparison.json", comparison, token); break;
             case JobState.Correcting:
                 if (File.Exists(FileFor(job.Id, "corrections.json"))) { await Read<Correction[]>(job.Id, "corrections.json", token); return; }
                 var disputes = (await Read<ComparisonResult>(job.Id, "comparison.json", token)).Disagreements;
                 var decisions = new List<Correction>();
-                if (disputes.Count > 0)
+                if (disputes.Count > 0 && !configuration.UseCorrectionModel)
+                {
+                    // The default: no model changes anybody's words. Whisper's text stays and every disagreement is marked as needing a listen.
+                    decisions = disputes.Select(dispute => new Correction(dispute, new("uncertain", dispute.Whisper, 0, true), null)).ToList();
+                }
+                else if (disputes.Count > 0)
                 {
                     await using var arbiter = new LlamaArbiter(runner, paths.CorrectionFor(configuration.CorrectionBackend), paths.CorrectionModel, configuration.CorrectionBackend, governor.Clamp(configuration.CorrectionThreads));
                     try
@@ -289,7 +296,27 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             + "The repeats were removed and Whisper's raw output is kept in the project folder, but speech inside that stretch may be missing from the transcript."
             + (alreadySkipping ? "" : " Turning on \"Skip silence and music\" in Settings usually avoids this and finds that speech."));
         return transcript with { Segments = kept, Text = string.Join(" ", kept.Select(segment => segment.Text)) };
-    }    private async Task<ChunkPlan?> TryReadPlanAsync(Guid id, CancellationToken token)
+    }    /// <summary>
+    /// Text that only Whisper wrote, in a stretch where the speech detector found no speech and Canary wrote nothing like it, is left out of the
+    /// comparison (see UnsupportedTextGuard). It needs both engines and the chunk plan; whisper.json is not changed and the removed segments
+    /// are listed in Whisper/unsupported.json.
+    /// </summary>
+    private async Task<EngineTranscript> DropUnsupportedAsync(Guid id, EngineTranscript whisper, EngineTranscript canary, double seconds, CancellationToken token)
+    {
+        var plan = await TryReadPlanAsync(id, token);
+        if (plan is null || plan.Version != ChunkPlan.CurrentVersion || Math.Abs(plan.DurationMs - seconds * 1000) > 2) return whisper;
+        var (kept, removed) = UnsupportedTextGuard.Remove(whisper.Segments, canary.Text, plan.Chunks);
+        if (removed.Count == 0) return whisper;
+        await Write(id, "Whisper/unsupported.json", new
+        {
+            Reason = "Whisper wrote these segments in stretches where the speech detector found no speech, and fewer than half of their words occur in Canary's text (see UnsupportedTextGuard).",
+            Removed = removed, RawOutput = "Whisper/raw.json"
+        }, token);
+        var words = removed.Sum(item => item.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length);
+        Issue("Unsupported text left out", $"{removed.Count} segments ({words} words) that only Whisper wrote, in stretches where no speech was detected and that Canary did not hear, were left out of the transcript. They are kept in the project folder.");
+        return whisper with { Segments = kept, Text = string.Join(' ', kept.Select(segment => segment.Text)) };
+    }
+    private async Task<ChunkPlan?> TryReadPlanAsync(Guid id, CancellationToken token)
     {
         if (!File.Exists(FileFor(id, "chunks.json"))) return null;
         try { return await Read<ChunkPlan>(id, "chunks.json", token); }

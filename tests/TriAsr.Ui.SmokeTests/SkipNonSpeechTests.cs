@@ -217,6 +217,86 @@ public sealed class SkipNonSpeechTests : IDisposable
         Assert.Contains("21 segments were removed", Assert.Single(_issues, item => item.Title == "Repeated text removed").Message);
     }
 
+    // ---- text only Whisper wrote, where no speech was detected ----------------------------------------------------------------------
+
+    [Fact]
+    public async Task InventedTextWithoutSupportIsLeftOutOfTheComparisonButKeptAsEvidence()
+    {
+        Configure(skip: false); SavePlan();   // speech chunks at 9.8-14.2 s and 29.8-34.2 s; the rest of the 40 s is quiet
+        var whisper = new EngineTranscript("Whisper", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1,
+            [new(10_000, 14_000, "Hallo zusammen das ist ein Test"), new(36_000, 39_000, "Vertraue und glaube es hilft es heilt")],
+            "Hallo zusammen das ist ein Test Vertraue und glaube es hilft es heilt", true);
+        var canary = new EngineTranscript("Canary", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1, [], "Hallo zusammen das ist ein Test", false);
+        await File.WriteAllTextAsync(Path.Combine(Directory, "whisper.json"), JsonSerializer.Serialize(whisper));
+        await File.WriteAllTextAsync(Path.Combine(Directory, "canary.json"), JsonSerializer.Serialize(new CanaryNative.Result(canary, ["x"], "cpu")));
+
+        await Stages(new Runner()).ExecuteAsync(_jobRecord, JobState.Aligning, default);
+
+        var comparison = await File.ReadAllTextAsync(Path.Combine(Directory, "comparison.json"));
+        Assert.Contains("Hallo zusammen", comparison);
+        Assert.DoesNotContain("Vertraue", comparison);
+        // whisper.json is untouched, and the removed segment is written down.
+        Assert.Contains("Vertraue", await File.ReadAllTextAsync(Path.Combine(Directory, "whisper.json")));
+        using var evidence = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "unsupported.json")));
+        Assert.Equal(1, evidence.RootElement.GetProperty("Removed").GetArrayLength());
+        Assert.Single(_issues, item => item.Title == "Unsupported text left out");
+    }
+
+    [Fact]
+    public async Task WithoutAChunkPlanNothingIsLeftOut()
+    {
+        Configure(skip: false);
+        var whisper = new EngineTranscript("Whisper", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1,
+            [new(36_000, 39_000, "Vertraue und glaube es hilft es heilt")], "Vertraue und glaube es hilft es heilt", true);
+        var canary = new EngineTranscript("Canary", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1, [], "Hallo zusammen", false);
+        await File.WriteAllTextAsync(Path.Combine(Directory, "whisper.json"), JsonSerializer.Serialize(whisper));
+        await File.WriteAllTextAsync(Path.Combine(Directory, "canary.json"), JsonSerializer.Serialize(new CanaryNative.Result(canary, ["x"], "cpu")));
+        await Stages(new Runner()).ExecuteAsync(_jobRecord, JobState.Aligning, default);
+        Assert.Contains("Vertraue", await File.ReadAllTextAsync(Path.Combine(Directory, "comparison.json")));
+        Assert.False(File.Exists(Path.Combine(Directory, "Whisper", "unsupported.json")));
+        Assert.Empty(_issues);
+    }
+
+    // ---- the correction model is opt-in ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void TheCorrectionModelIsOffByDefaultAndAJobKeepsItsOwnChoice()
+    {
+        Assert.False(new AppSettings().UseCorrectionModel);
+        Assert.True(JobConfiguration.Bind(Current(), null, false, useCorrectionModelSetting: true).UseCorrectionModel);
+        Assert.False(JobConfiguration.Bind(Current(), null, true).UseCorrectionModel);
+        // A resumed job keeps what it started with, whatever Settings say now.
+        Assert.True(JobConfiguration.Bind(Current(), Current() with { UseCorrectionModel = true }, false, false).UseCorrectionModel);
+        Assert.False(JobConfiguration.Bind(Current(), Current(), false, true).UseCorrectionModel);
+        // Jobs saved before the setting existed did not use it.
+        var old = """{"Fingerprint":"f","WhisperBackend":"cpu","WhisperThreads":1,"CanaryBackend":"cpu","CanaryThreads":1,"CorrectionBackend":"cpu","CorrectionThreads":1,"ParallelSpeech":false,"SkipNonSpeech":true}""";
+        Assert.False(JsonSerializer.Deserialize<JobConfiguration>(old)!.UseCorrectionModel);
+    }
+
+    [Fact]
+    public async Task WithoutTheCorrectionModelNothingIsLaunchedAndWhisperKeepsItsWords()
+    {
+        Configure(skip: false);
+        var whisper = new EngineTranscript("Whisper", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1,
+            [new(1_000, 6_000, "Wir treffen uns am Montag in der Schulternhalle zum Training.")], "Wir treffen uns am Montag in der Schulternhalle zum Training.", true);
+        var canary = new EngineTranscript("Canary", "model", "runtime", "cpu", "cpu", "CPU", "de", 40, 1, [], "Wir treffen uns am Montag in der Schulturnhalle zum Training.", false);
+        var comparison = TriAsr.Fusion.DisagreementDetector.Compare(whisper, canary);
+        Assert.NotEmpty(comparison.Disagreements);   // the engines really do disagree about one word
+        await File.WriteAllTextAsync(Path.Combine(Directory, "comparison.json"), JsonSerializer.Serialize(comparison));
+        var runner = new Runner();
+        var stages = Stages(runner);
+
+        await stages.ExecuteAsync(_jobRecord, JobState.Correcting, default);
+        await stages.ExecuteAsync(_jobRecord, JobState.Finalizing, default);
+
+        Assert.Empty(runner.Requests);                // no model server, no download check
+        var final = await stages.LoadFinalAsync(_job);
+        var region = Assert.Single(final.Regions);
+        Assert.Contains("Schulternhalle", region.FinalText);       // Whisper's word stays, the engines' disagreement is marked
+        Assert.Equal("uncertain", region.Source);
+        Assert.Empty(_issues);
+    }
+
     // ---- Canary ---------------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -357,6 +437,33 @@ public sealed class SkipNonSpeechSettingTests
                 var shell = host.Services.GetRequiredService<App.ShellViewModel>();
                 await shell.InitializeAsync();
                 Assert.True(shell.SkipNonSpeech);
+            }
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
+    public async Task TheCorrectionModelChoiceIsOffByDefaultSavedAndKept()
+    {
+        var root = NewRoot();
+        try
+        {
+            using (var host = App.App.CreateHost(root))
+            {
+                var shell = host.Services.GetRequiredService<App.ShellViewModel>();
+                await shell.InitializeAsync();
+                Assert.False(shell.UseCorrectionModel);
+                shell.UseCorrectionModel = true;
+                var store = host.Services.GetRequiredService<App.SettingsStore>();
+                await WaitForAsync(async () => (await store.LoadAsync()).UseCorrectionModel);
+                await WaitForSavedAsync(shell);
+            }
+            using (var host = App.App.CreateHost(root))
+            {
+                var shell = host.Services.GetRequiredService<App.ShellViewModel>();
+                await shell.InitializeAsync();
+                Assert.True(shell.UseCorrectionModel);
+                Assert.False(shell.SkipNonSpeech);   // the two choices are independent
             }
         }
         finally { TestCleanup.Delete(root); }

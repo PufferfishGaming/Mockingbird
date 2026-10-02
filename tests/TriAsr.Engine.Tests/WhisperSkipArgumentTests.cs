@@ -33,6 +33,15 @@ public sealed class WhisperSkipArgumentTests : IDisposable
     private WhisperEngine Engine(Runner runner) => new(runner, _executable, "model.bin", 4);
 
     [Fact]
+    public async Task WhisperIsAlwaysToldNotToFeedItsPreviousTextBackIn()
+    {
+        var runner = new Runner();
+        await Engine(runner).TranscribeAsync("a.wav", 10, "de", Path.Combine(_directory, "w"), "cpu", default);
+        var arguments = runner.Requests[0].Arguments.ToList();
+        Assert.Equal("0", arguments[arguments.IndexOf("-mc") + 1]);
+    }
+
+    [Fact]
     public async Task WithoutASkipModelWhisperIsNotToldToUseTheDetector()
     {
         var runner = new Runner();

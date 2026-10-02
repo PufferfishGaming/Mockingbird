@@ -1,6 +1,6 @@
 # ADR-0006: Remove runaway repetition from Whisper's output (loop guard and speech-rate guard)
 
-Status: accepted (after 0.1.18)
+Status: accepted (after 0.1.18). Since ADR-0007 Whisper decodes without the previous text, which prevents these loops at the source; the guards below did not fire on any of the three test recordings in that configuration and stay as a safety net.
 
 ## Context
 Over stretches without speech (game sound, music, the end of a song) Whisper can fall into a loop: each window is conditioned on the previous text, so a repeated phrase feeds itself. Two real cases:

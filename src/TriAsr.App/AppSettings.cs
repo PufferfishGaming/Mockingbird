@@ -7,7 +7,7 @@ namespace TriAsr.App;
 
 public sealed record AppSettings(string Theme = "System", string Density = "Comfortable", int Version = 1, bool AnimateErrors = true,
     bool CheckForUpdates = true, string? SkippedUpdateVersion = null, DateTimeOffset? LastUpdateCheckUtc = null, string ResourceProfile = "Auto",
-    bool SkipNonSpeech = false);
+    bool SkipNonSpeech = false, bool UseCorrectionModel = false);
 
 public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)
 {
