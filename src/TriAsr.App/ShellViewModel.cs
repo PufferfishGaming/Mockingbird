@@ -109,6 +109,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         AnimateErrors = settings.AnimateErrors;
         RestoreUpdateSettings(settings);
         RestoreResourceSettings(settings);
+        RestoreSpeechDetectionSettings(settings);
         if (store.LastLoadError is not null) ReportError("Preferences could not be restored", "Defaults were loaded. " + store.LastLoadError);
         if (runtimes.StorageLoadError is not null) ReportError("Saved folders could not be restored", "Existing model files have not been removed. Select your previous model repository in Settings. " + runtimes.StorageLoadError);
         SelectedPage = Navigation[0];

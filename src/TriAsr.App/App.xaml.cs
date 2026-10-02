@@ -181,6 +181,12 @@ public partial class App : System.Windows.Application
                     pipeline.ProgressChanged += ObserveProgress;
                     var languageArgument = Array.IndexOf(e.Args, "--speech-language");
                     var smokeLanguage = languageArgument >= 0 && languageArgument + 1 < e.Args.Length ? e.Args[languageArgument + 1] : "auto";
+                    // The shell smoke above resets the saved preferences, so the choice has to be made again here.
+                    if (e.Args.Contains("--skip-non-speech"))
+                    {
+                        var preferences = _host.Services.GetRequiredService<SettingsStore>();
+                        await preferences.SaveAsync((await preferences.LoadAsync()) with { SkipNonSpeech = true });
+                    }
                     var job = await queue.EnqueueAsync(e.Args.Last(), smokeLanguage);
                     job = await pipeline.RunAsync(job);
                     pipeline.ProgressChanged -= ObserveProgress;

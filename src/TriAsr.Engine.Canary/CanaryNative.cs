@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using TriAsr.Application;
 using TriAsr.Domain;
 
 namespace TriAsr.Engine.Canary;
@@ -8,8 +9,36 @@ namespace TriAsr.Engine.Canary;
 public static class CanaryNative
 {
     public sealed record Result(EngineTranscript Transcript, IReadOnlyList<string> RawChunks, string NativeBackend);
+    /// <summary>Reads the whole recording in the windows the caller supplies (the original behaviour, used when there is no chunk plan).</summary>
     public static Result Transcribe(string runtime, string modelPath, string language, string backend, int threads,
-        IEnumerable<float[]> chunks, double audioSeconds, Action<double>? progress = null)
+        IEnumerable<float[]> chunks, double audioSeconds, Action<double>? progress = null) =>
+        Run(runtime, modelPath, language, backend, threads, audioSeconds, recognize =>
+        {
+            var texts = new List<string>(); var raw = new List<string>();
+            long processedSamples = 0;
+            foreach (var samples in chunks)
+            {
+                var (full, rawText) = recognize(samples);
+                texts.Add(full); raw.Add(rawText);
+                processedSamples += samples.Length;
+                progress?.Invoke(Math.Clamp(processedSamples / (audioSeconds * 16000), 0, 1));
+            }
+            return (string.Join(" ", texts), raw, []);
+        });
+
+    /// <summary>Reads exactly the planned windows. Every finished window is saved in <paramref name="checkpointDirectory"/> so a restarted run continues.</summary>
+    public static Result TranscribeWindows(string runtime, string modelPath, string language, string backend, int threads,
+        IReadOnlyList<CanaryWindow> windows, string? checkpointDirectory, Func<CanaryWindow, IEnumerable<float[]>> readPieces,
+        double audioSeconds, Action<double>? progress = null) =>
+        Run(runtime, modelPath, language, backend, threads, audioSeconds, recognize =>
+        {
+            var results = CanaryWindowRunner.Run(windows, checkpointDirectory, $"{Path.GetFileName(modelPath)}|{language}", readPieces, recognize, progress);
+            var (text, segments) = CanaryWindowRunner.Assemble(results);
+            return (text, results.Select(result => result.Raw).ToList(), segments);
+        });
+
+    private static Result Run(string runtime, string modelPath, string language, string backend, int threads, double audioSeconds,
+        Func<Func<float[], (string Full, string Raw)>, (string Text, List<string> Raw, IReadOnlyList<TranscriptSegment> Segments)> process)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
         if (!SetDllDirectory(runtime)) throw new System.ComponentModel.Win32Exception();
@@ -35,29 +64,24 @@ public static class CanaryNative
             var actual = String(device.Kind).ToLowerInvariant();
             if (actual == "hip") actual = "rocm";
             if (!actual.Equals(backend, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"Requested {backend}, actual backend is {actual} ({nativeBackend}).");
-            var texts = new List<string>();
-            var raw = new List<string>();
             var languagePointer = Marshal.StringToCoTaskMemUTF8(language);
             try
             {
-                long processedSamples = 0;
-                foreach (var samples in chunks)
+                (string Full, string Raw) Recognize(float[] samples)
                 {
                     Native.transcribe_run_params_init(out var run);
                     run.Language = languagePointer;
                     run.Timestamps = 0; // Canary v2 port exposes no speech timestamps.
                     run.SpeculativeDrafts = 0;
                     Check(Native.transcribe_run(session, samples, samples.Length, ref run));
-                    texts.Add(String(Native.transcribe_full_text(session)));
-                    raw.Add(String(Native.transcribe_raw_text(session)));
-                    processedSamples += samples.Length;
-                    progress?.Invoke(Math.Clamp(processedSamples / (audioSeconds * 16000), 0, 1));
+                    return (String(Native.transcribe_full_text(session)), String(Native.transcribe_raw_text(session)));
                 }
+                var (text, raw, segments) = process(Recognize);
+                return new(new("Canary", Path.GetFileName(modelPath), version, backend, actual, String(device.Description),
+                    language, audioSeconds, stopwatch.Elapsed.TotalSeconds, segments, text, false, loadSeconds,
+                    Process.GetCurrentProcess().PeakWorkingSet64), raw, nativeBackend);
             }
             finally { Marshal.FreeCoTaskMem(languagePointer); }
-            return new(new("Canary", Path.GetFileName(modelPath), version, backend, actual, String(device.Description),
-                language, audioSeconds, stopwatch.Elapsed.TotalSeconds, [], string.Join(" ", texts), false, loadSeconds,
-                Process.GetCurrentProcess().PeakWorkingSet64), raw, nativeBackend);
         }
         finally { Native.transcribe_session_free(session); }
     }

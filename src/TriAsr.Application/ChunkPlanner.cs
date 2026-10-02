@@ -13,6 +13,12 @@ namespace TriAsr.Application;
 public sealed record ChunkOptions(long TargetMs = 30_000, long HardCapMs = 35_000, long CutSilenceMs = 300,
     long WeakCutSilenceMs = 100, long OverlapMs = 1_000, long PadMs = 200, long SeparateSilenceMs = 2_000)
 {
+    /// <summary>
+    /// The size Canary has always been run with (windows of up to 20 s). A longer target is possible but has not been measured
+    /// for accuracy and memory, so the saved plan keeps to this until it has.
+    /// </summary>
+    public static ChunkOptions ForCanary { get; } = new(TargetMs: 20_000, HardCapMs: 24_000);
+
     /// <summary>Longest speech core: padding or a merged short silence can add up to this much on each side.</summary>
     public long CoreCapMs => HardCapMs - 2 * SeparateSilenceMs;
     public void Validate()

@@ -10,11 +10,13 @@ namespace TriAsr.Engine.Whisper;
 public sealed partial class WhisperEngine(IProcessRunner runner, string executable, string model, int threads)
 {
     public sealed record LanguageDetection(string Language, double Confidence, IReadOnlyList<string> WindowLanguages);
-    public async Task<LanguageDetection> DetectLanguageAsync(string audio, double seconds, string directory, string backend, string ffmpeg, CancellationToken token)
+    /// <param name="sampleStarts">Where to take the 15 s samples from (seconds), chosen where there is speech; without it the start, middle and end are used.</param>
+    public async Task<LanguageDetection> DetectLanguageAsync(string audio, double seconds, string directory, string backend, string ffmpeg, CancellationToken token, IReadOnlyList<double>? sampleStarts = null)
     {
         Directory.CreateDirectory(directory);
         var detections = new List<(string Language, double Confidence)>();
-        var offsets = seconds <= 30 ? new[] { 0d } : new[] { 0d, Math.Max(0, seconds / 2 - 7.5), Math.Max(0, seconds - 15) };
+        var offsets = sampleStarts is { Count: > 0 } ? sampleStarts.ToArray()
+            : seconds <= 30 ? new[] { 0d } : new[] { 0d, Math.Max(0, seconds / 2 - 7.5), Math.Max(0, seconds - 15) };
         for (var i = 0; i < offsets.Length; i++)
         {
             var window = Path.Combine(directory, $"window-{i}.wav");
@@ -36,12 +38,14 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
         await File.WriteAllTextAsync(Path.Combine(directory, "language.json"), JsonSerializer.Serialize(detection), token);
         return detection;
     }
-    public async Task<EngineTranscript> TranscribeAsync(string audio, double audioSeconds, string language, string directory, string backend, CancellationToken token, Action<double>? progress = null)
+    /// <param name="vadModel">When given, Whisper skips the stretches without speech itself (timestamps stay on the original timeline).</param>
+    public async Task<EngineTranscript> TranscribeAsync(string audio, double audioSeconds, string language, string directory, string backend, CancellationToken token, Action<double>? progress = null, string? vadModel = null)
     {
         if (backend is not ("cpu" or "vulkan" or "cuda" or "rocm")) throw new ArgumentException("Unsupported backend.");
         Directory.CreateDirectory(directory);
         var output = Path.Combine(directory, "raw");
         var arguments = new List<string> { "-m", model, "-f", audio, "-l", language, "-t", threads.ToString(CultureInfo.InvariantCulture), "-ojf", "-otxt", "-of", output };
+        if (vadModel is not null) arguments.AddRange(["--vad", "-vm", vadModel, .. VadSegmenter.Thresholds]);
         if (backend == "cpu") arguments.Add("-ng");
         if (progress is not null) arguments.Add("-pp");
         var result = await runner.RunAsync(new(executable, arguments, Path.GetDirectoryName(executable)!, TimeSpan.FromHours(12), line =>

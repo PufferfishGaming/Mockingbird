@@ -8,9 +8,18 @@ namespace TriAsr.Engine.Whisper;
 /// <summary>Finds where speech is in the 16 kHz recording, using the Silero detector that ships with whisper.cpp.</summary>
 public static partial class VadSegmenter
 {
+    /// <summary>
+    /// The detector thresholds, written out so the chunk plan and Whisper's own skipping (<c>--vad</c>) always agree on what is speech:
+    /// threshold 0.5, at least 250 ms of speech, a pause of at least 100 ms ends it, 30 ms padding. The long spellings are used because
+    /// the standalone detector rejects the short <c>-vspd</c> (it prints "unknown argument" and still exits with 0), and its built-in
+    /// defaults differ from what its help prints, so every value is passed.
+    /// </summary>
+    public static readonly IReadOnlyList<string> Thresholds =
+        ["--vad-threshold", "0.5", "--vad-min-speech-duration-ms", "250", "--vad-min-silence-duration-ms", "100", "--vad-speech-pad-ms", "30"];
+
     public static async Task<IReadOnlyList<SpeechSpan>> DetectAsync(IProcessRunner runner, string tool, string model, string audio, int threads, CancellationToken token)
     {
-        var result = await runner.RunAsync(new(tool, ["-f", audio, "-vm", model, "-t", threads.ToString(CultureInfo.InvariantCulture), "-np"],
+        var result = await runner.RunAsync(new(tool, ["-f", audio, "-vm", model, "-t", threads.ToString(CultureInfo.InvariantCulture), .. Thresholds, "-np"],
             Path.GetDirectoryName(tool)!, TimeSpan.FromMinutes(10)), token);
         if (result.ExitCode != 0)
             throw new InvalidOperationException("Speech detection failed. " + (result.StandardError.Length > 300 ? result.StandardError[^300..] : result.StandardError).Trim());

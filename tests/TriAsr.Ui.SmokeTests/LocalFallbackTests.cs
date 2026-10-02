@@ -138,7 +138,8 @@ public sealed class LocalFallbackTests
         }
         public LocalTranscriptionStages Stages(IProcessRunner runner) => new(_workspace,
             new TriAsr.Audio.FfmpegNormalizer(runner, "unused"), runner, new RuntimePaths { CanaryModel = ModelPath }, _storage, new ModelStore(_root), new Records(),
-            new TriAsr.Hardware.ResourceGovernor(() => 24, () => TriAsr.Hardware.PowerSource.Ac));
+            new TriAsr.Hardware.ResourceGovernor(() => 24, () => TriAsr.Hardware.PowerSource.Ac),
+            new SettingsStore(_storage, Microsoft.Extensions.Logging.Abstractions.NullLogger<SettingsStore>.Instance));
         public void Dispose() { System.IO.Directory.Delete(_root, true); }
     }
     private sealed class Records : IRecordRepository

@@ -39,7 +39,8 @@ public sealed class ChunkPlanStageTests : IDisposable
         foreach (var file in new[] { _paths.VadTool, _paths.VadModel }) { System.IO.Directory.CreateDirectory(Path.GetDirectoryName(file)!); File.WriteAllText(file, "stand-in"); }
     }
     private LocalTranscriptionStages Stages(IProcessRunner runner) => new(_workspace, new TriAsr.Audio.FfmpegNormalizer(runner, "unused"), runner,
-        _paths, _storage, new ModelStore(_root), new Records(), new TriAsr.Hardware.ResourceGovernor(() => 24, () => TriAsr.Hardware.PowerSource.Ac));
+        _paths, _storage, new ModelStore(_root), new Records(), new TriAsr.Hardware.ResourceGovernor(() => 24, () => TriAsr.Hardware.PowerSource.Ac),
+        new SettingsStore(_storage, Microsoft.Extensions.Logging.Abstractions.NullLogger<SettingsStore>.Instance));
     private bool Has(string name) => File.Exists(Path.Combine(Directory, name));
 
     [Fact]
@@ -53,7 +54,7 @@ public sealed class ChunkPlanStageTests : IDisposable
         Assert.Equal("silero-v5.1.2", plan.Source);
         Assert.Equal([(0L, 9_800L, false), (9_800L, 14_200L, true), (14_200L, 29_800L, false), (29_800L, 34_200L, true), (34_200L, 40_000L, false)],
             plan.Chunks.Select(chunk => (chunk.StartMs, chunk.EndMs, chunk.IsSpeech)));
-        Assert.Equal("4", runner.Requests[0].Arguments[5]); // the detector never gets more than four threads
+        Assert.Equal("4", runner.Requests[0].Arguments[runner.Requests[0].Arguments.ToList().IndexOf("-t") + 1]); // the detector never gets more than four threads
         Assert.False(Has("chunks.skipped.json") || Has("chunks.failed.json"));
     }
 

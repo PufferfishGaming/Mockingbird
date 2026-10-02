@@ -52,7 +52,16 @@ public static class WaveAudio
         throw new InvalidDataException("WAV has no samples.");
     }
     private static string ReadTag(BinaryReader reader) => Encoding.ASCII.GetString(reader.ReadBytes(4));
-    public static IEnumerable<float[]> ReadChunks(string path, int maximumSeconds)
+    public static IEnumerable<float[]> ReadChunks(string path, int maximumSeconds) => ReadSamples(path, 0, long.MaxValue, maximumSeconds);
+
+    /// <summary>The audio between two times, in pieces of at most <paramref name="maximumSeconds"/>, cut at quiet points like <see cref="ReadChunks"/>.</summary>
+    public static IEnumerable<float[]> ReadRange(string path, long startMs, long endMs, int maximumSeconds)
+    {
+        if (startMs < 0 || endMs < startMs) throw new ArgumentOutOfRangeException(nameof(startMs), "The range must start at 0 or later and not end before it starts.");
+        return ReadSamples(path, startMs * 16, endMs * 16, maximumSeconds);
+    }
+
+    private static IEnumerable<float[]> ReadSamples(string path, long firstSample, long endSample, int maximumSeconds)
     {
         Inspect(path);
         using var reader = new BinaryReader(File.OpenRead(path));
@@ -61,7 +70,10 @@ public static class WaveAudio
         {
             var tag = ReadTag(reader); var size = reader.ReadUInt32();
             if (tag != "data") { reader.BaseStream.Position += size + (size & 1); continue; }
-            long remaining = size / 2;
+            var total = size / 2;
+            firstSample = Math.Min(firstSample, total); endSample = Math.Min(endSample, total);
+            reader.BaseStream.Position += firstSample * 2;
+            long remaining = Math.Max(0, endSample - firstSample);
             while (remaining > 0)
             {
                 var count = (int)Math.Min(remaining, maximumSeconds * 16000L);

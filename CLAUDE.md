@@ -32,11 +32,13 @@ Tests use temporary data folders (`TRIASR_DATA_ROOT`). Never point a test, scrip
 - Source media is never modified or overwritten. The engines read a normalized 16 kHz mono WAV; the review player prefers `playback.m4a`.
 - Hungarian and German accents are never stripped in comparisons.
 - Privacy: no telemetry, no uploads. The only network use is requested model/runtime downloads and the opt-out update check, which reads one small `latest.json`.
+- A change to the pipeline must not change the default results. Prove it on real recordings before committing: run the old and new build on the same audio and compare the final text (the default must come out identical). A fake runner cannot know what a real program accepts, so every external program the app starts needs at least one test that runs the real tool (skipped when it is not installed).
+- Speech detection (`chunks.json`, ADR-0005): the Silero tool and model are bundled in `Runtimes`. `whisper-vad-speech-segments.exe` exits with 0 even when it rejects an option, prints times in hundredths of a second, and its built-in defaults differ from its help text; always pass every threshold with the long option names (`VadSegmenter.Thresholds`). "Skip silence and music" is off by default because singing counts as non-speech and songs lose almost all their lyrics.
 - Be kind to the computer: engines run at below-normal priority, thread counts follow the resource profile, FFmpeg gets two threads, and Windows is asked not to sleep during jobs. Do not use CPU-rate hard caps on ggml workers (they degrade badly); limit threads instead.
 
 ## Working agreements
 
-- Add or update tests with every behaviour change. Baseline: 261 tests, all passing, none skipped.
+- Add or update tests with every behaviour change. Baseline: 338 tests, all passing. Tests that need local runtimes (FFmpeg, the speech detector) skip on a machine without them.
 - Source files are UTF-8 without BOM with LF endings. Windows PowerShell 5.1 `Get-Content` / `Set-Content` use the ANSI code page and corrupt non-ASCII text: edit with the editor tools or `[IO.File]::ReadAllText(path, [Text.Encoding]::UTF8)` and `WriteAllText` with `UTF8Encoding($false)`.
 - Make exact-match edits and check the match count; do not rewrite files wholesale to change a line.
 - One logical change per commit, message explains why. No `Co-Authored-By` or "Generated with" lines.
