@@ -83,7 +83,7 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     };
 
     partial void OnEnabledChanged(bool value) => Changed();
-    partial void OnAllowNetworkChanged(bool value) => Changed();
+    partial void OnAllowNetworkChanged(bool value) { OnPropertyChanged(nameof(LocalOnly)); Changed(); }
     partial void OnPortTextChanged(string value) { OnPropertyChanged(nameof(Example)); Changed(); }
     // The name and the password are read afresh by the beacon and the API each time, so changing them needs no restart.
     partial void OnNameChanged(string value) { OnPropertyChanged(nameof(DisplayName)); SettingsChangedOnly(); }
@@ -105,6 +105,17 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     {
         _started = true;
         return Enabled ? RestartAsync() : Task.CompletedTask;
+    }
+
+    /// <summary>Starts hosting, or stops it. This is the one button for it; the setting it changes is <see cref="Enabled"/>.</summary>
+    [RelayCommand]
+    private void ToggleHosting() => Enabled = !Enabled;
+
+    /// <summary>The other half of <see cref="AllowNetwork"/>, for the choice between "this computer only" and "other computers on the network".</summary>
+    public bool LocalOnly
+    {
+        get => !AllowNetwork;
+        set { if (value) AllowNetwork = false; }
     }
 
     [RelayCommand]

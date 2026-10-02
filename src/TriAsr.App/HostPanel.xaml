@@ -4,13 +4,26 @@
     <StackPanel>
       <TextBlock Text="{local:T 'Host a server'}" FontSize="17" FontWeight="SemiBold" />
       <TextBlock Text="{local:T 'Other computers send their recordings here and the speech programs run on this computer. Works while the app is open.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0" FontSize="12" />
-      <CheckBox Content="{local:T 'Host a server'}" IsChecked="{Binding Enabled}" Margin="0,14,0,0" AutomationProperties.Name="{local:T 'Host a server'}" />
+      <Button Style="{StaticResource PrimaryButton}" Content="{local:T 'Start hosting'}" Command="{Binding ToggleHostingCommand}" Margin="0,16,0,0" HorizontalAlignment="Stretch" AutomationProperties.Name="{local:T 'Start hosting'}" ToolTip="{local:T 'Starts the server with the settings below. Other computers can then send recordings to this one.'}">
+        <Button.Visibility><Binding Path="Enabled" Converter="{StaticResource InverseBoolVisibility}" /></Button.Visibility>
+      </Button>
+      <Grid Margin="0,16,0,0" Visibility="{Binding Enabled, Converter={StaticResource BoolVisibility}}">
+        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Ellipse Width="10" Height="10" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" /><TextBlock Text="{local:T 'Hosting'}" FontWeight="SemiBold" FontSize="15" Margin="9,0,0,0" /></StackPanel>
+        <Button Grid.Column="1" Content="{local:T 'Stop hosting'}" Command="{Binding ToggleHostingCommand}" Padding="18,9" AutomationProperties.Name="{local:T 'Stop hosting'}" />
+      </Grid>
       <TextBlock Text="{local:T 'Server name'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
       <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Padding="8" AutomationProperties.Name="{local:T 'Server name'}" ToolTip="{local:T 'How this server appears to other computers. Empty uses the name of this computer.'}" />
       <TextBlock Text="{local:T 'Password (optional)'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
       <TextBox Text="{Binding Password, UpdateSourceTrigger=LostFocus}" Padding="8" FontFamily="Consolas" AutomationProperties.Name="{local:T 'Password (optional)'}" ToolTip="{local:T 'Without a password anyone who can reach this server may use it. Share the password only with the people who should.'}" />
       <WrapPanel Margin="0,8,0,0"><Button Content="{local:T 'Make a password'}" Command="{Binding GeneratePasswordCommand}" Padding="10,6" /><Button Content="{local:T 'No password'}" Command="{Binding ClearPasswordCommand}" Padding="10,6" Margin="8,0,0,0" /></WrapPanel>
-      <CheckBox Content="{local:T 'Reachable from other computers on the network'}" IsChecked="{Binding AllowNetwork}" Margin="0,14,0,0" AutomationProperties.Name="{local:T 'Reachable from other computers on the network'}" ToolTip="{local:T 'Without this only programs on this computer can connect. With it the server announces itself on the network and every connection is encrypted. Windows may ask once whether to allow it.'}" />
+      <TextBlock Text="{local:T 'Who can use it'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
+      <Border Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="9" Padding="3" ToolTip="{local:T 'Without the network only programs on this computer can connect. With it the server announces itself on the network and every connection is encrypted. Windows may ask once whether to allow it.'}">
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+          <RadioButton Style="{StaticResource TabRadio}" GroupName="HostReach" IsChecked="{Binding LocalOnly}" Padding="10,8" AutomationProperties.Name="{local:T 'This computer only'}"><TextBlock Text="{local:T 'This computer only'}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" FontSize="12" /></RadioButton>
+          <RadioButton Grid.Column="1" Style="{StaticResource TabRadio}" GroupName="HostReach" IsChecked="{Binding AllowNetwork}" Padding="10,8" AutomationProperties.Name="{local:T 'Computers on the network'}"><TextBlock Text="{local:T 'Computers on the network'}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" FontSize="12" /></RadioButton>
+        </Grid>
+      </Border>
       <TextBlock Text="{local:T 'Port'}" FontWeight="SemiBold" Margin="0,14,0,6" FontSize="12" />
       <TextBox Text="{Binding PortText, UpdateSourceTrigger=LostFocus}" Width="100" HorizontalAlignment="Left" Padding="8" AutomationProperties.Name="{local:T 'Port'}" />
       <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,14,0,0" FontSize="12" />

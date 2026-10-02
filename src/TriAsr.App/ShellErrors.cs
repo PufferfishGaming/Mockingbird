@@ -23,5 +23,12 @@ public sealed partial class ShellViewModel
         Status = title + ": " + message;
         HasError = true;
     }
+    /// <summary>Something worth knowing that is not a failure: the status line and the activity log, no alert.</summary>
+    public void Note(string title, string message)
+    {
+        title = Loc.Describe(title); message = Loc.Describe(message);
+        Status = title + ": " + message;
+        activity.Append("notice", title + " · " + message);
+    }
     [RelayCommand] private void DismissError() => HasError = false;
 }

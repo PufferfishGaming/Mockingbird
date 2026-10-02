@@ -402,8 +402,25 @@ public partial class App : System.Windows.Application
 
                     if (shell.Jobs.Count != 3) throw new InvalidOperationException($"Expected three projects, found {shell.Jobs.Count}.");
                     if (shell.SelectedJob is not null) throw new InvalidOperationException("A recording sent to the server moved the selection.");
+                    // The same server used the way the window uses it: connected through its own list, then the project list with its rows and a review.
+                    // (The rows are only built once they are on screen, so this is where a binding that cannot work would stop the program.)
+                    shell.Dialogs = new SmokeDialogs(password);
+                    shell.Servers.AddressText = $"127.0.0.1:{port}";
+                    await shell.Servers.AddCommand.ExecuteAsync(null);
+                    if (await shell.Servers.ConnectAsync(shell.Servers.Servers[0]) is null) throw new InvalidOperationException("The window could not connect: " + shell.Servers.Status);
                     window.Width = 1220;
-                    shell.SelectedPage = shell.Navigation[0];
+                    for (var wait = 0; wait < 100 && !shell.IsRemotePage; wait++) await Task.Delay(50);
+                    if (!shell.IsRemotePage) throw new InvalidOperationException("Connecting did not open the page of the server.");
+                    shell.Remote.SelectedTab = "Projects";
+                    for (var wait = 0; wait < 100 && shell.Remote.Jobs.Count < 3; wait++) await Task.Delay(100);
+                    if (shell.Remote.Jobs.Count != 3) throw new InvalidOperationException($"The server's project list has {shell.Remote.Jobs.Count} recordings instead of 3.");
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-projects.png"), 1220, 900, 1);
+                    await shell.Remote.OpenReviewAsync(job.Id);
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    if (shell.Remote.Regions.Count == 0) throw new InvalidOperationException("The review of the server's recording is empty.");
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-review.png"), 1220, 900, 1);
+                    shell.SelectedPage = shell.Navigation.First(page => page.Name == "Servers");
                     await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "host-panel.png"), 1220, 1100, 1);
                     await File.WriteAllTextAsync(Path.Combine(dataRoot, "api-smoke.json"), JsonSerializer.Serialize(new
@@ -557,6 +574,13 @@ public partial class App : System.Windows.Application
             await StopHostAsync();
             Shutdown(1);
         }
+    }
+
+    /// <summary>Answers a connection's questions for the smoke run: the fingerprint is trusted (it was checked against the server's own) and the password is the one just made.</summary>
+    private sealed class SmokeDialogs(string password) : IServerDialogs
+    {
+        public Task<bool> ConfirmTrustAsync(TrustRequest request) => Task.FromResult(true);
+        public Task<PasswordAnswer?> AskPasswordAsync(string serverName, bool wrongBefore) => Task.FromResult<PasswordAnswer?>(new(password, false));
     }
 
     /// <summary>The Client edition: the window with the servers, and nothing that transcribes.</summary>

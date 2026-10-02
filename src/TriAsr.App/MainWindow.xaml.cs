@@ -34,7 +34,6 @@ public partial class MainWindow : Window
         viewModel.Dialogs = new WpfServerDialogs(() => this);
         viewModel.PropertyChanged += (_, change) =>
         {
-            if (change.PropertyName == nameof(ShellViewModel.ShowServerPanel)) ApplyServerColumn();
             if (change.PropertyName == nameof(ShellViewModel.TerminalOutput) && viewModel.TerminalAutoScroll)
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { TerminalOutputBox.UpdateLayout(); TerminalOutputBox.ScrollToEnd(); }));
         };
@@ -59,7 +58,6 @@ public partial class MainWindow : Window
     {
         IsNavigationCompact = ActualWidth < 980;
         NavigationColumn.Width = new GridLength(IsNavigationCompact ? 72 : 230);
-        ApplyServerColumn();
     }
     private void SelectFileClick(object sender, RoutedEventArgs args)
     {
@@ -93,14 +91,6 @@ public partial class MainWindow : Window
         if (Player is not null && SpeedPicker.SelectedItem is System.Windows.Controls.ComboBoxItem item)
             Player.SpeedRatio = double.Parse(item.Tag.ToString()!, System.Globalization.CultureInfo.InvariantCulture);
     }
-    /// <summary>The right-hand column is shown when it is switched on and the window is wide enough to leave room for the page beside it.</summary>
-    private void ApplyServerColumn()
-    {
-        var show = DataContext is ShellViewModel { ShowServerPanel: true } && ActualWidth >= 900;
-        ServerColumn.Width = new GridLength(show ? 320 : 0);
-        ServerPanelHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-    }
-
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs args)
     {
         var vm = (ShellViewModel)DataContext;

@@ -14,9 +14,6 @@ public sealed partial class ShellViewModel
     private HostViewModel? _host;
     private Action<TranscriptionJob>? _updateJob;
 
-    /// <summary>Whether the right-hand panel (servers on the network, the server this computer hosts) is open. It also closes by itself when the window is narrow.</summary>
-    [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty] private bool _showServerPanel = true;
-
     /// <summary>Hosting this computer's transcription for other computers and programs.</summary>
     public HostViewModel Host => _host ??= MakeHost();
 

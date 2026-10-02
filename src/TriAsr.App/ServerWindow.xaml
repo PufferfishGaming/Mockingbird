@@ -23,10 +23,11 @@
         <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
           <StackPanel>
             <TextBlock Text="{Binding Host.DisplayName}" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold" />
-            <TextBlock Text="{local:T 'Waiting for recordings from other computers.'}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" FontSize="12"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding HasTranscriptionProgress}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+            <TextBlock Text="{local:T 'Not hosting. Press Start hosting to let other computers send recordings here.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="12" Visibility="{Binding Host.Enabled, Converter={StaticResource InverseBoolVisibility}}" />
+            <TextBlock Text="{local:T 'Waiting for recordings from other computers.'}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" FontSize="12"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Host.Enabled}" Value="True" /><Condition Binding="{Binding HasTranscriptionProgress}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
             <StackPanel Visibility="{Binding HasTranscriptionProgress, Converter={StaticResource BoolVisibility}}" Margin="0,12,0,0">
               <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding TranscriptionStage}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Text="{Binding TranscriptionProgressSummary}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="16,0,0,0" FontSize="12" /></Grid>
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding TranscriptionPercent}" Height="8" Margin="0,10,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" AutomationProperties.Name="{local:T 'Overall transcription progress'}" />
+              <ProgressBar Minimum="0" Maximum="100" Value="{Binding TranscriptionPercent, Mode=OneWay}" Height="8" Margin="0,10,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" AutomationProperties.Name="{local:T 'Overall transcription progress'}" />
             </StackPanel>
           </StackPanel>
         </Border>
@@ -34,7 +35,7 @@
           <StackPanel>
             <TextBlock Text="{Binding Readiness}" TextWrapping="Wrap" />
             <WrapPanel Margin="0,12,0,0"><Button Content="{local:T 'Download models'}" Command="{Binding InstallSelectedModelsCommand}" Margin="0,0,10,0" /><Button Content="{local:T 'Pause'}" Command="{Binding CancelModelCommand}" /></WrapPanel>
-            <ProgressBar Value="{Binding ModelDownloadPercent}" Maximum="100" Height="6" Margin="0,12,0,0" Foreground="{DynamicResource AccentBrush}" Visibility="{Binding IsModelBusy, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Model download progress'}" />
+            <ProgressBar Value="{Binding ModelDownloadPercent, Mode=OneWay}" Maximum="100" Height="6" Margin="0,12,0,0" Foreground="{DynamicResource AccentBrush}" Visibility="{Binding IsModelBusy, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Model download progress'}" />
             <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,8,0,0" />
           </StackPanel>
         </Border>

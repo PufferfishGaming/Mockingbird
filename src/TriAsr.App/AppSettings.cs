@@ -14,8 +14,8 @@ public sealed record AppSettings(string Theme = "System", string Density = "Comf
 {
     public const int CurrentVersion = 2;
 
-    /// <summary>What a first start begins with. A server exists to be reached, so the Server edition starts hosting, open to the network, until the user says otherwise.</summary>
-    public static AppSettings ForFirstStart => Edition.IsServer ? new(HostEnabled: true, HostAllowNetwork: true) : new();
+    /// <summary>What a first start begins with. A server exists to be reached, so the Server edition offers the network from the start; it still waits for the owner to press Start hosting.</summary>
+    public static AppSettings ForFirstStart => Edition.IsServer ? new(HostAllowNetwork: true) : new();
 }
 
 public sealed class SettingsStore(IStoragePaths paths, ILogger<SettingsStore> logger)

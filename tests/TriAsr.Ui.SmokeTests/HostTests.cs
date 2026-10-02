@@ -50,6 +50,45 @@ public sealed class HostTests
     }
 
     [Fact]
+    public async Task OneButtonStartsAndStopsHostingAndTheChoiceOfWhoCanUseItIsOneSetting()
+    {
+        var root = NewRoot(); var port = FreePort(); var before = Loc.Instance.Language;
+        try
+        {
+            using var host = App.App.CreateHost(root);
+            var shell = host.Services.GetRequiredService<ShellViewModel>();
+            await shell.InitializeAsync();
+            shell.Host.PortText = port.ToString();
+            Assert.False(shell.Host.Enabled);
+            Assert.True(shell.Host.LocalOnly);
+            Assert.True(await RefusesAsync(port));
+
+            shell.Host.ToggleHostingCommand.Execute(null);
+            Assert.True(shell.Host.Enabled);
+            await WaitForAsync(() => Task.FromResult(shell.Host.Status.StartsWith("Listening on this computer only")), "the server starts");
+            Assert.False(await RefusesAsync(port));
+
+            // This computer only and the network are the two answers to one question.
+            var changes = new List<string>();
+            shell.Host.PropertyChanged += (_, change) => changes.Add(change.PropertyName!);
+            shell.Host.AllowNetwork = true;
+            Assert.False(shell.Host.LocalOnly);
+            Assert.Contains(nameof(HostViewModel.LocalOnly), changes);
+            shell.Host.LocalOnly = true;
+            Assert.False(shell.Host.AllowNetwork);
+            shell.Host.LocalOnly = false;       // choosing the other half again changes nothing
+            Assert.False(shell.Host.AllowNetwork);
+
+            shell.Host.ToggleHostingCommand.Execute(null);
+            Assert.False(shell.Host.Enabled);
+            await WaitForAsync(() => Task.FromResult(shell.Host.Status == "The server is off."), "the server stops");
+            Assert.True(await RefusesAsync(port));
+            await SettledAsync(shell, host.Services.GetRequiredService<SettingsStore>(), saved => !saved.HostEnabled && !saved.HostAllowNetwork);
+        }
+        finally { Loc.Instance.SetLanguage(before); TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task HostingIsOffByDefaultAndNothingIsMadeUntilItIsUsed()
     {
         var root = NewRoot(); var before = Loc.Instance.Language;

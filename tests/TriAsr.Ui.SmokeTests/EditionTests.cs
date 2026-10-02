@@ -67,7 +67,7 @@ public sealed class EditionTests
     }
 
     [Fact]
-    public async Task OnlyAServerStartsHostingOnItsFirstStart()
+    public async Task AServerOffersTheNetworkFromTheStartButWaitsForTheOwnerToStartHosting()
     {
         var root = NewRoot();
         try
@@ -77,13 +77,13 @@ public sealed class EditionTests
             using (new As(AppEdition.Server))
             {
                 var settings = await store.LoadAsync();
-                Assert.True(settings.HostEnabled);
-                Assert.True(settings.HostAllowNetwork);
-                Assert.Equal("", settings.HostPassword); // open until the owner chooses a password
+                Assert.False(settings.HostEnabled);       // nothing is opened until the owner presses Start hosting
+                Assert.True(settings.HostAllowNetwork);   // but when they do, the server is for the network
+                Assert.Equal("", settings.HostPassword);  // open until the owner chooses a password
             }
             // Once the owner has chosen, the choice stands.
-            await store.SaveAsync(new(HostEnabled: false));
-            using (new As(AppEdition.Server)) Assert.False((await store.LoadAsync()).HostEnabled);
+            await store.SaveAsync(new(HostEnabled: true, HostAllowNetwork: false));
+            using (new As(AppEdition.Server)) { var kept = await store.LoadAsync(); Assert.True(kept.HostEnabled); Assert.False(kept.HostAllowNetwork); }
         }
         finally { TestCleanup.Delete(root); }
     }
@@ -188,6 +188,37 @@ public sealed class EditionTests
                 Assert.NotNull(host.Services.GetService<TranscriptionPipeline>());
                 Assert.NotNull(host.Services.GetService<RuntimePaths>());
                 Assert.Null(host.Services.GetService<ClientViewModel>());
+            }
+            finally { TestCleanup.Delete(root); }
+        }
+    }
+
+    [Fact]
+    public async Task TheServerShowsWhatTheStagesNoticedOnItsStatusLineAndStudioStillShowsAnAlert()
+    {
+        foreach (var kind in new[] { AppEdition.Server, AppEdition.Studio })
+        {
+            var root = NewRoot();
+            try
+            {
+                using var edition = new As(kind);
+                using var host = App.App.CreateHost(root);
+                var shell = host.Services.GetRequiredService<ShellViewModel>();
+                await shell.InitializeAsync();
+                var stages = host.Services.GetRequiredService<LocalTranscriptionStages>();
+                typeof(LocalTranscriptionStages).GetMethod("Issue", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .Invoke(stages, ["Unsupported text left out", "Segments that only Whisper wrote were left out."]);
+                if (kind == AppEdition.Server)
+                {
+                    Assert.False(shell.HasError);   // nobody may be watching a server: no alert to dismiss
+                    Assert.Equal("Unsupported text left out: Segments that only Whisper wrote were left out.", shell.Status);
+                }
+                else
+                {
+                    Assert.True(shell.HasError);
+                    Assert.Equal("Unsupported text left out", shell.ErrorTitle);
+                }
+                await shell.Host.DisposeAsync();
             }
             finally { TestCleanup.Delete(root); }
         }

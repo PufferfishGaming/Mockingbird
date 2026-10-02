@@ -6,7 +6,7 @@
       <StackPanel>
         <TextBlock Text="{Binding SetupTitle}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
         <TextBlock Text="{Binding SetupDetail}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,16,0" />
-        <ProgressBar Minimum="0" Maximum="100" Value="{Binding SetupPercent}" IsIndeterminate="{Binding SetupIndeterminate}" Height="6" Margin="0,10,16,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding SetupRunning, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Setup progress'}" />
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding SetupPercent, Mode=OneWay}" IsIndeterminate="{Binding SetupIndeterminate}" Height="6" Margin="0,10,16,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding SetupRunning, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Setup progress'}" />
       </StackPanel>
       <WrapPanel Grid.Column="1" VerticalAlignment="Center" MaxWidth="380">
         <Button Content="{Binding SetupStartLabel}" Command="{Binding RunSetupCommand}" Visibility="{Binding SetupCanStart, Converter={StaticResource BoolVisibility}}" Margin="0,0,10,4" ToolTip="{local:T 'Downloads the recommended speech models if needed and measures the speed of this computer. You can cancel and continue later.'}" />
