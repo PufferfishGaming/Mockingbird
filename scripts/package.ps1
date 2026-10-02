@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Path $portable -Force | Out-Null
 $isolatedBuild = '-p:ArtifactsPath=' + (Join-Path $packageRoot 'build')
 Invoke-Dotnet publish src/TriAsr.App/TriAsr.App.csproj -c Release -r win-x64 --self-contained true '-p:Platform=x64' '-p:NuGetLockFilePath=packages.publish.lock.json' $isolatedBuild -o $portable
 Invoke-Dotnet publish src/TriAsr.Worker/TriAsr.Worker.csproj -c Release -r win-x64 --self-contained true '-p:Platform=x64' '-p:NuGetLockFilePath=packages.publish.lock.json' $isolatedBuild -o (Join-Path $portable 'Workers/Canary')
-foreach ($runtime in @('Whisper-Vulkan','Canary','FFmpeg','Llama')) {
+foreach ($runtime in @('Whisper-Vulkan','Canary','FFmpeg','Llama','Vad')) {
     $destination = Join-Path $portable "Runtimes/$runtime"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     $source = Join-Path $repoRoot "Runtimes/$runtime"

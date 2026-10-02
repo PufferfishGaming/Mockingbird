@@ -4,7 +4,9 @@ namespace TriAsr.App;
 
 public sealed class RuntimePaths
 {
-    public string Root { get; } = DiscoverRoot();
+    public RuntimePaths() : this(DiscoverRoot()) { }
+    public RuntimePaths(string root) { Root = root; }
+    public string Root { get; }
     private readonly StorageLocations.Location _location = StorageLocations.Load();
     public string? StorageLoadError { get; } = StorageLocations.LastLoadError;
     public string DefaultDataRoot => _location.DataRoot ?? (File.Exists(Path.Combine(Root, "TriAsr.slnx")) ? Root : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TriASR"));
@@ -18,6 +20,9 @@ public sealed class RuntimePaths
     public string CanaryModel { get => _canaryModel ?? Path.Combine(ModelRoot, "Models", "Canary", "canary-1b-v2-Q8_0.gguf"); set => _canaryModel = value; }
     public string CanaryWorker => Path.Combine(AppContext.BaseDirectory, "Workers", "Canary", "TriAsr.Worker.exe");
     public string LlamaServer => Path.Combine(Root, "Runtimes", "Llama", "llama-server.exe");
+    public const string VadToolName = "whisper-vad-speech-segments.exe";
+    public string VadTool => Path.Combine(Root, "Runtimes", "Whisper-Vulkan", VadToolName);
+    public string VadModel => Path.Combine(Root, "Runtimes", "Vad", "ggml-silero-v5.1.2.bin");
     public string WhisperFor(string backend) => backend is "cpu" or "vulkan" ? Whisper : Path.Combine(BackendRuntimes.Folder(this, "Whisper", backend), "whisper-cli.exe");
     public string CanaryFor(string backend) => backend is "cpu" or "vulkan" ? CanaryRuntime : BackendRuntimes.Folder(this, "Canary", backend);
     public string CorrectionFor(string backend) => backend is "cpu" or "vulkan" ? LlamaServer : Path.Combine(BackendRuntimes.Folder(this, "Correction", backend), "llama-server.exe");
@@ -26,8 +31,11 @@ public sealed class RuntimePaths
     public string ConfigurationFingerprint(string hardwareFingerprint)
     {
         var runtimeDirectory = Path.Combine(Root, "Runtimes");
+        // The speech detector is left out on purpose: each job saves its own chunk plan, so a different detector build cannot
+        // make a running job inconsistent, and adding it must not invalidate the speed settings the user tuned.
         var dependencies = Directory.Exists(runtimeDirectory)
-            ? Directory.EnumerateFiles(runtimeDirectory, "*", SearchOption.AllDirectories).Where(path => Path.GetExtension(path) is ".dll" or ".exe")
+            ? Directory.EnumerateFiles(runtimeDirectory, "*", SearchOption.AllDirectories)
+                .Where(path => Path.GetExtension(path) is ".dll" or ".exe" && !Path.GetFileName(path).Equals(VadToolName, StringComparison.OrdinalIgnoreCase))
             : Enumerable.Empty<string>();
         var optionalDirectory = Path.Combine(ModelRoot, "BackendRuntimes");
         if (Directory.Exists(optionalDirectory)) dependencies = dependencies.Concat(Directory.EnumerateFiles(optionalDirectory, "*", SearchOption.AllDirectories).Where(path => Path.GetExtension(path) is ".dll" or ".exe"));

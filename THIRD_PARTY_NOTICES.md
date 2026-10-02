@@ -6,6 +6,7 @@ Mockingbird Studio's own license does not replace dependency licenses.
 | --- | --- | --- |
 | .NET / WPF | https://github.com/dotnet/runtime and https://github.com/dotnet/wpf | Bundled runtime; license and notice files must accompany it |
 | Whisper.cpp | https://github.com/ggml-org/whisper.cpp | Bundled native runtime; upstream MIT notice required |
+| Silero VAD (ggml conversion, ggml-silero-v5.1.2.bin) | https://github.com/snakers4/silero-vad and https://huggingface.co/ggml-org/whisper-vad | Bundled 0.9 MB speech-detection model (MIT); used by whisper-vad-speech-segments.exe from the Whisper.cpp release. Upstream MIT notice required |
 | transcribe.cpp / ggml / miniz | https://github.com/handy-computer/transcribe.cpp | Native license files copied from the installed runtime |
 | llama.cpp / OpenMP | https://github.com/ggml-org/llama.cpp | Native runtime and OpenMP notice copied; upstream notices still require review |
 | FFmpeg 9.0.2 full build (Gyan) | https://www.gyan.dev/ffmpeg/builds/ | Built with --enable-gpl --enable-version3; complete corresponding source, build materials and notices are release gates |

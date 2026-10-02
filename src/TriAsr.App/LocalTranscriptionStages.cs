@@ -78,6 +78,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             }
             else await Write(job.Id, "configuration.json", config, token);
             await AudioPreparation.NormalizeAsync(audio, job.SourcePath, normalized, FileFor(job.Id, "playback.m4a"), token);
+            await PlanChunksAsync(job.Id, normalized, config.WhisperThreads, token);
             return;
         }
         var configuration = await Read<Configuration>(job.Id, "configuration.json", token);
@@ -232,6 +233,29 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 await Write(job.Id, "final.json", final, token);
                 break;
             default: throw new ArgumentOutOfRangeException(nameof(stage));
+        }
+    }
+    /// <summary>
+    /// Finds the speech in the recording and saves the shared chunk plan (chunks.json). Nothing reads the plan yet, so a missing
+    /// detector or a failed run only leaves evidence in the job folder and never stops the job.
+    /// </summary>
+    public async Task PlanChunksAsync(Guid id, string normalized, int threads, CancellationToken token)
+    {
+        if (File.Exists(FileFor(id, "chunks.json"))) { await Read<ChunkPlan>(id, "chunks.json", token); return; }
+        if (!File.Exists(paths.VadTool) || !File.Exists(paths.VadModel))
+        {
+            await Write(id, "chunks.skipped.json", new { Reason = "The speech detector or its model is not installed.", Tool = paths.VadTool, Model = paths.VadModel }, token);
+            return;
+        }
+        try
+        {
+            var milliseconds = (long)Math.Round(WaveAudio.Inspect(normalized).DurationSeconds * 1000);
+            var spans = await VadSegmenter.DetectAsync(runner, paths.VadTool, paths.VadModel, normalized, governor.Clamp(Math.Min(4, threads)), token);
+            await Write(id, "chunks.json", ChunkPlanner.Plan(milliseconds, spans, source: "silero-v5.1.2"), token);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            await Write(id, "chunks.failed.json", new { Error = error.Message, AtUtc = DateTimeOffset.UtcNow }, token);
         }
     }
     private async Task<Configuration> GetConfiguration(CancellationToken token)
