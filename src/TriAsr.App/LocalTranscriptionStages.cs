@@ -275,14 +275,14 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
     {
         var (kept, runs) = LoopGuard.Remove(transcript.Segments);
         if (runs.Count == 0) return transcript;
-        var removed = runs.Sum(run => run.Copies - 1);
+        var removed = runs.Sum(run => run.Removed);
         var minutes = runs.Sum(run => run.EndMs - run.StartMs) / 60000d;
         await Write(id, "Whisper/loops.json", new
         {
-            Reason = "The same segment was written again and again, back to back (see LoopGuard). The first copy of each run is kept.",
+            Reason = "The same segment, or the same few segments in the same order, were written again and again, back to back (see LoopGuard). The first copy of each run is kept.",
             Removed = removed, Runs = runs, RawOutput = "Whisper/raw.json"
         }, token);
-        Issue("Repeated text removed", $"Whisper wrote the same text {removed + runs.Count} times in a row ({minutes:0.#} minutes of the recording), a known failure over stretches without speech. "
+        Issue("Repeated text removed", $"Whisper kept repeating the same text: {runs.Sum(run => run.Segments)} segments in a row over {minutes:0.#} minutes of the recording, a known failure over stretches without speech or at the end of a song. "
             + "The repeats were removed and Whisper's raw output is kept in the project folder, but speech inside that stretch may be missing from the transcript."
             + (alreadySkipping ? "" : " Turning on \"Skip silence and music\" in Settings usually avoids this and finds that speech."));
         return transcript with { Segments = kept, Text = string.Join(" ", kept.Select(segment => segment.Text)) };

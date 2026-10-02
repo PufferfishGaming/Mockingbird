@@ -180,7 +180,7 @@ public sealed class SkipNonSpeechTests : IDisposable
         using var loops = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(Directory, "Whisper", "loops.json")));
         Assert.Equal(39, loops.RootElement.GetProperty("Removed").GetInt32());
         var issue = Assert.Single(_issues, item => item.Title == "Repeated text removed");
-        Assert.Contains("40 times", issue.Message);
+        Assert.Contains("40 segments", issue.Message);
         Assert.Equal(suggestsSkipping, issue.Message.Contains("Skip silence and music"));
     }
 
@@ -188,7 +188,7 @@ public sealed class SkipNonSpeechTests : IDisposable
     public async Task AnOrdinaryWhisperOutputIsSavedUntouchedWithoutAnyNotice()
     {
         Configure(skip: false);
-        var runner = new Runner { WhisperOutput = WhisperJson(Enumerable.Range(0, 30).Select(i => (i * 3_000, i * 3_000 + 2_500, i % 2 == 0 ? "Ja, das stimmt." : "Nein, überhaupt nicht."))) };
+        var runner = new Runner { WhisperOutput = WhisperJson(Enumerable.Range(0, 30).Select(i => (i * 3_000, i * 3_000 + 2_500, $"Das ist der Satz mit der Nummer {i}."))) };
         await Stages(runner).ExecuteAsync(_jobRecord, JobState.RunningWhisper, default);
         var saved = JsonSerializer.Deserialize<EngineTranscript>(await File.ReadAllTextAsync(Path.Combine(Directory, "whisper.json")))!;
         Assert.Equal(30, saved.Segments.Count);
