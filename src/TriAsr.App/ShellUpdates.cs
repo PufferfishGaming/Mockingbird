@@ -152,7 +152,7 @@ public sealed partial class ShellViewModel
     private async Task InstallUpdateAsync()
     {
         if (_updateOffer is not { } offer) return;
-        if (IsProcessing || IsModelBusy || IsBenchmarking || IsWatchBusy || Host.IsBusy) // Host.IsBusy: a recording another computer sent is being transcribed
+        if (IsProcessing || IsModelBusy || IsBenchmarking || IsWatchBusy || Host.IsBusy || IsRecordingNow) // Host.IsBusy: a recording another computer sent is being transcribed
         {
             SetUpdateDetail(() => T("Finish the running transcription, download or benchmark first, then choose Update now again."));
             Status = UpdateDetail;

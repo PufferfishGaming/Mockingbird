@@ -51,14 +51,31 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private readonly Action<string, string> _reportError;
     private readonly string _tempRoot;
     private RemoteConnection? _connection;
+    private readonly string _recordingsFolder;
+    private RecorderViewModel? _recorder;
+
+    /// <summary>The microphone, for sending a recording made here (ADR-0016).</summary>
+    public RecorderViewModel Recorder => _recorder ??= MakeRecorder();
+
+    /// <summary>What recordings are made from. Only a test changes it, and before the recorder is first used.</summary>
+    public TriAsr.Audio.Recording.IMicrophone Microphone { get; set; } = new TriAsr.Audio.Recording.WindowsMicrophone();
+
+    private RecorderViewModel MakeRecorder()
+    {
+        var recorder = new RecorderViewModel(Microphone, _recordingsFolder, _onUi);
+        recorder.Recorded += file => SourcePath = file.Path;
+        return recorder;
+    }
+
     private CancellationTokenSource? _polling, _audio;
     private Guid _reviewJob;
     private string _reviewLanguage = "";
     private string? _rawCanaryNote;
 
-    public RemoteWorkspaceViewModel(Action<Action> onUi, Action<string, string> reportError, string tempRoot)
+    public RemoteWorkspaceViewModel(Action<Action> onUi, Action<string, string> reportError, string tempRoot, string? recordingsFolder = null)
     {
         _onUi = onUi; _reportError = reportError; _tempRoot = tempRoot;
+        _recordingsFolder = recordingsFolder ?? System.IO.Path.Combine(tempRoot, "Recordings");
         Loc.Instance.PropertyChanged += (_, change) => { if (change.PropertyName == nameof(Loc.Version)) _onUi(RefreshTexts); };
     }
 
@@ -121,6 +138,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private void RefreshTexts()
     {
         RefreshServerNote(_connection?.Info);
+        _recorder?.RefreshTexts();
         foreach (var row in Jobs) row.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
         if (Regions.Count > 0) ShowReviewSummary();
@@ -376,5 +394,6 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         _polling?.Cancel(); _audio?.Cancel();
         _polling?.Dispose(); _audio?.Dispose();
+        _recorder?.Dispose();   // a recording that is running is saved
     }
 }

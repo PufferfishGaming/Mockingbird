@@ -1,0 +1,25 @@
+<UserControl x:Class="TriAsr.App.RecorderCard" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: RecorderViewModel. Record with the microphone; the finished recording becomes the file to transcribe or to send. Shared by Studio and the Client. -->
+  <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="26">
+    <StackPanel>
+      <TextBlock Text="{local:T 'Record'}" FontSize="21" FontWeight="SemiBold" />
+      <TextBlock Text="{local:T 'Record with the microphone. The recording is saved on this computer and chosen as the recording above.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,16" />
+      <TextBlock Text="{local:T 'Microphone'}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" />
+      <ComboBox ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" IsEnabled="{Binding CanChooseDevice}" HorizontalAlignment="Left" MinWidth="280" MaxWidth="420" AutomationProperties.Name="{local:T 'Microphone'}">
+        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+        <Button Style="{StaticResource PrimaryButton}" Content="{local:T 'Start recording'}" Command="{Binding ToggleRecordingCommand}" IsEnabled="{Binding CanRecord}" AutomationProperties.Name="{local:T 'Start recording'}">
+          <Button.Visibility><Binding Path="IsRecording" Converter="{StaticResource InverseBoolVisibility}" /></Button.Visibility>
+        </Button>
+        <Button Style="{StaticResource PrimaryButton}" Content="{local:T 'Stop recording'}" Command="{Binding ToggleRecordingCommand}" Visibility="{Binding IsRecording, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Stop recording'}" />
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0" Visibility="{Binding IsRecording, Converter={StaticResource BoolVisibility}}">
+          <Ellipse Width="11" Height="11" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Elapsed}" FontSize="18" FontWeight="SemiBold" Margin="9,0,0,0" FontFamily="Consolas" AutomationProperties.Name="{local:T 'Recording time'}" />
+        </StackPanel>
+      </StackPanel>
+      <ProgressBar Minimum="0" Maximum="100" Value="{Binding Level, Mode=OneWay}" Height="6" Margin="0,16,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding IsRecording, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Microphone level'}" />
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite" />
+    </StackPanel>
+  </Border>
+</UserControl>

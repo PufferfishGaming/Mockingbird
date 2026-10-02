@@ -82,3 +82,4 @@ pre.raw { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg);
 audio { width: 100%; margin-top: 12px; }
 .keys { font-size: 12px; color: var(--muted); }
 .login { max-width: 460px; margin: 40px auto; }
+.clock { font: 600 18px/1 Consolas, "Cascadia Mono", monospace; font-variant-numeric: tabular-nums; }

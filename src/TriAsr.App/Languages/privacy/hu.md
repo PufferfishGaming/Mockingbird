@@ -10,6 +10,8 @@ A projektek tartalmazhatják a forrásmédia elérési útját és hash-érték�
 
 A telepítőcsomaggal terjesztett verziók a korábbi LocalAppData/TriASR könyvtárat használják, hacsak nem választ más projekt- vagy modellmappát. Ez megőrzi a meglévő telepítéseket. Az alkalmazás eltávolítása a projekteket, a beállításokat és a letöltött modelleket a helyükön hagyja. Adatai eltávolításához zárja be az alkalmazást, és törölje saját kezűleg a kiválasztott mappákat. A megtartani kívánt felvételeket és exportokat előtte mentse el. A Server a fájljait a LocalAppData/TriASR-Server, a Client a LocalAppData/TriASR-Client mappában tárolja.
 
+Felvétel: az alkalmazás csak a Felvétel indítása és a Felvétel leállítása gomb között használja a mikrofont. A programban a felvétel WAV-fájlként az adatmappa Recordings mappájába kerül, és ott marad, amíg Ön törli; a weboldalon a böngésző előbb engedélyt kér, és a felvétel a böngészőben marad, amíg el nem küldi. A felvételt sehová sem küldi el az alkalmazás, hacsak Ön nem küldi el egy szervernek.
+
 ## Hálózati kapcsolatok
 Amikor modell- vagy futtatókörnyezet-letöltést kér, az alkalmazás a Hugging Face vagy a GitHub szolgáltatásához és azok letöltési infrastruktúrájához csatlakozik. Ezek a szolgáltatók a szokásos kapcsolati adatokat kapják meg, például az Ön IP-címét és a kért fájlt. A média- és átirattartalmak nem részei ezeknek a letöltési kéréseknek. A szolgáltatók saját szolgáltatásaira a saját adatvédelmi szabályzatuk vonatkozik:
 - https://huggingface.co/privacy

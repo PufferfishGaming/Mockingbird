@@ -212,6 +212,33 @@ public sealed class UpdateUiTests
         await shell.Host.DisposeAsync();
     }
 
+    private sealed class QuietRoom : TriAsr.Audio.Recording.IMicrophone
+    {
+        public IReadOnlyList<TriAsr.Audio.Recording.InputDevice> Devices() => [new(TriAsr.Audio.Recording.WindowsMicrophone.DefaultDevice, "")];
+        public IDisposable Start(int deviceId, Action<ReadOnlyMemory<byte>> onData, Action<Exception> onFailure) => new Nothing();
+        private sealed class Nothing : IDisposable { public void Dispose() { } }
+    }
+
+    [Fact]
+    public async Task UpdateIsRefusedWhileARecordingIsBeingMade()
+    {
+        using var fixture = new Fixture();
+        fixture.Respond = request => request.RequestUri!.AbsolutePath.EndsWith("latest.json", StringComparison.Ordinal)
+            ? Json(Manifest("99.0.0")) : throw new InvalidOperationException("The installer must not be downloaded during a recording.");
+        var shell = fixture.Shell(testSource: true);
+        shell.Microphone = new QuietRoom();
+        await shell.InitializeAsync();
+        await shell.RunUpdateCheckAsync(manual: true);
+        shell.Recorder.ToggleRecordingCommand.Execute(null);
+        Assert.True(shell.IsRecordingNow);
+        var requestsBefore = fixture.Requests;
+        await shell.InstallUpdateCommand.ExecuteAsync(null);
+        Assert.Equal(requestsBefore, fixture.Requests);
+        Assert.Contains("Finish the running", shell.UpdateDetail);
+        shell.Recorder.StopForExit();
+        await shell.Host.DisposeAsync();
+    }
+
     [Fact]
     public async Task OnlyTheInstalledCopyCanReplaceItself()
     {

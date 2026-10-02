@@ -41,6 +41,7 @@
               <TextBlock Text="{Binding SendStatus}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" />
             </StackPanel>
           </Border>
+          <local:RecorderCard DataContext="{Binding Recorder}" Margin="0,18,0,0" />
         </StackPanel>
 
         <!-- Projects -->

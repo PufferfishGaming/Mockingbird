@@ -411,6 +411,9 @@ public partial class App : System.Windows.Application
                     window.Width = 1220;
                     for (var wait = 0; wait < 100 && !shell.IsRemotePage; wait++) await Task.Delay(50);
                     if (!shell.IsRemotePage) throw new InvalidOperationException("Connecting did not open the page of the server.");
+                    shell.Remote.SelectedTab = "New";
+                    await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    ShellSmoke.Capture(window, Path.Combine(dataRoot, "renders", "remote-new.png"), 1220, 1100, 1);
                     shell.Remote.SelectedTab = "Projects";
                     for (var wait = 0; wait < 100 && shell.Remote.Jobs.Count < 3; wait++) await Task.Delay(100);
                     if (shell.Remote.Jobs.Count != 3) throw new InvalidOperationException($"The server's project list has {shell.Remote.Jobs.Count} recordings instead of 3.");

@@ -175,5 +175,9 @@
  "The update version number is not valid.",
  "The running version number is not valid.",
  "Choose a supported export format: TXT, MD, JSON, CSV, SRT, VTT or DOCX.",
- "Whisper returned invalid timestamps."
+ "Whisper returned invalid timestamps.",
+ "No microphone was found. Connect one, or check that it is enabled in the Windows sound settings.",
+ "The microphone is being used by another program. Close that program, or choose another microphone.",
+ "This microphone cannot record in the format the speech programs need.",
+ "There is not enough free disk space to record."
 ]

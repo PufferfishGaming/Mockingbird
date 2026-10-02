@@ -10,6 +10,8 @@ Los proyectos pueden contener la ruta y el hash del archivo multimedia de origen
 
 Las versiones instaladas de la aplicación usan el directorio heredado LocalAppData/TriASR, a menos que elija otra carpeta de proyectos o de modelos. Así se conservan las instalaciones existentes. Desinstalar la aplicación deja en su sitio los proyectos, los ajustes y los modelos descargados. Para eliminar sus datos, cierre la aplicación y borre usted mismo las carpetas elegidas. Conserve las grabaciones o exportaciones que desee mantener. Server guarda sus archivos en LocalAppData/TriASR-Server y Client en LocalAppData/TriASR-Client.
 
+Grabación: la aplicación usa el micrófono solo entre «Iniciar grabación» y «Detener grabación». En el programa, la grabación se guarda como archivo WAV en la carpeta Recordings de la carpeta de datos y permanece allí hasta que usted la elimine; en la página web, el navegador pide permiso primero y la grabación permanece en el navegador hasta que usted la envíe. Una grabación no se envía a ninguna parte salvo que usted la envíe a un servidor.
+
 ## Conexiones de red
 Cuando solicita descargas de modelos o de entornos de ejecución, la aplicación se conecta a Hugging Face o a GitHub y a su infraestructura de descarga. Esos proveedores reciben la información de conexión habitual, como su dirección IP y el recurso solicitado. El contenido de los archivos multimedia y de las transcripciones no se incluye en estas solicitudes de descarga. A sus servicios se aplican las políticas de privacidad de los proveedores:
 - https://huggingface.co/privacy

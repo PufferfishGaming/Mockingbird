@@ -97,6 +97,7 @@ public partial class MainWindow : Window
         if (vm.IsProcessing) vm.CancelCommand.Execute(null);
         vm.CancelModelCommand.Execute(null); vm.CancelBenchmarkCommand.Execute(null);
         vm.StopWatchingForExit();
+        vm.StopRecordingForExit();
         vm.Host.StopForExit();
         vm.Remote.Dispose();
         _ = vm.Servers.DisposeAsync().AsTask();

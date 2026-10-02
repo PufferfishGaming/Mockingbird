@@ -10,6 +10,8 @@ Projekte können den Pfad und den Hash der Quellmedien, normalisiertes Audio, Ro
 
 Mit dem Installationspaket installierte Versionen verwenden das bisherige Verzeichnis LocalAppData/TriASR, sofern Sie keinen anderen Projekt- oder Modellordner wählen. So bleiben bestehende Installationen erhalten. Beim Deinstallieren der App bleiben Projekte, Einstellungen und heruntergeladene Modelle an ihrem Platz. Um Ihre Daten zu entfernen, schließen Sie die App und löschen Sie die gewählten Ordner selbst. Bewahren Sie Aufnahmen oder Exporte, die Sie behalten möchten, vorher auf. Server speichert seine Dateien in LocalAppData/TriASR-Server, Client in LocalAppData/TriASR-Client.
 
+Aufnahme: Die App verwendet das Mikrofon nur zwischen „Aufnahme starten“ und „Aufnahme beenden“. Im Programm wird eine Aufnahme als WAV-Datei im Ordner Recordings des Datenordners gespeichert und bleibt dort, bis Sie sie löschen; auf der Webseite fragt der Browser zuerst um Erlaubnis, und die Aufnahme bleibt im Browser, bis Sie sie senden. Eine Aufnahme wird nirgendwohin gesendet, außer Sie senden sie selbst an einen Server.
+
 ## Netzwerkverbindungen
 Wenn Sie Modell- oder Laufzeit-Downloads anfordern, verbindet sich die App mit Hugging Face oder GitHub und deren Download-Infrastruktur. Diese Anbieter erhalten übliche Verbindungsinformationen wie Ihre IP-Adresse und die angeforderte Datei. Medien- und Transkriptinhalte sind in diesen Download-Anfragen nicht enthalten. Für die Dienste der Anbieter gelten deren Datenschutzerklärungen:
 - https://huggingface.co/privacy

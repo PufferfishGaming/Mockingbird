@@ -10,6 +10,8 @@ Projects may contain a source-media path and hash, normalized audio, raw engine 
 
 Installed versions of the app use the legacy LocalAppData/TriASR directory unless you choose another project or model folder. This preserves existing installations. Uninstalling the app leaves projects, settings and downloaded models in place. To remove your data, close the app and delete the chosen folders yourself. Keep any recordings or exports you want to retain. Server keeps its files in LocalAppData/TriASR-Server and Client in LocalAppData/TriASR-Client.
 
+Recording: the app uses the microphone only between pressing Start recording and Stop recording. In the program a recording is saved as a WAV file in the Recordings folder of the data folder and stays there until you delete it; in the web page the browser asks for your permission first and the recording stays in the browser until you send it. A recording is not sent anywhere unless you send it to a server yourself.
+
 ## Network connections
 When you request model or runtime downloads, the app connects to Hugging Face or GitHub and their download infrastructure. Those providers receive normal connection information such as your IP address and the requested asset. Media and transcript contents are not included in these download requests. Provider privacy policies apply to their services:
 - https://huggingface.co/privacy

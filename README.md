@@ -59,6 +59,7 @@ Native Linux support is pending; there is currently no native Linux build.
 - TXT, Markdown, JSON, CSV, SRT, VTT and DOCX export.
 - Persistent model downloads, CPU/Vulkan backends, optional compatible CUDA/ROCm runtimes and measured auto-tuning.
 - Live activity output, an interactive PowerShell panel and light/dark/system themes.
+- An in-app recorder: record with the microphone in Studio, in the Client or in the browser; the recording becomes the file to transcribe or to send.
 - The interface in English, Hungarian, German, Spanish and French: chosen on the first start, switchable in Settings without a restart.
 - In-app update checks with a verified one-click update.
 - Three editions: Studio does everything on one computer, Server holds the models and serves them, Client is only the window (see Editions).

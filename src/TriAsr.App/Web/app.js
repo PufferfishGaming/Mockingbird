@@ -177,6 +177,7 @@
   }
 
   async function remount() {
+    if (recorder.media) stopRecording();
     renderHeader();
     if (!state.health) return;
     if (state.health.passwordRequired && !state.password) { showLogin(""); return; }
@@ -260,9 +261,114 @@
       h("div", { class: "card stack" }, drop, input,
         h("div", null, h("label", { for: "language" }, t("Language")), language),
         h("div", { class: "row" }, send),
-        progress, status));
+        progress, status),
+      buildRecorder());
     if (state.file) choose(state.file);
   }
+
+  // ---- record with the microphone ---------------------------------------------------------------------------------------------------------
+  // The browser records (MediaRecorder) and asks the user's permission itself; the recording stays in the page until it is sent like any chosen file.
+
+  const recorder = { media: null, stream: null, context: null, chunks: [], started: 0, timer: 0, quiet: 0, type: "" };
+
+  function buildRecorder() {
+    const start = h("button", { class: "btn primary", type: "button", onClick: () => startRecording() }, t("Start recording"));
+    const stop = h("button", { class: "btn primary", type: "button", hidden: true, onClick: () => stopRecording() }, t("Stop recording"));
+    const timeLabel = h("span", { class: "clock", hidden: true, "aria-label": t("Recording time") }, "0:00");
+    const level = h("progress", { max: "100", value: "0", hidden: true, "aria-label": t("Microphone level") });
+    const message = h("p", { class: "muted", "aria-live": "polite" }, "");
+    const devices = h("select", { "aria-label": t("Microphone"), id: "microphone" }, h("option", { value: "" }, t("Default microphone")));
+    Object.assign(ui, { recStart: start, recStop: stop, recClock: timeLabel, recLevel: level, recMessage: message, recDevices: devices });
+    return h("div", { class: "card stack" },
+      h("h2", null, t("Record")),
+      h("p", { class: "muted" }, t("Record with the microphone. The recording is chosen as the recording above and is only sent when you press the button.")),
+      h("div", null, h("label", { for: "microphone" }, t("Microphone")), devices),
+      h("div", { class: "row" }, start, stop, timeLabel),
+      level, message);
+  }
+
+  function recordingType() {
+    if (typeof MediaRecorder === "undefined") return null;
+    return ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
+
+  async function startRecording() {
+    if (recorder.media) return;
+    if (!window.isSecureContext || !navigator.mediaDevices) { ui.recMessage.textContent = t("The browser only allows recording on a secure page (https, or localhost)."); return; }
+    const type = recordingType();
+    if (type === null) { ui.recMessage.textContent = t("Recording is not available in this browser."); return; }
+    try {
+      const wanted = ui.recDevices.value;
+      recorder.stream = await navigator.mediaDevices.getUserMedia({ audio: wanted ? { deviceId: { exact: wanted } } : true });
+    } catch (error) {
+      ui.recMessage.textContent = error && error.name === "NotFoundError" ? t("No microphone was found. Connect one and allow the browser to use it.")
+        : t("The browser did not allow this page to use the microphone. Allow it in the address bar, then try again.");
+      return;
+    }
+    await listMicrophones();
+    recorder.chunks = []; recorder.type = type; recorder.quiet = 0;
+    recorder.media = type ? new MediaRecorder(recorder.stream, { mimeType: type }) : new MediaRecorder(recorder.stream);
+    recorder.media.addEventListener("dataavailable", (event) => { if (event.data && event.data.size) recorder.chunks.push(event.data); });
+    recorder.media.addEventListener("stop", finishRecording);
+    recorder.media.start(1000);
+    recorder.started = Date.now();
+    const analyser = meter(recorder.stream);
+    ui.recStart.hidden = true; ui.recStop.hidden = false; ui.recClock.hidden = false; ui.recLevel.hidden = false; ui.recDevices.disabled = true;
+    ui.recMessage.textContent = t("Recording…");
+    recorder.timer = window.setInterval(() => {
+      ui.recClock.textContent = clock(Date.now() - recorder.started);
+      const peak = analyser();
+      ui.recLevel.value = peak * 100;
+      recorder.quiet = peak > 0.002 ? 0 : recorder.quiet + 1;
+      if (recorder.quiet === 20) ui.recMessage.textContent = t("No sound is coming from the microphone. Check that it is not muted and that the browser is using the right microphone.");
+      else if (recorder.quiet === 0 && ui.recMessage.textContent !== t("Recording…")) ui.recMessage.textContent = t("Recording…");
+    }, 100);
+  }
+
+  /** A function that answers how loud the microphone is now, 0 to 1. */
+  function meter(stream) {
+    try {
+      recorder.context = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = recorder.context.createAnalyser();
+      analyser.fftSize = 1024;
+      recorder.context.createMediaStreamSource(stream).connect(analyser);
+      const samples = new Uint8Array(analyser.fftSize);
+      return () => { analyser.getByteTimeDomainData(samples); let peak = 0; for (const sample of samples) peak = Math.max(peak, Math.abs(sample - 128) / 128); return peak; };
+    } catch { return () => 0.5; }
+  }
+
+  async function listMicrophones() {
+    try {
+      const chosen = ui.recDevices.value;
+      const found = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "audioinput" && device.deviceId && device.deviceId !== "default");
+      ui.recDevices.replaceChildren(h("option", { value: "" }, t("Default microphone")), ...found.map((device) => h("option", { value: device.deviceId }, device.label || t("Microphone"))));
+      ui.recDevices.value = found.some((device) => device.deviceId === chosen) ? chosen : "";
+    } catch { /* the list stays as it was */ }
+  }
+
+  function stopRecording() {
+    if (recorder.media && recorder.media.state !== "inactive") recorder.media.stop(); // finishRecording runs when the last piece has arrived
+  }
+
+  function finishRecording() {
+    window.clearInterval(recorder.timer);
+    const duration = Date.now() - recorder.started;
+    for (const track of recorder.stream ? recorder.stream.getTracks() : []) track.stop();
+    if (recorder.context) { recorder.context.close().catch(() => { }); recorder.context = null; }
+    const quiet = recorder.quiet >= 20 && recorder.chunks.length === 0;
+    const type = (recorder.media && recorder.media.mimeType) || recorder.type || "audio/webm";
+    recorder.media = null; recorder.stream = null;
+    ui.recStart.hidden = false; ui.recStop.hidden = true; ui.recClock.hidden = true; ui.recLevel.hidden = true; ui.recDevices.disabled = false;
+    if (quiet || !recorder.chunks.length || duration < 500) { ui.recMessage.textContent = t("No sound was recorded. Check that the microphone is not muted and that the browser may use it."); return; }
+    const extension = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "m4a" : "webm";
+    const now = new Date();
+    const stamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + " " + pad(now.getHours()) + "-" + pad(now.getMinutes()) + "-" + pad(now.getSeconds());
+    const file = new File(recorder.chunks, "Recording " + stamp + "." + extension, { type: type.split(";")[0] });
+    recorder.chunks = [];
+    choose(file);
+    ui.recMessage.textContent = t("Recording saved: {0} ({1})", file.name, clock(duration));
+  }
+
 
   function languageOptions() {
     const names = new Intl.Collator(text.lang);
@@ -533,7 +639,7 @@
     }, (message) => t("Export failed") + ": " + message);
   }
 
-  window.addEventListener("beforeunload", (event) => { if (state.dirty) { event.preventDefault(); event.returnValue = ""; } });
+  window.addEventListener("beforeunload", (event) => { if (state.dirty || recorder.media) { event.preventDefault(); event.returnValue = ""; } });
 
   document.addEventListener("keydown", (event) => {
     if (state.tab !== "review" || !state.review || event.ctrlKey || event.metaKey || event.altKey) return;

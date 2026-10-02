@@ -10,6 +10,8 @@ Les projets peuvent contenir le chemin et le hachage du fichier multimédia sour
 
 Les versions installées avec le programme d'installation utilisent l'ancien répertoire LocalAppData/TriASR, sauf si vous choisissez un autre dossier de projets ou de modèles. Cela préserve les installations existantes. La désinstallation de l'application laisse en place les projets, les paramètres et les modèles téléchargés. Pour supprimer vos données, fermez l'application et supprimez vous-même les dossiers choisis. Conservez les enregistrements ou les exports que vous souhaitez garder. Server conserve ses fichiers dans LocalAppData/TriASR-Server et Client dans LocalAppData/TriASR-Client.
 
+Enregistrement : l'application n'utilise le microphone qu'entre « Démarrer l'enregistrement » et « Arrêter l'enregistrement ». Dans le programme, un enregistrement est sauvegardé en fichier WAV dans le dossier Recordings du dossier de données et y reste jusqu'à ce que vous le supprimiez ; sur la page web, le navigateur demande d'abord votre autorisation et l'enregistrement reste dans le navigateur jusqu'à ce que vous l'envoyiez. Un enregistrement n'est envoyé nulle part, sauf si vous l'envoyez vous-même à un serveur.
+
 ## Connexions réseau
 Lorsque vous demandez le téléchargement de modèles ou de runtimes, l'application se connecte à Hugging Face ou à GitHub et à leur infrastructure de téléchargement. Ces fournisseurs reçoivent les informations de connexion habituelles, telles que votre adresse IP et la ressource demandée. Le contenu des fichiers multimédias et des transcriptions n'est pas inclus dans ces demandes de téléchargement. Les politiques de confidentialité des fournisseurs s'appliquent à leurs services :
 - https://huggingface.co/privacy
