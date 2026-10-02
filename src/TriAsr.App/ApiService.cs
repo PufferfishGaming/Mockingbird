@@ -23,12 +23,15 @@ namespace TriAsr.App;
 /// <param name="CanRun">False while the program is busy with something that must not overlap (model download, tuning, setup).</param>
 /// <param name="BusyChanged">Told when the API starts and stops working on a job.</param>
 /// <param name="Links">Fetches the sound of a web address for <c>POST /v1/links</c>. Null: this server does not fetch links.</param>
+/// <param name="Live">Reads one phrase of live dictation for <c>POST /v1/live</c>. Null: this server does not read dictation.</param>
+/// <param name="LiveReady">Whether <paramref name="Live"/> can read a phrase right now (a speech model is installed); null means always.</param>
 /// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c>. Null: this server does not delete recordings.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
-    Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null);
+    Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null,
+    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null);
 
 /// <summary>Everything the remote review page needs about a finished job.</summary>
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
@@ -164,6 +167,8 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "GET" ? Languages() : MethodNotAllowed("GET");
             case ["v1", "transcriptions"]:
                 return request.Method switch { "POST" => await UploadAsync(request, token), "GET" => List(), _ => MethodNotAllowed("GET, POST") };
+            case ["v1", "live"]:
+                return request.Method == "POST" ? await LiveAsync(request, token) : MethodNotAllowed("POST");
             case ["v1", "links"]:
                 return request.Method == "POST" ? await LinkAsync(request, token) : MethodNotAllowed("POST");
             case ["v1", "transcriptions", var id]:
@@ -187,7 +192,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- who the request is for -------------------------------------------------------------------------------------------------------
 
@@ -308,6 +313,33 @@ public sealed class ApiService : IAsyncDisposable
         var (job, refusal) = await StartJobAsync(upload.Path, upload.Name, language, token);
         if (refusal is not null) return refusal;
         return HttpResponse.Json(202, Describe(job!)).With("Location", $"/v1/transcriptions/{job!.Id}");
+    }
+
+    // ---- live dictation ------------------------------------------------------------------------------------------------------------
+
+    private const int MaxLiveBody = 2 * 1024 * 1024;       // a minute of sound is 1.9 MB: far more than a phrase
+
+    /// <summary>
+    /// <c>POST /v1/live?language=xx</c>: the body is one phrase as a WAV file; the answer is <c>{"text": "..."}</c>. This is what a Client types with while its person dictates:
+    /// only the speech program runs (no second engine, no comparison), so that the answer comes back within a second or two.
+    /// </summary>
+    private async Task<HttpResponse> LiveAsync(HttpRequest request, CancellationToken token)
+    {
+        if (_deps.Live is not { } live) return HttpResponse.Error(501, "live_unavailable", "This server does not read live dictation.");
+        if (LanguageProblem(request.Query.GetValueOrDefault("language"), out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        if (request.ContentLength > MaxLiveBody) return HttpResponse.Error(413, "payload_too_large", LiveMessages.TooLong);
+        using var buffer = new MemoryStream();
+        var piece = new byte[64 * 1024]; int read;
+        while ((read = await request.Body.ReadAsync(piece, token)) > 0)
+        {
+            if (buffer.Length + read > MaxLiveBody) return HttpResponse.Error(413, "payload_too_large", LiveMessages.TooLong);
+            buffer.Write(piece, 0, read);
+        }
+        if (buffer.Length < 44) return HttpResponse.Error(400, "empty_upload", "Send one phrase as a WAV file in the request body.");
+        try { return HttpResponse.Json(200, new { text = await live.RecognizeAsync(buffer.ToArray(), language, token) }); }
+        catch (LiveException error) when (error.Message == LiveMessages.NoModel) { return HttpResponse.Error(409, "models_missing", error.Message); }
+        catch (LiveException error) when (error.Message == LiveMessages.TooLong) { return HttpResponse.Error(413, "payload_too_large", error.Message); }
+        catch (LiveException error) { return HttpResponse.Error(502, "live_failed", error.Message); }
     }
 
     // ---- links ------------------------------------------------------------------------------------------------------------------------
@@ -494,7 +526,8 @@ public sealed class ApiService : IAsyncDisposable
         var password = _deps.GetPassword().Length > 0;
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
-            LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true));
+            LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true)));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

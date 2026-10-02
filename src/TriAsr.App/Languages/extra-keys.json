@@ -196,5 +196,8 @@
  "The link could not be downloaded.",
  "The link helper could not be downloaded.",
  "The link helper failed its checksum and was not installed.",
- "The link helper is in use. Wait until the download that uses it has finished, then try again."
+ "The link helper is in use. Wait until the download that uses it has finished, then try again.",
+ "No speech model is downloaded yet. Download one on the Models page.",
+ "The phrase could not be recognised.",
+ "The phrase is too long."
 ]

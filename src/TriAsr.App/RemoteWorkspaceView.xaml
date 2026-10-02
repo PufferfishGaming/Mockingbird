@@ -43,6 +43,7 @@
           </Border>
           <local:RecorderCard DataContext="{Binding Recorder}" Margin="0,18,0,0" />
           <local:LinkCard DataContext="{Binding Link}" Margin="0,18,0,0" />
+          <local:DictationCard DataContext="{Binding Dictation}" Margin="0,18,0,0" />
         </StackPanel>
 
         <!-- Projects -->

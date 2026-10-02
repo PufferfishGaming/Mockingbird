@@ -359,6 +359,24 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
         }
         return new(hash, backend, threads, backend, threads, backend, threads, false);
     }
+    /// <summary>
+    /// The graphics card or processor, and the number of threads, that a phrase of live dictation is read with: what a transcription would use. The models are not checked
+    /// the way a transcription checks them, because dictation reads with whichever Whisper model is installed.
+    /// </summary>
+    public async Task<(string Backend, int Threads)> LiveExecutionAsync(string model, CancellationToken token)
+    {
+        HardwareProfile? hardware = null;
+        var profile = Path.Combine(storage.Root, "Config", "hardware-profile.json");
+        if (File.Exists(profile)) hardware = JsonSerializer.Deserialize<HardwareProfile>(await File.ReadAllTextAsync(profile, token));
+        var gpu = hardware?.Gpus.MaxBy(item => item.DedicatedBytes);
+        var weights = File.Exists(model) ? (ulong)new FileInfo(model).Length : 0UL;
+        var backend = hardware?.VulkanDevices.Count > 0 && GpuMemoryPlanner.Fits(gpu?.DedicatedBytes ?? 0, weights, 1024UL * 1024 * 1024, 512UL * 1024 * 1024, 1024UL * 1024 * 1024) ? "vulkan" : "cpu";
+        var threads = Math.Clamp(hardware?.Topology.PerformanceCores ?? Environment.ProcessorCount / 2, 1, 12);
+        var active = await ExecutionSettingsStore.LoadAsync(storage.Root);
+        if (active?.Fingerprint == paths.ConfigurationFingerprint(hardware?.Fingerprint ?? "unknown")) return (active.WhisperBackend, active.WhisperThreads);
+        return (backend, threads);
+    }
+
     public async Task<bool> CanRunSpeechParallelAsync(TranscriptionJob job, CancellationToken token) =>
         (await Read<JobConfiguration>(job.Id, "configuration.json", token)).ParallelSpeech;
     public async Task<bool> RecoverSpeechFailureAsync(TranscriptionJob job, JobState stage, Exception error, CancellationToken token)

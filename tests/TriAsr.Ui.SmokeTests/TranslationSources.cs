@@ -32,8 +32,10 @@ internal static partial class TranslationSources
         Directory.EnumerateFiles(AppFolder, "*.xaml", SearchOption.AllDirectories)
             .Where(path => !IsBuildOutput(path) && (includeLiteralWindows || !LiteralWindows.Contains(Path.GetFileName(path))));
 
+    /// <summary>Every code file of the app, in nested folders too (dictation).</summary>
     public static IEnumerable<string> CodeFiles(bool includeHarness = false) =>
-        Directory.EnumerateFiles(AppFolder, "*.cs").Where(path => includeHarness || !HarnessFiles.Contains(Path.GetFileName(path)));
+        Directory.EnumerateFiles(AppFolder, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(path) && (includeHarness || !HarnessFiles.Contains(Path.GetFileName(path))));
 
     /// <summary>The source of the layers below the app, where the messages listed in extra-keys.json and in <c>LowerLayerMessages</c> are written.</summary>
     public static string LowerLayerSource() =>
@@ -56,7 +58,7 @@ internal static partial class TranslationSources
         "Time", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
         // the user's own words, program output, paths and numbers
         "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Location",
-        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName", "Label", "Elapsed", "CreatedUtc", "LinkText", "Description", "ActionLabel", "Note", "NoteActionLabel", "LinkHelper.Summary", "LinkHelper.ActionLabel",
+        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName", "Label", "Elapsed", "CreatedUtc", "OverlayButtonLabel", "HotkeyNote", "LastText", "LinkText", "Description", "ActionLabel", "Note", "NoteActionLabel", "LinkHelper.Summary", "LinkHelper.ActionLabel",
         // the name of a language in that language
         "NativeName"
     };

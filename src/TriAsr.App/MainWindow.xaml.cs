@@ -19,6 +19,7 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) == true) ((ShellViewModel)DataContext).SetStorageLocation(dialog.FolderName, forModels);
     }
     private bool _playing;
+    private readonly WpfDictationPresenter _dictationPresenter;
     public static readonly DependencyProperty IsNavigationCompactProperty = DependencyProperty.Register(
         nameof(IsNavigationCompact), typeof(bool), typeof(MainWindow), new PropertyMetadata(false));
     public bool IsNavigationCompact
@@ -32,6 +33,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         viewModel.Dialogs = new WpfServerDialogs(() => this);
+        _dictationPresenter = new WpfDictationPresenter();
+        viewModel.Dictation.Presenter = _dictationPresenter;
         viewModel.PropertyChanged += (_, change) =>
         {
             if (change.PropertyName == nameof(ShellViewModel.TerminalOutput) && viewModel.TerminalAutoScroll)
@@ -134,6 +137,8 @@ public partial class MainWindow : Window
         vm.CancelModelCommand.Execute(null); vm.CancelBenchmarkCommand.Execute(null);
         vm.StopWatchingForExit();
         vm.StopRecordingForExit();
+        vm.StopDictationForExit();
+        _dictationPresenter.Dispose();
         vm.Host.StopForExit();
         vm.Remote.Dispose();
         _ = vm.Servers.DisposeAsync().AsTask();

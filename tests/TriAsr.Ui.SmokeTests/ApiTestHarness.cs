@@ -66,6 +66,24 @@ internal sealed class FakeStages : ITranscriptionStages
     public Task SaveManualAsync(FinalTranscript transcript, CancellationToken token = default) => throw new NotSupportedException();
 }
 
+/// <summary>Stands in for the speech program that reads one phrase of live dictation: it records what it was given and answers what the test says.</summary>
+internal sealed class FakeLive : ILiveRecognizer
+{
+    public bool Ready { get; set; } = true;
+    public string Answer { get; set; } = "Hello there.";
+    public Func<byte[], string, Exception?>? Fail { get; set; }
+    public TimeSpan Delay { get; set; }
+    public List<(byte[] Wav, string Language)> Calls { get; } = [];
+
+    public async Task<string> RecognizeAsync(byte[] wav, string language, CancellationToken token)
+    {
+        lock (Calls) Calls.Add((wav, language));
+        if (Delay > TimeSpan.Zero) await Task.Delay(Delay, token);
+        if (Fail?.Invoke(wav, language) is { } error) throw error;
+        return Answer;
+    }
+}
+
 /// <summary>Stands in for the program that downloads the sound of a link: it records what it was asked, can be held, can fail, and writes a small file.</summary>
 internal sealed class FakeLinks : ILinkFetcher
 {
@@ -105,6 +123,8 @@ internal sealed class Harness : IAsyncDisposable
     public string Name { get; set; } = "Test server";
     /// <summary>Fetches the sound of links for <c>POST /v1/links</c>; null makes the server one that does not fetch links.</summary>
     public FakeLinks? Links { get; set; }
+    /// <summary>Reads the phrases of live dictation for <c>POST /v1/live</c>; null makes the server one that does not read dictation.</summary>
+    public FakeLive? Live { get; set; }
     /// <summary>Deletes a finished recording with its files, the real thing over the harness's repository and folders.</summary>
     public ProjectRemoval Removal { get; private set; } = null!;
     public FinalTranscript? Saved { get; private set; }
@@ -127,7 +147,7 @@ internal sealed class Harness : IAsyncDisposable
             (id, _) => Task.FromResult(ApiTestData.Transcript(id, harness.Native)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
             () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(ApiTestData.Transcript(id, harness.Native), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
-            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token)));
+            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();
         harness.Identity = ServerIdentity.LoadOrCreate(Path.Combine(harness.Root, "Identity"));

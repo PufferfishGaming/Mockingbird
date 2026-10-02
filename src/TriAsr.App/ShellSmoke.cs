@@ -56,6 +56,7 @@ public static class ShellSmoke
         }
         count += await LanguageRendersAsync(window, shell, output);
         await KaraokeRendersAsync(window, shell, output);       // extra pictures for a look at the colours; not counted in the matrix
+        DictationRenders(shell, output);
         shell.ReportError("Download needs attention", "The download host is unavailable. Your downloaded models and partial files are retained. Retry when the connection is restored.");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         if (!shell.HasError || FindText(window, shell.ErrorTitle) is null) throw new InvalidOperationException("Error alert did not appear.");
@@ -85,6 +86,40 @@ public static class ShellSmoke
             Capture(window, Path.Combine(output, $"karaoke-{requested}.png"), 1220, 900, 1);
         }
         shell.Regions.Remove(before); shell.Regions.Remove(region);
+        shell.SelectedTheme = "Light";
+    }
+
+    /// <summary>The little dictation window in both themes. It is drawn but never shown, so that a smoke run does not put a window above the programs of the person running it.</summary>
+    private static void DictationRenders(ShellViewModel shell, string output)
+    {
+        var overlay = new DictationOverlay(shell.Dictation);
+        try
+        {
+            // The picture is taken of the window's content, whose own margin (room for the shadow) would be cut off: so the pill is drawn inside a plain grid.
+            var pill = (FrameworkElement)overlay.Content;
+            overlay.Content = null;
+            pill.HorizontalAlignment = HorizontalAlignment.Left;
+            overlay.Content = new System.Windows.Controls.Grid { Children = { pill } };
+            foreach (var requested in new[] { "Dark", "Light" })
+            {
+                shell.SelectedTheme = requested;
+                overlay.Background = new SolidColorBrush(requested == "Dark" ? Color.FromRgb(0x18, 0x18, 0x18) : Color.FromRgb(0xDD, 0xDD, 0xDD));   // the window is see-through; this stands for whatever is behind it
+                Capture(overlay, Path.Combine(output, $"dictation-overlay-{requested}.png"), 440, double.PositiveInfinity, 2);
+            }
+        }
+        finally { overlay.Close(); }
+        // The card on the New transcription page, which is too far down that page to be in its picture.
+        var card = new Window { Content = new System.Windows.Controls.Grid { Children = { new DictationCard { DataContext = shell.Dictation, Margin = new Thickness(24) } } } };
+        try
+        {
+            foreach (var requested in new[] { "Dark", "Light" })
+            {
+                shell.SelectedTheme = requested;
+                card.SetResourceReference(Window.BackgroundProperty, "WindowBackgroundBrush");
+                Capture(card, Path.Combine(output, $"dictation-card-{requested}.png"), 960, double.PositiveInfinity, 1);
+            }
+        }
+        finally { card.Close(); }
         shell.SelectedTheme = "Light";
     }
 
@@ -121,6 +156,7 @@ public static class ShellSmoke
                 if (FindText(window, Loc.T("Settings")) is null) throw new InvalidOperationException($"The sidebar is not shown in {language.Code}.");
                 if (FindText(window, Loc.T("Host a server")) is null) throw new InvalidOperationException($"The server panel is not shown in {language.Code}.");
                 if (name == "New Transcription" && FindText(window, Loc.T("Select file")) is null) throw new InvalidOperationException($"The buttons are not shown in {language.Code}.");
+                if (name == "New Transcription" && FindText(window, Loc.T("Dictation")) is null) throw new InvalidOperationException($"The dictation card is not shown in {language.Code}.");
                 Capture(window, Path.Combine(output, $"lang-{language.Code}-{name.Replace(' ', '-')}.png"), 1220, 1100, 1);
                 count++;
             }
@@ -187,7 +223,8 @@ public static class ShellSmoke
         using (var drawing = picture.RenderOpen())
         {
             drawing.DrawRectangle(window.Background, null, new Rect(0, 0, width, height));
-            drawing.DrawRectangle(new VisualBrush(content), null, new Rect(0, 0, width, height));
+            // The view box is the window's own area, so that a shadow or other effect that reaches beyond it does not stretch the picture.
+            drawing.DrawRectangle(new VisualBrush(content) { Viewbox = new Rect(0, 0, width, height), ViewboxUnits = BrushMappingMode.Absolute }, null, new Rect(0, 0, width, height));
         }
         var bitmap = new RenderTargetBitmap((int)(width * scale), (int)(height * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         bitmap.Render(picture);

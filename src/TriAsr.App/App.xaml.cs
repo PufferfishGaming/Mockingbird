@@ -63,6 +63,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IJobWorkspace, JobWorkspace>();
         services.AddSingleton<IJobRepository, JobRepository>();
         services.AddSingleton<ProjectRemoval>();
+        services.AddSingleton<LocalLiveRecognizer>();
         services.AddSingleton<IRecordRepository, RecordRepository>();
         services.AddSingleton<IAudioNormalizer>(provider => new FfmpegNormalizer(provider.GetRequiredService<IProcessRunner>(), runtimes.Ffmpeg));
         services.AddSingleton<AudioJobQueue>();

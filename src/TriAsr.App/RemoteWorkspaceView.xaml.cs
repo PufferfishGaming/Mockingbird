@@ -26,11 +26,16 @@ public partial class RemoteWorkspaceView : UserControl
             { model.SelectedRegion = spoken; RegionList.ScrollIntoView(spoken); }
             _lastSpoken = spoken;
         };
-        Loaded += (_, _) => _timer.Start();
-        Unloaded += (_, _) => { _timer.Stop(); Player.Close(); };
+        Loaded += (_, _) =>
+        {
+            _timer.Start();
+            if (DataContext is RemoteWorkspaceViewModel model && _dictationPresenter is null) model.Dictation.Presenter = _dictationPresenter = new WpfDictationPresenter();
+        };
+        Unloaded += (_, _) => { _timer.Stop(); Player.Close(); _dictationPresenter?.Dispose(); _dictationPresenter = null; };
     }
 
     private RemoteWorkspaceViewModel Model => (RemoteWorkspaceViewModel)DataContext;
+    private WpfDictationPresenter? _dictationPresenter;
 
     private void SelectFileClick(object sender, RoutedEventArgs args)
     {

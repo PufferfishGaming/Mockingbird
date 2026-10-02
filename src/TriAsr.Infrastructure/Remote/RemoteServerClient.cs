@@ -125,6 +125,17 @@ public sealed class RemoteServerClient : IDisposable
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }
 
+    /// <summary>Has the server read one phrase of live dictation (a WAV file of a few seconds) and returns the words.</summary>
+    public async Task<string> LiveAsync(byte[] wav, string language, CancellationToken token)
+    {
+        using var content = new ByteArrayContent(wav);
+        content.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/live?language={Uri.EscapeDataString(language)}") { Content = content };
+        using var response = await SendAsync(request, 120, token);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+        return document.RootElement.TryGetProperty("text", out var text) ? text.GetString() ?? "" : "";
+    }
+
     /// <summary>Deletes a finished recording on the server with its transcript, edits and the copy of the recording it holds. One that is still being worked on is refused (<c>still_running</c>).</summary>
     public async Task DeleteAsync(Guid id, CancellationToken token)
     {

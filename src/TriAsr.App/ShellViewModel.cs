@@ -20,7 +20,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     IJobRepository repository, AudioJobQueue queue, RuntimePaths runtimes, HardwareProfiler hardware, IStoragePaths storage,
     TranscriptionPipeline pipeline, LocalTranscriptionStages stages, IJobWorkspace workspace, ModelStore models, LocalOptimizer optimizer, IRecordRepository records,
     ActivityFeed activity, InteractiveTerminal terminal, UpdateService updates, ResourceGovernor governor, IProcessRunner processes,
-    ILinkFetcher links, ILinkTool linkTool, ProjectRemoval removal) : ObservableObject
+    ILinkFetcher links, ILinkTool linkTool, ProjectRemoval removal, LocalLiveRecognizer live) : ObservableObject
 {
     public IReadOnlyList<NavigationItem> Navigation { get; } =
     [

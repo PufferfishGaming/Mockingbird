@@ -1,0 +1,61 @@
+using System.Buffers.Binary;
+using System.Text.RegularExpressions;
+
+namespace TriAsr.Application;
+
+/// <summary>The text of a recognised phrase, tidied up for typing, and the sound of a phrase wrapped as a WAV file.</summary>
+public static partial class PhraseText
+{
+    // What Whisper writes in brackets for sounds it heard: [BLANK_AUDIO], [Music], (applause)... It is not something a person said.
+    [GeneratedRegex(@"\[[^\]]*\]|♪[^♪]*♪?|\((?:[^)]*\b)?(?:music|applause|laughter|laughs|silence|noise|inaudible|crosstalk|coughs|coughing|sighs|beep|singing)\b[^)]*\)", RegexOptions.IgnoreCase)]
+    private static partial Regex Markers();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Whitespace();
+
+    // Whisper writes these for sound that holds no speech (a cough, a click, a breath): they come from the videos it learnt from.
+    private static readonly HashSet<string> Phantoms = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "you", "thank you", "thanks", "thank you very much", "thanks for watching", "thank you for watching", "bye", "bye bye", "okay", "so", "uh", "um", "hmm", "oh",
+        "thanks for watching and see you in the next video", "please subscribe"
+    };
+
+    /// <summary>The text without the program's markers, in one line without the blanks Whisper puts around it.</summary>
+    public static string Clean(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var withoutMarkers = Markers().Replace(text, " ");
+        return Whitespace().Replace(withoutMarkers, " ").Trim();
+    }
+
+    /// <summary>
+    /// Whether a short phrase is probably one of the words Whisper invents for sound without speech. Only a phrase of a second or so is judged this way:
+    /// "Thank you." in the middle of a sentence is real, and a long phrase is real however it ends.
+    /// </summary>
+    public static bool IsPhantom(string text, TimeSpan speech)
+    {
+        if (speech >= TimeSpan.FromMilliseconds(1200)) return false;
+        var plain = new string(text.Where(c => char.IsLetterOrDigit(c) || c == ' ' || c == '\'').ToArray()).Trim();
+        return plain.Length == 0 || Phantoms.Contains(plain);
+    }
+
+    /// <summary>A WAV file (16 kHz, mono, 16-bit) around the sound of a phrase.</summary>
+    public static byte[] Wav(ReadOnlySpan<byte> pcm)
+    {
+        var file = new byte[44 + pcm.Length];
+        "RIFF"u8.CopyTo(file);
+        BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(4), (uint)(36 + pcm.Length));
+        "WAVEfmt "u8.CopyTo(file.AsSpan(8));
+        BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(16), 16);
+        BinaryPrimitives.WriteUInt16LittleEndian(file.AsSpan(20), 1);
+        BinaryPrimitives.WriteUInt16LittleEndian(file.AsSpan(22), 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(24), 16_000);
+        BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(28), 32_000);
+        BinaryPrimitives.WriteUInt16LittleEndian(file.AsSpan(32), 2);
+        BinaryPrimitives.WriteUInt16LittleEndian(file.AsSpan(34), 16);
+        "data"u8.CopyTo(file.AsSpan(36));
+        BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(40), (uint)pcm.Length);
+        pcm.CopyTo(file.AsSpan(44));
+        return file;
+    }
+}

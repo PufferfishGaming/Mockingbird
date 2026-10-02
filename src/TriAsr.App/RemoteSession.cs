@@ -15,7 +15,7 @@ public sealed class RemoteSession
     public RemoteSession(string dataRoot, Action<string, string> reportError, Action reviewSaved)
     {
         Servers = new ServerBrowserViewModel(new SavedServerStore(Path.Combine(dataRoot, "Config", "servers.json")), new ForwardedDialogs(() => Dialogs), OnUi);
-        Remote = new RemoteWorkspaceViewModel(OnUi, (title, message) => OnUi(() => reportError(title, message)), Path.Combine(dataRoot, "Temp", "Remote"), Path.Combine(dataRoot, "Recordings"));
+        Remote = new RemoteWorkspaceViewModel(OnUi, (title, message) => OnUi(() => reportError(title, message)), Path.Combine(dataRoot, "Temp", "Remote"), Path.Combine(dataRoot, "Recordings"), dataRoot);
         Remote.ConnectionLost += reason => OnUi(() => Servers.Lost(reason));
         Remote.ReviewSaved += () => OnUi(reviewSaved);
         Servers.ConnectionChanged += connection => OnUi(() => { Remote.Attach(connection); ConnectionChanged?.Invoke(connection); });

@@ -54,6 +54,24 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private readonly string _tempRoot;
     private RemoteConnection? _connection;
     private readonly string _recordingsFolder;
+    private readonly string _dataRoot;
+    private DictationViewModel? _dictation;
+
+    /// <summary>
+    /// Live dictation through this server: the phrases are recorded and typed here, and the server reads them (ADR: live dictation). The window with the keys and the little window
+    /// are the same as in Studio.
+    /// </summary>
+    public DictationViewModel Dictation => _dictation ??= new DictationViewModel(Microphone, ServerEngine, DictationOutput, new DictationSettingsStore(_dataRoot), _onUi);
+
+    /// <summary>Where the words go. Only a test changes it, and before dictation is first used.</summary>
+    public ITextOutput DictationOutput { get; set; } = new WindowsKeyboard();
+
+    private DictationEngine ServerEngine()
+    {
+        if (_connection is not { } connection) return new(null, Loc.T("Connect to a server to dictate."));
+        if (!connection.Info.LiveEnabled) return new(null, Loc.T("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet."));
+        return new(new RemoteLiveRecognizer(connection.Client));
+    }
     private RecorderViewModel? _recorder;
 
     /// <summary>The link card: the server fetches the sound of a web address and transcribes it.</summary>
@@ -92,9 +110,10 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private string _reviewLanguage = "";
     private string? _rawCanaryNote;
 
-    public RemoteWorkspaceViewModel(Action<Action> onUi, Action<string, string> reportError, string tempRoot, string? recordingsFolder = null)
+    /// <param name="dataRoot">The program's data folder, where the choices for live dictation are kept; without it they are kept in the temporary folder.</param>
+    public RemoteWorkspaceViewModel(Action<Action> onUi, Action<string, string> reportError, string tempRoot, string? recordingsFolder = null, string? dataRoot = null)
     {
-        _onUi = onUi; _reportError = reportError; _tempRoot = tempRoot;
+        _onUi = onUi; _reportError = reportError; _tempRoot = tempRoot; _dataRoot = dataRoot ?? tempRoot;
         Link = new RemoteLinkViewModel(this);
         _recordingsFolder = recordingsFolder ?? System.IO.Path.Combine(tempRoot, "Recordings");
         Loc.Instance.PropertyChanged += (_, change) => { if (change.PropertyName == nameof(Loc.Version)) _onUi(RefreshTexts); };
@@ -139,6 +158,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _polling?.Cancel(); _audio?.Cancel();
         _connection = connection;
         Jobs.Clear(); Regions.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
+        if (connection is null && _dictation is { IsListening: true } running) _ = running.StopAsync();      // the server is gone: nothing can read the phrases
         IsConnected = connection is not null;
         ServerName = connection?.Info.Name ?? "";
         SelectedTab = "New";
@@ -153,6 +173,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         ServerNote = info is { ModelsReady: false } ? Loc.T("This server cannot transcribe yet: its speech models are missing ({0}). Set it up on the server first.", string.Join(", ", info.MissingModels)) : "";
         UpdateCanSend();
         Link.ServerChanged();
+        _dictation?.RefreshAvailability();
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -162,6 +183,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         RefreshServerNote(_connection?.Info);
         _recorder?.RefreshTexts();
         Link.RefreshTexts();
+        _dictation?.RefreshTexts();
         foreach (var row in Jobs) row.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
         if (Regions.Count > 0) ShowReviewSummary();
@@ -487,5 +509,6 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _polling?.Cancel(); _audio?.Cancel();
         _polling?.Dispose(); _audio?.Dispose();
         _recorder?.Dispose();   // a recording that is running is saved
+        _dictation?.Dispose();
     }
 }

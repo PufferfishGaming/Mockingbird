@@ -52,6 +52,7 @@
           </StackPanel></Border>
           <local:RecorderCard DataContext="{Binding Recorder}" Margin="0,18,0,0" />
           <local:LinkCard DataContext="{Binding Link}" Margin="0,18,0,0" />
+          <local:DictationCard DataContext="{Binding Dictation}" Margin="0,18,0,0" />
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="32" Margin="0,18,0,0">
             <StackPanel>
               <TextBlock Text="{local:T 'Watch a folder'}" FontSize="21" FontWeight="SemiBold" />
