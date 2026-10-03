@@ -233,6 +233,7 @@
   async function refreshInfo() {
     try { state.info = await getJson("/v1/server"); } catch { return; }
     updateLink();
+    updateSpeakers();
     if (state.tab === "new") renderInfoNotice();
   }
 
@@ -268,6 +269,12 @@
       title: t("If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer."),
       onChange: () => chooseSpeechLanguages(language.value, secondLanguage.value) }, secondLanguageOptions(kept.first));
     secondLanguage.value = kept.second;
+    // Telling the speakers apart: offered when the server can.
+    const speakers = h("select", { id: "speakers", "aria-label": t("Speakers"), onChange: () => { state.speakers = speakers.value; },
+      title: t("Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.") },
+      h("option", { value: "off" }, t("Don't tell speakers apart")), h("option", { value: "auto" }, t("Tell speakers apart")),
+      ...[2, 3, 4, 5, 6, 7, 8].map((count) => h("option", { value: String(count) }, String(count))));
+    speakers.value = state.speakers || "off";
     const send = h("button", { class: "btn primary", type: "button", disabled: true, onClick: () => sendFile() }, t("Send to server"));
     const drop = h("div", { class: "drop" },
       h("strong", null, t("Drop audio or video here")),
@@ -277,18 +284,20 @@
     drop.addEventListener("dragover", (event) => { event.preventDefault(); drop.classList.add("over"); });
     drop.addEventListener("dragleave", () => drop.classList.remove("over"));
     drop.addEventListener("drop", (event) => { event.preventDefault(); drop.classList.remove("over"); const file = event.dataTransfer && event.dataTransfer.files[0]; if (file) choose(file); });
-    Object.assign(ui, { fileInput: input, chosen, progress, sendStatus: status, language, secondLanguage, send });
+    Object.assign(ui, { fileInput: input, chosen, progress, sendStatus: status, language, secondLanguage, speakers, send });
     ui.newView.replaceChildren(h("h1", null, t("New transcription")),
       h("div", { class: "card stack" }, drop, input,
         h("div", { class: "row" },
           h("div", null, h("label", { for: "language" }, t("Language")), language),
-          h("div", null, h("label", { for: "second-language" }, t("Second language")), secondLanguage)),
+          h("div", null, h("label", { for: "second-language" }, t("Second language")), secondLanguage),
+          h("div", { class: "speakers-choice", hidden: !(state.info && state.info.speakers) }, h("label", { for: "speakers" }, t("Speakers")), speakers)),
         h("div", { class: "row" }, send),
         progress, status),
       buildRecorder(),
       buildLink());
     if (state.file) choose(state.file);
     updateLink();
+    updateSpeakers();
   }
 
   /** The languages of a recording or a link were changed: the second list loses the first language, and both are kept while the page is open. */
@@ -298,6 +307,15 @@
     ui.secondLanguage.value = state.speech.second;
     ui.secondLanguage.disabled = state.speech.first === "auto";
   }
+
+  /** The Speakers list is shown when the server tells speakers apart (an older one, or one without the speaker program, does not). */
+  function updateSpeakers() {
+    const choice = ui.speakers && ui.speakers.closest(".speakers-choice");
+    if (choice) choice.hidden = !(state.info && state.info.speakers);
+  }
+
+  /** What is asked about the speakers of a recording or a link: nothing unless the server tells speakers apart and they are to be told apart. */
+  const speakersChoice = () => state.info && state.info.speakers && ui.speakers && ui.speakers.value !== "off" ? ui.speakers.value : "";
 
   /** What a recording or a link is sent to be read in: "auto", "en" or "en+hu". */
   const speechChoice = () => MbLive.joinLanguages(ui.language.value, ui.secondLanguage.value);
@@ -338,7 +356,7 @@
     state.sendingLink = true; updateLink();
     ui.linkStatus.textContent = t("Sending to {0}…", state.health.name);
     try {
-      const response = await api("/v1/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, language: speechChoice() }) });
+      const response = await api("/v1/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, language: speechChoice(), speakers: speakersChoice() || undefined }) });
       await response.json();
       ui.linkInput.value = ""; ui.linkStatus.textContent = t("Sent. The server is working on it.");
       selectTab("projects"); refreshJobs();
@@ -482,7 +500,7 @@
     state.sending = true; ui.send.disabled = true; ui.progress.hidden = false; ui.progress.value = 0;
     ui.sendStatus.textContent = t("Sending to {0}…", state.health.name);
     const request = new XMLHttpRequest();
-    request.open("POST", "/v1/transcriptions?language=" + encodeURIComponent(speechChoice()) + "&name=" + encodeURIComponent(file.name));
+    request.open("POST", "/v1/transcriptions?language=" + encodeURIComponent(speechChoice()) + "&name=" + encodeURIComponent(file.name) + (speakersChoice() ? "&speakers=" + encodeURIComponent(speakersChoice()) : ""));
     if (state.password) request.setRequestHeader("Authorization", "Bearer " + state.password);
     request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
     request.upload.addEventListener("progress", (event) => { if (event.lengthComputable) ui.progress.value = (event.loaded * 100) / event.total; });
@@ -731,7 +749,8 @@
     ui.regionList.replaceChildren(...shown.map((entry) => h("li", {
       class: "region" + (needsListening(entry.region) ? " uncertain" : "") + (entry.text !== entry.original ? " edited" : ""), role: "option", "aria-selected": String(entry.index === review.selected), "data-index": String(entry.index),
       onClick: () => select(entry.index)
-    }, h("div", null, h("div", { class: "time" }, clock(entry.region.startMs) + " – " + clock(entry.region.endMs)), h("div", { class: "source" }, sourceLabel(entry.region.source))),
+    }, h("div", null, h("div", { class: "time" }, clock(entry.region.startMs) + " – " + clock(entry.region.endMs)),
+        entry.region.speaker && h("div", { class: "speaker" }, t("Speaker {0}", entry.region.speaker)), h("div", { class: "source" }, sourceLabel(entry.region.source))),
       h("div", { class: "text" }, entry.text))));
     if (review.spoken !== undefined && review.spoken >= 0) paintText(review.regions[review.spoken], review.spokenWord);
   }

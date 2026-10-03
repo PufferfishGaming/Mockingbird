@@ -172,21 +172,23 @@ public sealed class RemoteServerClient : IDisposable
     }
 
     /// <summary>Sends a recording. The file goes from disk to the connection in pieces, with the count of bytes sent reported as it goes.</summary>
-    public async Task<RemoteJob> UploadAsync(string path, string language, IProgress<long>? progress, CancellationToken token)
+    /// <param name="speakers"><c>off</c>, <c>auto</c> or how many speakers there are; sent only when it is not <c>off</c>, so an older server is asked nothing new.</param>
+    public async Task<RemoteJob> UploadAsync(string path, string language, IProgress<long>? progress, CancellationToken token, string speakers = "off")
     {
         await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
         using var content = new StreamContent(new ProgressStream(file, progress), 1024 * 1024);
         content.Headers.ContentLength = file.Length;
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/transcriptions?language={Uri.EscapeDataString(language)}&name={Uri.EscapeDataString(Path.GetFileName(path))}") { Content = content };
+        var asked = speakers is "off" or "" ? "" : $"&speakers={Uri.EscapeDataString(speakers)}";
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/transcriptions?language={Uri.EscapeDataString(language)}&name={Uri.EscapeDataString(Path.GetFileName(path))}{asked}") { Content = content };
         using var response = await SendAsync(request, 0, token);
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }
 
     /// <summary>Asks the server to fetch the sound of a web address and transcribe it. The server downloads it; nothing is downloaded here.</summary>
-    public async Task<RemoteJob> SendLinkAsync(string url, string language, CancellationToken token)
+    public async Task<RemoteJob> SendLinkAsync(string url, string language, CancellationToken token, string speakers = "off")
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/links") { Content = JsonContent.Create(new RemoteLinkRequest(url, language), options: Json) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/links") { Content = JsonContent.Create(new RemoteLinkRequest(url, language, speakers is "off" or "" ? null : speakers), options: Json) };
         using var response = await SendAsync(request, 60, token);
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }

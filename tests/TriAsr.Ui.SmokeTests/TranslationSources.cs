@@ -55,7 +55,7 @@ internal static partial class TranslationSources
         "BenchmarkProgress", "BenchmarkSummary", "SavedLanguageSummary", "LanguageCoverage", "LanguageSetupStatus", "BackendProgress", "ActiveBackendSummary",
         "ThemeSummary", "ResourceSummary", "StorageSummary", "EngineStatus", "Status", "Title", "Details", "SetupStartLabel", "SetupDismissLabel", "TerminalSendLabel", "CurrentText", "CaptureText", "Message", "NoSourceText", "Notice", "RecordButtonLabel",
         // a review region's texts, announced again by ReviewRegion.NotifyLanguageChanged
-        "Time", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
+        "Time", "SpeakerLabel", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
         // the user's own words, program output, paths and numbers
         "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Location", "DisplayTitle", "PreviewLine", "Updated",
         "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName", "Label", "Elapsed", "CreatedUtc", "OverlayButtonLabel", "HotkeyNote", "LastText", "LinkText", "Description", "ActionLabel", "Note", "NoteActionLabel", "LinkHelper.Summary", "LinkHelper.ActionLabel",

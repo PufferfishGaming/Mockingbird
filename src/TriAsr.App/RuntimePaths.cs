@@ -23,6 +23,13 @@ public sealed class RuntimePaths
     public const string VadToolName = "whisper-vad-speech-segments.exe";
     public string VadTool => Path.Combine(Root, "Runtimes", "Whisper-Vulkan", VadToolName);
     public string VadModel => Path.Combine(Root, "Runtimes", "Vad", "ggml-silero-v5.1.2.bin");
+    /// <summary>The speaker program (sherpa-onnx speaker diarization, processor only) and its two models, which ship with it.</summary>
+    public string SpeakersFolder => Path.Combine(Root, "Runtimes", "Speakers");
+    public string SpeakersTool => Path.Combine(SpeakersFolder, "sherpa-onnx-offline-speaker-diarization.exe");
+    public string SpeakerSegmentationModel => Path.Combine(SpeakersFolder, "pyannote-segmentation-3.0.onnx");
+    public string SpeakerEmbeddingModel => Path.Combine(SpeakersFolder, "nemo_en_titanet_small.onnx");
+    /// <summary>Whether speakers can be told apart on this computer: the program and both models are there.</summary>
+    public bool CanTellSpeakersApart => File.Exists(SpeakersTool) && File.Exists(SpeakerSegmentationModel) && File.Exists(SpeakerEmbeddingModel);
     public string WhisperFor(string backend) => backend is "cpu" or "vulkan" ? Whisper : Path.Combine(BackendRuntimes.Folder(this, "Whisper", backend), "whisper-cli.exe");
     public string CanaryFor(string backend) => backend is "cpu" or "vulkan" ? CanaryRuntime : BackendRuntimes.Folder(this, "Canary", backend);
     public string CorrectionFor(string backend) => backend is "cpu" or "vulkan" ? LlamaServer : Path.Combine(BackendRuntimes.Folder(this, "Correction", backend), "llama-server.exe");
@@ -31,11 +38,13 @@ public sealed class RuntimePaths
     public string ConfigurationFingerprint(string hardwareFingerprint)
     {
         var runtimeDirectory = Path.Combine(Root, "Runtimes");
-        // The speech detector is left out on purpose: each job saves its own chunk plan, so a different detector build cannot
-        // make a running job inconsistent, and adding it must not invalidate the speed settings the user tuned.
+        // The speech detector and the speaker program are left out on purpose: each job saves its own chunk plan and speaker turns, so a different
+        // build of either cannot make a running job inconsistent, and adding them must not invalidate the speed settings the user tuned.
+        var speakers = SpeakersFolder + Path.DirectorySeparatorChar;
         var dependencies = Directory.Exists(runtimeDirectory)
             ? Directory.EnumerateFiles(runtimeDirectory, "*", SearchOption.AllDirectories)
-                .Where(path => Path.GetExtension(path) is ".dll" or ".exe" && !Path.GetFileName(path).Equals(VadToolName, StringComparison.OrdinalIgnoreCase))
+                .Where(path => Path.GetExtension(path) is ".dll" or ".exe" && !Path.GetFileName(path).Equals(VadToolName, StringComparison.OrdinalIgnoreCase)
+                    && !path.StartsWith(speakers, StringComparison.OrdinalIgnoreCase))
             : Enumerable.Empty<string>();
         var optionalDirectory = Path.Combine(ModelRoot, "BackendRuntimes");
         if (Directory.Exists(optionalDirectory)) dependencies = dependencies.Concat(Directory.EnumerateFiles(optionalDirectory, "*", SearchOption.AllDirectories).Where(path => Path.GetExtension(path) is ".dll" or ".exe"));

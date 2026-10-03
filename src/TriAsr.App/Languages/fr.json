@@ -993,5 +993,17 @@
  "The keys work while this page is open.": "Les touches fonctionnent tant que cette page est ouverte.",
  "If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.": "Si l'enregistrement passe d'une langue à l'autre, choisissez les deux : chaque partie est écrite dans la langue où elle a été dite, sans traduction. Trouver les parties prend un peu plus de temps.",
  "Second speech language": "Deuxième langue parlée",
- "Second watch folder language": "Deuxième langue du dossier surveillé"
+ "Second watch folder language": "Deuxième langue du dossier surveillé",
+ "Speakers": "Locuteurs",
+ "Don't tell speakers apart": "Ne pas distinguer les locuteurs",
+ "Tell speakers apart": "Distinguer les locuteurs",
+ "Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.": "Mockingbird peut distinguer les voix et indiquer le locuteur de chaque partie de la transcription. Si vous savez combien de personnes parlent, choisissez ce nombre : exactement autant de locuteurs sont conservés.",
+ "Speaker {0}": "Locuteur {0}",
+ "Telling the speakers apart": "Distinction des locuteurs",
+ "Speakers could not be told apart": "Les locuteurs n'ont pas pu être distingués",
+ "The speaker program is missing. Reinstall Mockingbird Studio. The transcript is made without speakers.": "Le programme des locuteurs est absent. Réinstallez Mockingbird Studio. La transcription est faite sans locuteurs.",
+ "The transcript is made without speakers. {0}": "La transcription est faite sans locuteurs. {0}",
+ "Speaker detection failed. {0}": "La détection des locuteurs a échoué. {0}",
+ "The speaker program did not report a result.": "Le programme des locuteurs n'a renvoyé aucun résultat.",
+ "The speaker program listed a turn that ends before it starts.": "Le programme des locuteurs a indiqué un tour qui se termine avant de commencer."
 }

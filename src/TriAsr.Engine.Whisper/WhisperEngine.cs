@@ -141,6 +141,30 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
         }
         return segments;
     }
+    /// <summary>
+    /// The words of Whisper's full output (<c>-ojf</c>) with their times, moved by <paramref name="offsetMs"/>: a word begins at a token that starts with a space
+    /// (or the first token of a segment), and the program's own markers ([_BEG_] and the like) are left out.
+    /// </summary>
+    public static IReadOnlyList<TimedWord> ParseWords(JsonElement root, long offsetMs = 0)
+    {
+        var words = new List<TimedWord>();
+        foreach (var segment in root.GetProperty("transcription").EnumerateArray())
+        {
+            if (!segment.TryGetProperty("tokens", out var tokens) || tokens.ValueKind != JsonValueKind.Array) continue;
+            var first = true;
+            foreach (var token in tokens.EnumerateArray())
+            {
+                var text = token.TryGetProperty("text", out var spelled) ? spelled.GetString() ?? "" : "";
+                if (text.StartsWith("[_", StringComparison.Ordinal) || text.Length == 0 || !token.TryGetProperty("offsets", out var offsets)) continue;
+                var start = offsets.GetProperty("from").GetInt64() + offsetMs;
+                var end = offsets.GetProperty("to").GetInt64() + offsetMs;
+                if (first || text.StartsWith(' ')) words.Add(new(start, Math.Max(start, end), text));
+                else words[^1] = words[^1] with { EndMs = Math.Max(words[^1].EndMs, end), Text = words[^1].Text + text };
+                first = false;
+            }
+        }
+        return words;
+    }
     public static string IdentifyBackend(string log)
     {
         if (log.Contains("using Vulkan", StringComparison.OrdinalIgnoreCase)) return "vulkan";

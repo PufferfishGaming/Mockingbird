@@ -27,12 +27,13 @@ namespace TriAsr.App;
 /// <param name="LiveReady">Whether <paramref name="Live"/> can read a phrase right now (a speech model is installed); null means always.</param>
 /// <param name="Notes">Keeps the notes for <c>/v1/notes</c>. Null: this server does not keep notes.</param>
 /// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c>. Null: this server does not delete recordings.</param>
+/// <param name="SpeakersReady">Whether this server can tell the speakers of a recording apart (the speaker program and its models are installed); null means it cannot.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
     Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null,
-    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null, INoteStore? Notes = null);
+    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null, INoteStore? Notes = null, Func<bool>? SpeakersReady = null);
 
 /// <summary>Everything the remote review page needs about a finished job.</summary>
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
@@ -51,6 +52,8 @@ public sealed class ApiService : IAsyncDisposable
         public Guid Id { get; } = job.Id;
         public string Name { get; set; } = name;
         public TranscriptionJob Job { get; set; } = job;
+        /// <summary>What else was asked for the recording (telling its speakers apart).</summary>
+        public JobOptions Options { get; init; } = new();
         /// <summary>A link whose sound is still being fetched: the job exists only here (as queued) until the file has arrived and the real job is made with this id.</summary>
         public bool Fetching { get; set; }
         public double FetchPercent { get; set; }
@@ -289,8 +292,10 @@ public sealed class ApiService : IAsyncDisposable
     }
 
     /// <summary>Why a new recording cannot be taken now (speech models missing, too many waiting), or null.</summary>
-    private HttpResponse? CannotStart(string language)
+    private HttpResponse? CannotStart(string language, JobOptions? options = null)
     {
+        if (options?.TellsSpeakersApart == true && _deps.SpeakersReady?.Invoke() != true)
+            return HttpResponse.Error(409, "speakers_unavailable", "This server cannot tell speakers apart: its speaker program is not installed.");
         var missing = _deps.MissingModels(language);
         if (missing.Length > 0)
             return HttpResponse.Json(409, new { error = new { code = "models_missing", message = "The speech models for this language are not downloaded yet. Download them in the Models page of the app.", type = "invalid_request_error" }, missing });
@@ -299,27 +304,36 @@ public sealed class ApiService : IAsyncDisposable
         return null;
     }
 
-    private async Task<(ApiJob? Job, HttpResponse? Refusal)> StartJobAsync(string path, string name, string language, CancellationToken token)
+    private async Task<(ApiJob? Job, HttpResponse? Refusal)> StartJobAsync(string path, string name, string language, CancellationToken token, JobOptions? options = null)
     {
-        if (CannotStart(language) is { } refusal)
+        options ??= new JobOptions();
+        if (CannotStart(language, options) is { } refusal)
         {
             DeleteFolder(Path.GetDirectoryName(path)!);
             return (null, refusal);
         }
-        var job = await _deps.Queue.EnqueueAsync(path, language, token);
-        var entry = new ApiJob(job, name);
+        var job = await _deps.Queue.EnqueueAsync(path, language, token, options: options);
+        var entry = new ApiJob(job, name) { Options = options };
         _jobs[job.Id] = entry;
         _queue.Writer.TryWrite(job.Id);
         return (entry, null);
     }
 
+    /// <summary>The speakers asked for: <c>off</c> (or nothing), <c>auto</c>, or how many there are (2 to 8).</summary>
+    private static string? SpeakersProblem(string? speakers, out JobOptions options)
+    {
+        options = new JobOptions(JobOptions.NormalizeSpeakers(speakers) ?? "off");
+        return JobOptions.NormalizeSpeakers(speakers) is null ? $"\"{speakers?.Trim()}\" is not a choice of speakers: give auto, off, or how many there are (2 to {JobOptions.MostSpeakers})." : null;
+    }
+
     private async Task<HttpResponse> UploadAsync(HttpRequest request, CancellationToken token)
     {
         if (LanguageProblem(request.Query.GetValueOrDefault("language"), out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        if (SpeakersProblem(request.Query.GetValueOrDefault("speakers"), out var options) is { } wrong) return HttpResponse.Error(400, "invalid_speakers", wrong);
         if (request.Header("Content-Type") is { } type && type.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase))
             return HttpResponse.Error(415, "use_raw_body", "Send the recording itself as the request body, or use POST /v1/audio/transcriptions for a multipart form.");
         var upload = await SaveUploadAsync(request.Body, request.Query.GetValueOrDefault("name"), request.ContentLength, token);
-        var (job, refusal) = await StartJobAsync(upload.Path, upload.Name, language, token);
+        var (job, refusal) = await StartJobAsync(upload.Path, upload.Name, language, token, options);
         if (refusal is not null) return refusal;
         return HttpResponse.Json(202, Describe(job!)).With("Location", $"/v1/transcriptions/{job!.Id}");
     }
@@ -469,6 +483,7 @@ public sealed class ApiService : IAsyncDisposable
         catch (System.Text.Json.JsonException) { return HttpResponse.Error(400, "bad_json", "Send JSON like {\"url\": \"https://…\", \"language\": \"auto\"}."); }
         if (body is null) return HttpResponse.Error(400, "bad_json", "Send JSON like {\"url\": \"https://…\", \"language\": \"auto\"}.");
         if (LanguageProblem(body.Language, out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        if (SpeakersProblem(body.Speakers, out var options) is { } wrong) return HttpResponse.Error(400, "invalid_speakers", wrong);
         Uri link;
         try
         {
@@ -476,11 +491,11 @@ public sealed class ApiService : IAsyncDisposable
             await _deps.Links.CheckAsync(link, allowPrivateNetwork: false, token);
         }
         catch (LinkException error) { return HttpResponse.Error(400, "invalid_link", error.Message); }
-        if (CannotStart(language) is { } refusal) return refusal;
+        if (CannotStart(language, options) is { } refusal) return refusal;
 
         var id = Guid.NewGuid();
         var folder = Path.Combine(_deps.IncomingFolder, id.ToString("N"));
-        var entry = new ApiJob(new TranscriptionJob(id, Path.Combine(folder, "link"), language, JobState.Queued, DateTimeOffset.UtcNow), link.IdnHost) { Fetching = true };
+        var entry = new ApiJob(new TranscriptionJob(id, Path.Combine(folder, "link"), language, JobState.Queued, DateTimeOffset.UtcNow), link.IdnHost) { Fetching = true, Options = options };
         var running = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
         entry.Running = running;
         _jobs[id] = entry;
@@ -498,7 +513,7 @@ public sealed class ApiService : IAsyncDisposable
             var fetched = await _deps.Links!.FetchAsync(link, folder, new LinkFetchOptions(AllowPrivateNetwork: false),
                 new Progress<double>(value => entry.FetchPercent = value), running.Token);
             running.Token.ThrowIfCancellationRequested();
-            var job = await _deps.Queue.EnqueueAsync(fetched.Path, entry.Job.Language, running.Token, entry.Id);
+            var job = await _deps.Queue.EnqueueAsync(fetched.Path, entry.Job.Language, running.Token, entry.Id, entry.Options);
             entry.Name = Path.GetFileName(fetched.Path);
             entry.Job = job;
             entry.Fetching = false;
@@ -629,7 +644,7 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)
@@ -754,7 +769,7 @@ public sealed class ApiService : IAsyncDisposable
                 segments = transcript.Regions.Select((region, index) => new
                 {
                     index, startMs = region.NativeTimestamps ? (long?)region.StartMs : null, endMs = region.NativeTimestamps ? (long?)region.EndMs : null,
-                    text = region.FinalText, needsListening = ReviewRegion.NeedsListening(region), source = region.Source
+                    text = region.FinalText, needsListening = ReviewRegion.NeedsListening(region), source = region.Source, speaker = region.Speaker
                 })
             });
         var extension = format == "full-json" ? "json" : format;

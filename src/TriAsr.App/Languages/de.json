@@ -993,5 +993,17 @@
  "The keys work while this page is open.": "Die Tasten funktionieren, solange diese Seite geöffnet ist.",
  "If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.": "Wenn die Aufnahme zwischen zwei Sprachen wechselt, wählen Sie beide: Jeder Teil wird in der Sprache geschrieben, in der er gesprochen wurde, nicht übersetzt. Das Finden der Teile dauert etwas länger.",
  "Second speech language": "Zweite gesprochene Sprache",
- "Second watch folder language": "Zweite Sprache für den überwachten Ordner"
+ "Second watch folder language": "Zweite Sprache für den überwachten Ordner",
+ "Speakers": "Sprecher",
+ "Don't tell speakers apart": "Sprecher nicht unterscheiden",
+ "Tell speakers apart": "Sprecher unterscheiden",
+ "Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.": "Mockingbird kann die Stimmen unterscheiden und jeden Teil des Transkripts mit seinem Sprecher kennzeichnen. Wenn Sie wissen, wie viele Personen sprechen, wählen Sie die Zahl: Genau so viele werden behalten.",
+ "Speaker {0}": "Sprecher {0}",
+ "Telling the speakers apart": "Sprecher werden unterschieden",
+ "Speakers could not be told apart": "Die Sprecher konnten nicht unterschieden werden",
+ "The speaker program is missing. Reinstall Mockingbird Studio. The transcript is made without speakers.": "Das Sprecherprogramm fehlt. Installieren Sie Mockingbird Studio neu. Das Transkript wird ohne Sprecher erstellt.",
+ "The transcript is made without speakers. {0}": "Das Transkript wird ohne Sprecher erstellt. {0}",
+ "Speaker detection failed. {0}": "Die Sprechererkennung ist fehlgeschlagen. {0}",
+ "The speaker program did not report a result.": "Das Sprecherprogramm hat kein Ergebnis gemeldet.",
+ "The speaker program listed a turn that ends before it starts.": "Das Sprecherprogramm hat einen Abschnitt gemeldet, der endet, bevor er beginnt."
 }

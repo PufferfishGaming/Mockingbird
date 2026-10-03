@@ -202,5 +202,8 @@
  "The phrase is too long.",
  "This note no longer exists.",
  "This note was changed on another computer.",
- "The note is too long."
+ "The note is too long.",
+ "Telling the speakers apart",
+ "The speaker program did not report a result.",
+ "The speaker program listed a turn that ends before it starts."
 ]

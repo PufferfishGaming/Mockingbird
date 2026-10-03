@@ -59,7 +59,7 @@ public sealed partial class ShellViewModel
         () => !IsModelBusy && !IsBenchmarking && !SetupRunning && !IsCheckingSystem,
         busy => OnUi(() => host.IsBusy = busy),
         () => host.DisplayName, Edition.Label, LoadReviewBundleAsync, (transcript, token) => stages.SaveManualAsync(transcript, token), AudioPathFor, links,
-        (job, token) => removal.DeleteAsync(job, token), live, () => live.IsReady, noteStore));
+        (job, token) => removal.DeleteAsync(job, token), live, () => live.IsReady, noteStore, () => runtimes.CanTellSpeakersApart));
 
     private bool IsApiJob(TranscriptionJob job) => job.SourcePath.StartsWith(IncomingFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 

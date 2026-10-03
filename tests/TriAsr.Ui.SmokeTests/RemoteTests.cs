@@ -298,6 +298,32 @@ public sealed class RemoteTests
     }
 
     [Fact]
+    public async Task TheSpeakersToTellApartAreSentOnlyToAServerThatCan()
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync(h => h.Speakers = true);
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            Assert.True(workspace.CanTellSpeakersApart);
+            Assert.Equal("off", workspace.SpeakersChoice);                                    // nothing is asked until it is chosen
+            workspace.SelectedSpeakers = "3";
+            var recording = Path.Combine(root, "meeting.wav");
+            await File.WriteAllBytesAsync(recording, new byte[200_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            Assert.Equal("3", Assert.Single(api.Workspace.Options).Value.Speakers);
+
+            workspace.Attach(new RemoteConnection(workspace.Client!, workspace.ServerInfo! with { Speakers = false }, browser.Servers[0]));
+            Assert.False(workspace.CanTellSpeakersApart);                                     // a server without the speaker program is not asked
+            Assert.Equal("off", workspace.SpeakersChoice);
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task ARecordingInTwoLanguagesIsSentAsAPairAndAnOlderServerIsSentTheFirst()
     {
         var root = NewRoot();

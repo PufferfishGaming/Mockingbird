@@ -20,6 +20,7 @@ public static partial class LowerLayerMessages
         Loc.Key("FFmpeg exited with code {0}: {1}"),
         Loc.Key("The Windows device query exited with code {0}."),
         Loc.Key("Speech detection failed. {0}"),
+        Loc.Key("Speaker detection failed. {0}"),
         Loc.Key("Requested {0}, actual backend is {1} ({2})."),
         Loc.Key("Canary ABI version mismatch: {0}"),
         Loc.Key("llama.cpp exited {0}: {1}"),

@@ -41,6 +41,15 @@ internal sealed class FakeWorkspace(string root) : IJobWorkspace
 {
     public string DirectoryFor(Guid jobId) => Path.Combine(root, "Jobs", jobId.ToString("N"));
     public Task CreateAsync(TranscriptionJob job, CancellationToken cancellationToken) { Directory.CreateDirectory(DirectoryFor(job.Id)); return Task.CompletedTask; }
+
+    /// <summary>What was chosen for each job beyond its language (telling its speakers apart).</summary>
+    public Dictionary<Guid, JobOptions> Options { get; } = [];
+
+    public Task CreateAsync(TranscriptionJob job, JobOptions options, CancellationToken cancellationToken)
+    {
+        lock (Options) Options[job.Id] = options;
+        return CreateAsync(job, cancellationToken);
+    }
 }
 
 internal sealed class FakeAudio : IAudioNormalizer
@@ -128,6 +137,10 @@ internal sealed class Harness : IAsyncDisposable
     public FakeLive? Live { get; set; }
     /// <summary>Keeps the notes for <c>/v1/notes</c>; null makes the server one that keeps no notes.</summary>
     public INoteStore? Notes { get; set; }
+    /// <summary>Whether the server tells speakers apart (has the speaker program).</summary>
+    public bool Speakers { get; set; }
+    /// <summary>The job folders, with what was chosen for each job beyond its language.</summary>
+    public FakeWorkspace Workspace { get; private set; } = null!;
     /// <summary>Deletes a finished recording with its files, the real thing over the harness's repository and folders.</summary>
     public ProjectRemoval Removal { get; private set; } = null!;
     public FinalTranscript? Saved { get; private set; }
@@ -143,14 +156,15 @@ internal sealed class Harness : IAsyncDisposable
         var harness = new Harness();
         configure?.Invoke(harness);
         Directory.CreateDirectory(harness.Root);
-        var queue = new AudioJobQueue(harness.Repository, new FakeWorkspace(harness.Root), new FakeAudio());
+        harness.Workspace = new FakeWorkspace(harness.Root);
+        var queue = new AudioJobQueue(harness.Repository, harness.Workspace, new FakeAudio());
         var pipeline = new TranscriptionPipeline(harness.Repository, harness.Stages);
         harness.Removal = new ProjectRemoval(harness.Repository, new FakeWorkspace(harness.Root), new StoragePaths(harness.Root));
         harness.Service = new ApiService(new ApiServiceDependencies(queue, pipeline, harness.Repository,
             (id, _) => Task.FromResult(ApiTestData.Transcript(id, harness.Native)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
             () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(ApiTestData.Transcript(id, harness.Native), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
-            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes));
+            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes, () => harness.Speakers));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();
         harness.Identity = ServerIdentity.LoadOrCreate(Path.Combine(harness.Root, "Identity"));

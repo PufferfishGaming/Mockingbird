@@ -993,5 +993,17 @@
  "The keys work while this page is open.": "Las teclas funcionan mientras esta página esté abierta.",
  "If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.": "Si la grabación alterna entre dos idiomas, elija ambos: cada parte se escribe en el idioma en que se dijo, sin traducir. Encontrar las partes tarda un poco más.",
  "Second speech language": "Segundo idioma hablado",
- "Second watch folder language": "Segundo idioma de la carpeta vigilada"
+ "Second watch folder language": "Segundo idioma de la carpeta vigilada",
+ "Speakers": "Hablantes",
+ "Don't tell speakers apart": "No distinguir a los hablantes",
+ "Tell speakers apart": "Distinguir a los hablantes",
+ "Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.": "Mockingbird puede distinguir las voces y marcar cada parte de la transcripción con su hablante. Si sabe cuántas personas hablan, elija el número: se conservan exactamente esas.",
+ "Speaker {0}": "Hablante {0}",
+ "Telling the speakers apart": "Distinguiendo a los hablantes",
+ "Speakers could not be told apart": "No se pudo distinguir a los hablantes",
+ "The speaker program is missing. Reinstall Mockingbird Studio. The transcript is made without speakers.": "Falta el programa de hablantes. Reinstale Mockingbird Studio. La transcripción se hace sin hablantes.",
+ "The transcript is made without speakers. {0}": "La transcripción se hace sin hablantes. {0}",
+ "Speaker detection failed. {0}": "La detección de hablantes falló. {0}",
+ "The speaker program did not report a result.": "El programa de hablantes no informó ningún resultado.",
+ "The speaker program listed a turn that ends before it starts.": "El programa de hablantes indicó un turno que termina antes de empezar."
 }

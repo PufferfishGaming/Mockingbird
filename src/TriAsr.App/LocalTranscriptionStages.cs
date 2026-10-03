@@ -21,7 +21,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
     public event EventHandler<StageProgress>? StageProgressChanged;
     public event EventHandler<(string Title, string Message)>? IssueOccurred;
     private void Issue(string title, string message) => IssueOccurred?.Invoke(this, (title, message));
-    private void Report(Guid id, JobState stage, double fraction) => StageProgressChanged?.Invoke(this, new(id, stage, fraction));
+    private void Report(Guid id, JobState stage, double fraction, string? label = null) => StageProgressChanged?.Invoke(this, new(id, stage, fraction, label));
     private void CanaryProgress(Guid id, string line)
     {
         const string prefix = "TRIASR_PROGRESS ";
@@ -194,9 +194,10 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                         TriAsr.Alignment.TokenAligner.Align([], "", survivingCanary.Language)), token);
                     break;
                 }
+                var speakerTurns = await FindSpeakersAsync(job.Id, configuration, normalized, token);
                 if (!File.Exists(FileFor(job.Id, "canary.json")) && (File.Exists(FileFor(job.Id, "Canary/failure.json")) || File.Exists(FileFor(job.Id, "Canary/skipped-language.json"))))
                 {
-                    var surviving = await Read<EngineTranscript>(job.Id, "whisper.json", token);
+                    var surviving = await WithSpeakersAsync(job.Id, await Read<EngineTranscript>(job.Id, "whisper.json", token), speakerTurns, token);
                     var fallback = DisagreementDetector.Compare(surviving, surviving with { Text = "", Segments = [] });
                     await Write(job.Id, "comparison.json", fallback with
                     {
@@ -207,7 +208,7 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 }
                 var whisperSaved = await Read<EngineTranscript>(job.Id, "whisper.json", token);
                 var canarySaved = (await Read<CanaryNative.Result>(job.Id, "canary.json", token)).Transcript;
-                var comparison = DisagreementDetector.Compare(await DropUnsupportedAsync(job.Id, whisperSaved, canarySaved, seconds, token), canarySaved);
+                var comparison = DisagreementDetector.Compare(await WithSpeakersAsync(job.Id, await DropUnsupportedAsync(job.Id, whisperSaved, canarySaved, seconds, token), speakerTurns, token), canarySaved);
                 await Write(job.Id, "comparison.json", comparison, token); break;
             case JobState.Correcting:
                 if (File.Exists(FileFor(job.Id, "corrections.json"))) { await Read<Correction[]>(job.Id, "corrections.json", token); return; }
@@ -275,6 +276,81 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             default: throw new ArgumentOutOfRangeException(nameof(stage));
         }
     }
+    /// <summary>
+    /// Tells the speakers of the recording apart, when the job asks for it (options.json): the speaker program finds the turns (Speakers/found.json), they are tidied
+    /// and numbered (speakers.json, which a resumed job reads again). Null when the job does not ask, or when it cannot be done: the transcript is then made without
+    /// speakers and the person is told why.
+    /// </summary>
+    private async Task<IReadOnlyList<SpeakerTurn>?> FindSpeakersAsync(Guid id, JobConfiguration configuration, string normalized, CancellationToken token)
+    {
+        var options = await OptionsAsync(id, token);
+        if (!options.TellsSpeakersApart) return null;
+        if (File.Exists(FileFor(id, "speakers.json"))) return await Read<SpeakerTurn[]>(id, "speakers.json", token);
+        if (!paths.CanTellSpeakersApart)
+        {
+            await Write(id, "Speakers/unavailable.json", new { Reason = "The speaker program or its models are not installed.", Tool = paths.SpeakersTool }, token);
+            Issue(Loc.T("Speakers could not be told apart"), Loc.T("The speaker program is missing. Reinstall Mockingbird Studio. The transcript is made without speakers."));
+            return null;
+        }
+        try
+        {
+            Report(id, JobState.Aligning, 0, TranscriptionProgressTracker.SpeakerStage);
+            var found = await SpeakerFinder.FindAsync(runner, paths.SpeakersTool, paths.SpeakerSegmentationModel, paths.SpeakerEmbeddingModel, normalized,
+                governor.Clamp(configuration.WhisperThreads), token, value => Report(id, JobState.Aligning, value * 0.9, TranscriptionProgressTracker.SpeakerStage));
+            await Write(id, "Speakers/found.json", found, token);
+            var turns = SpeakerTurns.Tidy(found, options.SpeakerCount);
+            await Write(id, "speakers.json", turns, token);
+            return turns;
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            await Write(id, "Speakers/failure.json", new { Error = error.Message, AtUtc = DateTimeOffset.UtcNow }, token);
+            Issue(Loc.T("Speakers could not be told apart"), Loc.T("The transcript is made without speakers. {0}", Loc.Describe(error.Message)));
+            return null;
+        }
+        finally { Report(id, JobState.Aligning, 0.9, TranscriptionProgressTracker.StageName(JobState.Aligning)); }
+    }
+
+    /// <summary>What was chosen for the job beyond its language (nothing, for a job without options.json).</summary>
+    private async Task<JobOptions> OptionsAsync(Guid id, CancellationToken token)
+    {
+        var path = FileFor(id, JobWorkspace.OptionsFile);
+        if (!File.Exists(path)) return new JobOptions();
+        try
+        {
+            var options = JsonSerializer.Deserialize<JobOptions>(await File.ReadAllTextAsync(path, token)) ?? new JobOptions();
+            return JobOptions.NormalizeSpeakers(options.Speakers) is { } speakers ? options with { Speakers = speakers } : new JobOptions();
+        }
+        catch (JsonException) { return new JobOptions(); }
+    }
+
+    /// <summary>
+    /// Gives Whisper's segments their speakers, cut where the speaker changes; the words and their times come from Whisper's own output (block by block for a
+    /// recording in two languages, from the processor's output when the graphics card failed). Without speakers the segments stay as they are.
+    /// </summary>
+    private async Task<EngineTranscript> WithSpeakersAsync(Guid id, EngineTranscript whisper, IReadOnlyList<SpeakerTurn>? turns, CancellationToken token)
+    {
+        if (turns is not { Count: > 0 }) return whisper;
+        var folder = File.Exists(FileFor(id, "Whisper/fallback.json")) ? "WhisperCpu" : "Whisper";
+        var detection = File.Exists(FileFor(id, "language.json")) ? await Read<WhisperEngine.LanguageDetection>(id, "language.json", token) : null;
+        var outputs = detection?.Blocks is { Count: > 1 } blocks
+            ? blocks.Select((block, i) => (Path: FileFor(id, $"{folder}/Block{i:D3}/raw.json"), Offset: block.StartMs)).ToList()
+            : [(Path: FileFor(id, $"{folder}/raw.json"), Offset: 0L)];
+        var words = new List<TimedWord>();
+        foreach (var (path, offset) in outputs)
+        {
+            if (!File.Exists(path)) continue;
+            try
+            {
+                using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, token));
+                words.AddRange(WhisperEngine.ParseWords(document.RootElement, offset));
+            }
+            catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException) { }
+        }
+        var segments = SpeakerTurns.Split(whisper.Segments, words, turns);
+        return whisper with { Segments = segments };
+    }
+
     /// <summary>
     /// Runs Canary once (in <paramref name="folder"/>: its request, raw output and the program's messages), and once more on the processor when the graphics card fails.
     /// <paramref name="windows"/> null reads the whole file in Canary's own windows.

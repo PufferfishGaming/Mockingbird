@@ -32,7 +32,7 @@ public static class DisagreementDetector
         {
             var indices = projected[index];
             var text = indices.Count == 0 ? "" : CanarySlice(canary.Text, alignment.CanaryTokens, indices.Min(), indices.Max());
-            return new FinalRegion(item.StartMs, item.EndMs, item.Text, item.Text, text, "agreement");
+            return new FinalRegion(item.StartMs, item.EndMs, item.Text, item.Text, text, "agreement", Speaker: item.Speaker);
         }).ToArray();
         var disagreements = new List<Disagreement>();
         for (var cursor = 0; cursor < alignment.Operations.Count;)

@@ -96,6 +96,12 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
 
     /// <summary>What a recording is read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
     public string LanguageChoice => SpeechLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
+
+    /// <summary>Whether (and how) the speakers of the recording are told apart: <c>off</c>, <c>auto</c> or how many there are.</summary>
+    [ObservableProperty] private string _selectedSpeakers = "off";
+    public IReadOnlyList<SpeakerChoice> SpeakerChoices => SpeakerChoice.All;
+    /// <summary>Whether this computer has the speaker program; without it the list is not offered.</summary>
+    public bool CanTellSpeakersApart => runtimes.CanTellSpeakersApart;
     /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is listed only while Settings ask for it, and it never blocks a transcription.</summary>
     public string Readiness
     {
@@ -286,7 +292,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         try
         {
             using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing");
-            var job = await queue.EnqueueAsync(SourcePath, LanguageChoice, _jobCancellation.Token);
+            var job = await queue.EnqueueAsync(SourcePath, LanguageChoice, _jobCancellation.Token, options: new JobOptions(SelectedSpeakers));
             job = await pipeline.RunAsync(job, _jobCancellation.Token);
             if (job.State == JobState.Complete) await OpenReviewAsync();
         }

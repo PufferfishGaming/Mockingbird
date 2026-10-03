@@ -23,7 +23,7 @@ public sealed class TranscriptionPipeline(IJobRepository repository, ITranscript
         await _execution.WaitAsync(token);
         var progress = new TranscriptionProgressTracker(job.Id);
         void OnStageProgress(object? sender, StageProgress update)
-        { if (update.JobId == job.Id) ProgressChanged?.Invoke(this, progress.Report(update.Stage, update.Fraction)); }
+        { if (update.JobId == job.Id) ProgressChanged?.Invoke(this, progress.Report(update.Stage, update.Fraction, update.Label)); }
         var reporting = stages as IProgressReportingStages;
         if (reporting is not null) reporting.StageProgressChanged += OnStageProgress;
         try

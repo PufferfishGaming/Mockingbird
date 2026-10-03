@@ -12,7 +12,7 @@ $isolatedBuild = '-p:ArtifactsPath=' + (Join-Path $packageRoot 'build')
 Invoke-Dotnet publish src/TriAsr.App/TriAsr.App.csproj -c Release -r win-x64 --self-contained true '-p:Platform=x64' '-p:NuGetLockFilePath=packages.publish.lock.json' $isolatedBuild -o $portable
 # The client transcribes nothing: it carries no speech programs, no worker and no models.
 if ($info.Engines) { Invoke-Dotnet publish src/TriAsr.Worker/TriAsr.Worker.csproj -c Release -r win-x64 --self-contained true '-p:Platform=x64' '-p:NuGetLockFilePath=packages.publish.lock.json' $isolatedBuild -o (Join-Path $portable 'Workers/Canary') }
-$runtimeNames = if ($info.Engines) { @('Whisper-Vulkan','Canary','FFmpeg','Llama','Vad') } else { @() }
+$runtimeNames = if ($info.Engines) { @('Whisper-Vulkan','Canary','FFmpeg','Llama','Vad','Speakers') } else { @() }
 foreach ($runtime in $runtimeNames) {
     $destination = Join-Path $portable "Runtimes/$runtime"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null

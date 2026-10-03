@@ -993,5 +993,17 @@
   "The keys work while this page is open.": "A billentyűk addig működnek, amíg ez az oldal nyitva van.",
   "If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.": "Ha a felvételen két nyelv váltakozik, válassza ki mindkettőt: minden részt azon a nyelven ír le, amelyen elhangzott, fordítás nélkül. A részek megkeresése kicsit tovább tart.",
   "Second speech language": "Második beszédnyelv",
-  "Second watch folder language": "A figyelt mappa második nyelve"
+  "Second watch folder language": "A figyelt mappa második nyelve",
+  "Speakers": "Beszélők",
+  "Don't tell speakers apart": "Ne különböztesse meg a beszélőket",
+  "Tell speakers apart": "Beszélők megkülönböztetése",
+  "Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.": "A Mockingbird meg tudja különböztetni a hangokat, és az átirat minden részénél jelöli, ki beszél. Ha tudja, hányan beszélnek, válassza ki a számot: pontosan ennyi beszélő marad meg.",
+  "Speaker {0}": "{0}. beszélő",
+  "Telling the speakers apart": "Beszélők megkülönböztetése",
+  "Speakers could not be told apart": "A beszélőket nem sikerült megkülönböztetni",
+  "The speaker program is missing. Reinstall Mockingbird Studio. The transcript is made without speakers.": "A beszélőfelismerő program hiányzik. Telepítse újra a Mockingbird Studiót. Az átirat beszélők nélkül készül el.",
+  "The transcript is made without speakers. {0}": "Az átirat beszélők nélkül készül el. {0}",
+  "Speaker detection failed. {0}": "A beszélők felismerése nem sikerült. {0}",
+  "The speaker program did not report a result.": "A beszélőfelismerő program nem adott eredményt.",
+  "The speaker program listed a turn that ends before it starts.": "A beszélőfelismerő program olyan szakaszt adott, amely előbb ér véget, mint ahogy kezdődik."
 }

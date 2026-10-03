@@ -199,6 +199,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _dictation?.RefreshAvailability();
         _notes?.RefreshAvailability();
         OnPropertyChanged(nameof(CanChooseSecondLanguage));
+        OnPropertyChanged(nameof(CanTellSpeakersApart));
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -249,6 +250,14 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     /// <summary>A second language can be chosen with a first one, when the server takes two.</summary>
     public bool CanChooseSecondLanguage => SelectedLanguage != "auto" && ServerTakesPairs;
 
+    /// <summary>Whether (and how) the speakers of the recording are told apart: <c>off</c>, <c>auto</c> or how many there are.</summary>
+    [ObservableProperty] private string _selectedSpeakers = "off";
+    public IReadOnlyList<SpeakerChoice> SpeakerChoices => SpeakerChoice.All;
+    /// <summary>Whether the server tells speakers apart; an older one, or one without the speaker program, is not asked.</summary>
+    public bool CanTellSpeakersApart => _connection?.Info.Speakers == true;
+    /// <summary>What is asked of the server about the speakers of a recording or a link.</summary>
+    public string SpeakersChoice => CanTellSpeakersApart ? SelectedSpeakers : "off";
+
     /// <summary>What a recording (or a link) is sent to be read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
     public string LanguageChoice => SpeechLanguages.Join(SelectedLanguage, ServerTakesPairs ? _selectedSecondLanguage : "");
 
@@ -274,7 +283,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         var length = Math.Max(1, new FileInfo(SourcePath).Length);
         try
         {
-            var job = await connection.Client.UploadAsync(SourcePath, LanguageChoice, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), CancellationToken.None);
+            var job = await connection.Client.UploadAsync(SourcePath, LanguageChoice, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), CancellationToken.None, SpeakersChoice);
             Interlocked.Increment(ref _localChanges);
             Merge([job]);
             SelectedJob = Jobs.FirstOrDefault(row => row.Id == job.Id);

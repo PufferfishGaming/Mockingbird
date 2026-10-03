@@ -13,12 +13,14 @@ public sealed record RemoteHealth(string Status, string Name, string Edition, st
 /// <param name="LiveEnabled">The server can read the phrases of live dictation right now (<c>POST /v1/live</c>): it has a speech model and the program that reads it.</param>
 /// <param name="NotesEnabled">The server keeps notes for the computers that use it (<c>/v1/notes</c>).</param>
 /// <param name="LinkPages">The server can also fetch the sound of web pages, not only of links straight to a file: its link helper is installed.</param>
+/// <param name="Speakers">The server tells the speakers of a recording apart when asked (<c>speakers=auto</c> or how many there are).</param>
 /// <param name="LanguagePairs">The server takes two languages for speech that switches between them (<c>language=en+hu</c>), for a phrase of live dictation and for a recording.</param>
 public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
-    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false);
+    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false);
 
 /// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
-public sealed record RemoteLinkRequest(string Url, string? Language);
+/// <param name="Speakers"><c>off</c> (or null), <c>auto</c>, or how many speakers there are.</param>
+public sealed record RemoteLinkRequest(string Url, string? Language, string? Speakers = null);
 
 /// <summary>A note as <c>GET /v1/notes/{id}</c> answers it.</summary>
 public sealed record RemoteNote(Guid Id, string Title, string Text, DateTimeOffset CreatedUtc, DateTimeOffset UpdatedUtc, int Revision);
