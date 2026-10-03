@@ -427,7 +427,9 @@ public partial class App : System.Windows.Application
                     shell.Dialogs = new SmokeDialogs(password);
                     shell.Servers.AddressText = $"127.0.0.1:{port}";
                     await shell.Servers.AddCommand.ExecuteAsync(null);
-                    if (await shell.Servers.ConnectAsync(shell.Servers.Servers[0]) is null) throw new InvalidOperationException("The window could not connect: " + shell.Servers.Status);
+                    // Servers announced on the network join the list too, so the entry is found by its address, not by its place.
+                    var own = shell.Servers.Servers.FirstOrDefault(item => item.Address.Authority == $"127.0.0.1:{port}") ?? throw new InvalidOperationException("The server added by address is not in the list: " + shell.Servers.Status);
+                    if (await shell.Servers.ConnectAsync(own) is null) throw new InvalidOperationException("The window could not connect: " + shell.Servers.Status);
                     window.Width = 1220;
                     for (var wait = 0; wait < 100 && !shell.IsRemotePage; wait++) await Task.Delay(50);
                     if (!shell.IsRemotePage) throw new InvalidOperationException("Connecting did not open the page of the server.");
