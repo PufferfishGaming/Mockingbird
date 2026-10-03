@@ -70,12 +70,12 @@ public sealed class HostTests
 
             // This computer only and the network are the two answers to one question.
             var changes = new List<string>();
-            shell.Host.PropertyChanged += (_, change) => changes.Add(change.PropertyName!);
+            shell.Host.PropertyChanged += (_, change) => { lock (changes) changes.Add(change.PropertyName!); };   // the server's status also changes from its own thread
             Assert.Equal($"http://127.0.0.1:{port}", shell.Host.WebPageAddress);    // the page of the server, where a program on this computer reaches it
             shell.Host.AllowNetwork = true;
             Assert.Equal($"https://127.0.0.1:{port}", shell.Host.WebPageAddress);
             Assert.False(shell.Host.LocalOnly);
-            Assert.Contains(nameof(HostViewModel.LocalOnly), changes);
+            lock (changes) Assert.Contains(nameof(HostViewModel.LocalOnly), changes);
             shell.Host.LocalOnly = true;
             Assert.False(shell.Host.AllowNetwork);
             shell.Host.LocalOnly = false;       // choosing the other half again changes nothing

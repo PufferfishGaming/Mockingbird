@@ -133,6 +133,21 @@ public sealed class PlaybackCopyTests
     private static async Task<ProcessResult> Ffmpeg(string ffmpeg, params string[] arguments) =>
         await new ProcessRunner().RunAsync(new(ffmpeg, arguments, Path.GetTempPath(), TimeSpan.FromMinutes(1)));
 
+    /// <summary>A sine tone as a 16-bit WAV file. (The FFmpeg Mockingbird ships has no tone generator: the program never needs one.)</summary>
+    private static void WriteTone(string path, double frequency, int rate, int channels, double seconds)
+    {
+        var frames = (int)(rate * seconds);
+        using var writer = new BinaryWriter(File.Create(path));
+        writer.Write("RIFF"u8); writer.Write(36 + frames * channels * 2); writer.Write("WAVEfmt "u8); writer.Write(16);
+        writer.Write((short)1); writer.Write((short)channels); writer.Write(rate); writer.Write(rate * channels * 2); writer.Write((short)(channels * 2)); writer.Write((short)16);
+        writer.Write("data"u8); writer.Write(frames * channels * 2);
+        for (var i = 0; i < frames; i++)
+        {
+            var sample = (short)(Math.Sin(2 * Math.PI * frequency * i / rate) * 0.125 * short.MaxValue);
+            for (var channel = 0; channel < channels; channel++) writer.Write(sample);
+        }
+    }
+
     [FfmpegFact]
     public async Task TheRealEncoderProducesA48KilohertzStereoCopyBesideTheSpeechFile()
     {
@@ -141,7 +156,7 @@ public sealed class PlaybackCopyTests
         try
         {
             var source = Path.Combine(root, "source.wav");
-            Assert.Equal(0, (await Ffmpeg(ffmpeg, "-nostdin", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=2", "-ac", "2", source)).ExitCode);
+            WriteTone(source, 440, 44100, channels: 2, seconds: 2);
             var normalizer = new FfmpegNormalizer(new ProcessRunner(), ffmpeg);
             var normalized = Path.Combine(root, "normalized.wav"); var playback = Path.Combine(root, "playback.m4a");
             var info = await normalizer.NormalizeAsync(source, normalized, CancellationToken.None);
@@ -166,7 +181,7 @@ public sealed class PlaybackCopyTests
         try
         {
             var source = Path.Combine(root, "mono.wav");
-            Assert.Equal(0, (await Ffmpeg(ffmpeg, "-nostdin", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=330:sample_rate=22050:duration=1", "-ac", "1", source)).ExitCode);
+            WriteTone(source, 330, 22050, channels: 1, seconds: 1);
             var normalizer = new FfmpegNormalizer(new ProcessRunner(), ffmpeg);
             var playback = Path.Combine(root, "playback.m4a");
             await normalizer.CreatePlaybackCopyAsync(source, playback, CancellationToken.None);

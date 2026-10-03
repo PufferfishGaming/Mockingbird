@@ -28,6 +28,24 @@ if ($info.Engines) { Check 'Packaged pipeline and checkpoint reuse' ($verificati
 Check 'Packaged edition starts as itself' ($verification.Edition -eq $Edition -and $verification.Renders -gt 0) "$Edition from edition.txt, $($verification.Renders) renders"
 Check 'Edition marker matches' ((Get-Content -LiteralPath (Join-Path $payload 'edition.txt') -Raw).Trim() -eq $Edition.ToLowerInvariant()) $Edition
 if (-not $info.Engines) { Check 'No speech programs in the client' (-not (Test-Path -LiteralPath (Join-Path $payload 'Runtimes'))) 'The client sends recordings to a server and transcribes nothing.' }
+if ($info.Engines) {
+    # FFmpeg is LGPL 2.1 or later: the packaged program must be the one its build information describes, with its licence, and its source bundle must sit beside the installer.
+    $ffmpegFolder = Join-Path $payload 'Runtimes/FFmpeg'
+    $ffmpegInfo = Get-Content -LiteralPath (Join-Path $ffmpegFolder 'BUILD-INFO.txt') -ErrorAction SilentlyContinue
+    $ffmpegHash = (($ffmpegInfo | Where-Object { $_ -like 'Program SHA256: *' }) -split ': ')[1]
+    $ffmpegLgpl = [bool]($ffmpegInfo -match '^License: LGPL version 2.1 or later$') -and (Test-Path -LiteralPath (Join-Path $ffmpegFolder 'COPYING.LGPLv2.1.txt')) -and $ffmpegHash -and
+        (Get-FileHash -LiteralPath (Join-Path $ffmpegFolder 'ffmpeg.exe') -Algorithm SHA256).Hash -eq $ffmpegHash
+    Check 'FFmpeg is the LGPL build its information describes' $ffmpegLgpl "$($ffmpegInfo | Select-Object -First 1)"
+    $ffmpegVersion = if ($ffmpegInfo) { ($ffmpegInfo[0] -split ' ')[1] } else { '?' }
+    $bundle = Join-Path $package "FFmpeg-$ffmpegVersion-source.zip"
+    $bundleOk = (Test-Path -LiteralPath $bundle) -and (Get-Content -LiteralPath (Join-Path $package $info.Sums) -Raw).Contains((Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash)
+    if ($bundleOk) {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead($bundle)
+        try { $bundleOk = @($zip.Entries.Name) -contains "ffmpeg-$ffmpegVersion.tar.xz" -and @($zip.Entries.Name) -contains 'build.sh' -and @($zip.Entries.Name) -contains 'BUILD-INFO.txt' } finally { $zip.Dispose() }
+    }
+    Check 'FFmpeg source bundle beside the installer' $bundleOk "FFmpeg-$ffmpegVersion-source.zip, listed in $($info.Sums)"
+}
 $msi = Join-Path $package "Mockingbird-$($info.Name)-$version-win-x64.msi"
 $signature = (Get-AuthenticodeSignature -LiteralPath $msi).Status.ToString()
 Check 'Signature status disclosed' ((Get-Content (Join-Path $repoRoot 'README.md') -Raw) -match 'unsigned') $signature
@@ -45,7 +63,7 @@ if (Test-Path -LiteralPath $latestPath) {
 }
 Check "Update manifest matches the $($info.Setup)" $latestOk $latestDetail
 $pending = @(
-    'Complete third-party notices and exact FFmpeg GPL corresponding-source/build bundle',
+    'Complete third-party notices (the FFmpeg source bundle is done; the other bundled notices still need review)',
     'Clean-machine install/download/offline/upgrade/uninstall acceptance',
     'Physical DPI/high-contrast/keyboard acceptance',
     'Real HU/EN, long-recording and silence/noise accuracy acceptance'

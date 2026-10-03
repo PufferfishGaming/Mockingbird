@@ -162,5 +162,5 @@ Legacy `TriAsr.*` names, storage paths and `TRIASR_*` environment variables rema
 
 Copyright © 2026 PufferfishGaming. Original source is **GPL-3.0-or-later**; see [LICENSE](LICENSE). Dependencies retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-This candidate is unsigned. Before public binary distribution, complete third-party license/source requirements, clean-machine installation tests and remaining accuracy/accessibility acceptance checks.
+This candidate is unsigned. FFmpeg, the audio converter inside Studio and Server, is Mockingbird's own LGPL build of the official FFmpeg source, and its complete source (`FFmpeg-<version>-source.zip`) is published on the release page with the installers ([scripts/build-ffmpeg.ps1](scripts/build-ffmpeg.ps1) builds it). Before public binary distribution, complete the review of the other third-party notices, clean-machine installation tests and remaining accuracy/accessibility acceptance checks.
 

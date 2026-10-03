@@ -46,7 +46,10 @@ if (Test-Path -LiteralPath $setup) { Remove-Item -LiteralPath $setup -Force }
 & $wix build $source -arch x64 -ext $wixExtension -o $setup
 if ($LASTEXITCODE -ne 0) { throw 'Setup build failed.' }
 $hash = Get-FileHash -LiteralPath $setup -Algorithm SHA256
-"$($hash.Hash)  $($info.Setup)" | Set-Content -LiteralPath (Join-Path $packageRoot $info.Sums) -Encoding ascii
+$sumLines = @("$($hash.Hash)  $($info.Setup)")
+# Studio and Server carry FFmpeg, whose source bundle is published beside the installer (package.ps1 put it here).
+foreach ($bundle in Get-ChildItem -LiteralPath $packageRoot -Filter 'FFmpeg-*-source.zip' -File) { $sumLines += "$((Get-FileHash -LiteralPath $bundle.FullName -Algorithm SHA256).Hash)  $($bundle.Name)" }
+$sumLines | Set-Content -LiteralPath (Join-Path $packageRoot $info.Sums) -Encoding ascii
 # The manifest (latest.json for Studio, latest-server.json, latest-client.json) is what installed apps read to learn about this release. Upload it AFTER the Setup.exe so
 # no app is told about a version whose installer is not yet available. Written without a byte-order mark.
 $manifest = [ordered]@{

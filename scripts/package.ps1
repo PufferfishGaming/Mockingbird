@@ -27,6 +27,15 @@ foreach ($runtime in $runtimeNames) {
     }
 }
 if ($info.Engines) {
+    # FFmpeg is LGPL: its source goes on the release page beside the installer. The bundle must be the one that built this very ffmpeg.exe (scripts/build-ffmpeg.ps1).
+    $ffmpegInfo = Get-Content -LiteralPath (Join-Path $repoRoot 'Runtimes/FFmpeg/BUILD-INFO.txt') -ErrorAction SilentlyContinue
+    if (-not $ffmpegInfo) { throw 'Runtimes/FFmpeg/BUILD-INFO.txt is missing: build ffmpeg.exe with scripts/build-ffmpeg.ps1 and copy its out folder to Runtimes/FFmpeg.' }
+    $ffmpegVersion = ($ffmpegInfo[0] -split ' ')[1]
+    $ffmpegHash = (($ffmpegInfo | Where-Object { $_ -like 'Program SHA256: *' }) -split ': ')[1]
+    if ((Get-FileHash -LiteralPath (Join-Path $portable 'Runtimes/FFmpeg/ffmpeg.exe') -Algorithm SHA256).Hash -ne $ffmpegHash) { throw 'Runtimes/FFmpeg/ffmpeg.exe is not the program BUILD-INFO.txt describes.' }
+    $ffmpegSource = Join-Path $repoRoot "artifacts/ffmpeg-build/FFmpeg-$ffmpegVersion-source.zip"
+    if (-not (Test-Path -LiteralPath $ffmpegSource)) { throw "The FFmpeg source bundle $ffmpegSource is missing: run scripts/build-ffmpeg.ps1." }
+    Copy-Item -LiteralPath $ffmpegSource -Destination $packageRoot
     $vcSource = Join-Path $repoRoot 'artifacts/packaging/vcredist/extracted/a4'
     if (-not (Test-Path -LiteralPath $vcSource)) { throw 'Extract the verified official Microsoft x64 VC redistributable first.' }
     $vcFiles = Join-Path $packageRoot 'vc-files'

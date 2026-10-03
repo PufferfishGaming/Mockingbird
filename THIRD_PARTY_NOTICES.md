@@ -13,11 +13,11 @@ Mockingbird Studio's own license does not replace dependency licenses.
 | NVIDIA NeMo TitaNet small (ONNX conversion by sherpa-onnx) | https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small and https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models | Bundled 40 MB speaker-embedding model; covered by the NeMo Toolkit license (Apache-2.0) |
 | transcribe.cpp / ggml / miniz | https://github.com/handy-computer/transcribe.cpp | Native license files copied from the installed runtime |
 | llama.cpp / OpenMP | https://github.com/ggml-org/llama.cpp | Native runtime and OpenMP notice copied; upstream notices still require review |
-| FFmpeg 9.0.2 full build (Gyan) | https://www.gyan.dev/ffmpeg/builds/ | Built with --enable-gpl --enable-version3; complete corresponding source, build materials and notices are release gates |
+| FFmpeg 9.0.2 (ffmpeg.exe in Runtimes/FFmpeg, Studio and Server) | https://ffmpeg.org | LGPL-2.1-or-later. Built by Mockingbird from the unmodified official source release with only FFmpeg's own code and zlib (zlib License), without `--enable-gpl` ([scripts/build-ffmpeg.ps1](scripts/build-ffmpeg.ps1), [scripts/ffmpeg](scripts/ffmpeg)). Its licence and build information (configure line, compiler, SHA256) ship beside it. The complete source, the release tarball with its signature and the build files, is published as `FFmpeg-9.0.2-source.zip` on the [release page](https://github.com/PufferfishGaming/Mockingbird/releases/tag/download) next to the installers, and the tarball is also at https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz |
 | Microsoft Visual C++ runtime | https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files | App-local DLLs; redistribution terms require review |
 | NuGet dependencies | Directory.Packages.props and package lock files | Package metadata inventory generated; complete notice review required |
 | Whisper / Canary / Qwen model weights | Pinned URLs in ModelStore.cs | Not bundled; respective model licenses apply to downloads |
 | yt-dlp (optional link helper) | https://github.com/yt-dlp/yt-dlp | Not bundled and not installed with Mockingbird. Downloaded on request from the project's latest release and checked against the SHA-256 published with it; the project's own code is under the Unlicense and its standalone build carries its own third-party notices |
 
-The current notice inventory is not a completed redistribution bundle. FFmpeg requirements: https://ffmpeg.org/legal.html.
+The current notice inventory is not a completed redistribution bundle: the FFmpeg source and licence are complete; the other rows marked as needing review are not yet. FFmpeg's licence terms: https://ffmpeg.org/legal.html.
 
