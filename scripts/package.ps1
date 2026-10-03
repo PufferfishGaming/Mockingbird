@@ -30,7 +30,7 @@ if ($info.Engines) {
     # FFmpeg is LGPL: its source goes on the release page beside the installer. The bundle must be the one that built this very ffmpeg.exe (scripts/build-ffmpeg.ps1).
     $ffmpegInfo = Get-Content -LiteralPath (Join-Path $repoRoot 'Runtimes/FFmpeg/BUILD-INFO.txt') -ErrorAction SilentlyContinue
     if (-not $ffmpegInfo) { throw 'Runtimes/FFmpeg/BUILD-INFO.txt is missing: build ffmpeg.exe with scripts/build-ffmpeg.ps1 and copy its out folder to Runtimes/FFmpeg.' }
-    $ffmpegVersion = ($ffmpegInfo[0] -split ' ')[1]
+    $ffmpegVersion = ([regex]::Match($ffmpegInfo[0], '^FFmpeg ([^,\s]+)').Groups[1].Value)
     $ffmpegHash = (($ffmpegInfo | Where-Object { $_ -like 'Program SHA256: *' }) -split ': ')[1]
     if ((Get-FileHash -LiteralPath (Join-Path $portable 'Runtimes/FFmpeg/ffmpeg.exe') -Algorithm SHA256).Hash -ne $ffmpegHash) { throw 'Runtimes/FFmpeg/ffmpeg.exe is not the program BUILD-INFO.txt describes.' }
     $ffmpegSource = Join-Path $repoRoot "artifacts/ffmpeg-build/FFmpeg-$ffmpegVersion-source.zip"

@@ -36,7 +36,7 @@ if ($info.Engines) {
     $ffmpegLgpl = [bool]($ffmpegInfo -match '^License: LGPL version 2.1 or later$') -and (Test-Path -LiteralPath (Join-Path $ffmpegFolder 'COPYING.LGPLv2.1.txt')) -and $ffmpegHash -and
         (Get-FileHash -LiteralPath (Join-Path $ffmpegFolder 'ffmpeg.exe') -Algorithm SHA256).Hash -eq $ffmpegHash
     Check 'FFmpeg is the LGPL build its information describes' $ffmpegLgpl "$($ffmpegInfo | Select-Object -First 1)"
-    $ffmpegVersion = if ($ffmpegInfo) { ($ffmpegInfo[0] -split ' ')[1] } else { '?' }
+    $ffmpegVersion = if ($ffmpegInfo) { ([regex]::Match($ffmpegInfo[0], '^FFmpeg ([^,\s]+)').Groups[1].Value) } else { '?' }
     $bundle = Join-Path $package "FFmpeg-$ffmpegVersion-source.zip"
     $bundleOk = (Test-Path -LiteralPath $bundle) -and (Get-Content -LiteralPath (Join-Path $package $info.Sums) -Raw).Contains((Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash)
     if ($bundleOk) {
