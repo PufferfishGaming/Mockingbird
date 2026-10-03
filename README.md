@@ -12,7 +12,7 @@ Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishG
 [![Download Mockingbird Server](https://img.shields.io/badge/Server-Download_for_Windows-1f6feb?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Server-Setup.exe)
 [![Download Mockingbird Client](https://img.shields.io/badge/Client-Download_for_Windows-8250df?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Client-Setup.exe)
 
-One file each. Download it, double-click it, accept the license and click **Install**. No administrator permission is needed. Studio does everything on one computer; Server and Client are for working across computers (see Editions). Or install from PowerShell in one line (Quick install, below).
+One file each. Download it, double-click it, accept the license and click **Install**. No administrator permission is needed. The installers are not signed yet, so Windows warns before it runs them: see [Installing an unsigned program](#installing-an-unsigned-program). Studio does everything on one computer; Server and Client are for working across computers (see Editions). Or install from PowerShell in one line (Quick install, below).
 
 </div>
 
@@ -40,9 +40,20 @@ Use `-Edition Server` or `-Edition Client` for the other two. Add `-Quiet` to in
 
 Download `Mockingbird-Studio-Setup.exe` from the `download` release and double-click it. The setup wizard installs for your user only and includes the .NET runtime, so nothing else is required. Download models inside the app after installing.
 
-The installer is unsigned, so Windows SmartScreen may show "Windows protected your PC". Choose **More info**, then **Run anyway**. To check the download first, compare `SHA256SUMS.txt` from the same release with `Get-FileHash .\Mockingbird-Studio-Setup.exe` (the other editions have their own checksum file). The Server edition downloads its models after installing, like Studio; the Client needs none.
+The Server edition downloads its models after installing, like Studio; the Client needs none.
 
 To remove the app, use **Settings → Apps → Installed apps → Mockingbird Studio**. Uninstalling keeps your projects, settings and models.
+
+### Installing an unsigned program
+
+The installers are **not code-signed** yet. Windows trusts a program it has not seen often only when it carries a code-signing certificate, which costs money every year, so for now Windows warns before Mockingbird is installed. The warnings do not mean anything was found in the file: Mockingbird is open source, and every release publishes the SHA256 of each installer, so you can check that your download is exactly the file built here.
+
+1. **Check the download** (recommended). Open PowerShell in the folder you saved it to and run `Get-FileHash .\Mockingbird-Studio-Setup.exe`. The hash must equal the line for that file in `SHA256SUMS.txt` from the same release (`SHA256SUMS-server.txt` and `SHA256SUMS-client.txt` for the other editions). If it differs, delete the file and download it again.
+2. **If the browser holds the download back.** Edge may say the file "isn't commonly downloaded": point at the download, click **…** → **Keep**, then **Show more** → **Keep anyway**. Other browsers ask in a similar way; choose to keep the file.
+3. **If "Windows protected your PC" appears** when you open the installer (Microsoft Defender SmartScreen): click **More info**, then **Run anyway**. The setup wizard opens.
+4. **If "Smart App Control blocked an app" appears** (Windows 11 with Smart App Control on): there is no *Run anyway* button, and Smart App Control cannot make an exception for one program; it only lets through signed programs or ones Microsoft already knows. Mockingbird can be installed only with Smart App Control turned off (**Windows Security → App & browser control → Smart App Control settings → Off**). That is your choice to make, since it switches the protection off for every program; on Windows versions from before the 2026 change it cannot be switched on again without reinstalling Windows. Otherwise, wait for a signed release.
+
+Instead of steps 2 and 3 you can install with the PowerShell line under [Quick install](#quick-install): it checks the SHA256 for you, and a file it downloads is not marked as coming from the internet, so SmartScreen does not ask. You can also clear that mark yourself after checking the hash: right-click the installer → **Properties** → tick **Unblock** → **OK** (or `Unblock-File .\Mockingbird-Studio-Setup.exe`). Updates made from inside the app check the SHA256 the same way and do not show these warnings.
 
 ### Updates
 
