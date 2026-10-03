@@ -242,18 +242,14 @@ public sealed class ApiService : IAsyncDisposable
         return stem + extension;
     }
 
-    private string? LanguageProblem(string? language, out string code)
+    /// <summary>
+    /// The language of a recording or a phrase: <c>auto</c> (or nothing), a code, or two joined with <c>+</c> (<c>en+hu</c>) for speech that switches between them.
+    /// A plus in a web address arrives as a space, which is read the same.
+    /// </summary>
+    private static string? LanguageProblem(string? language, out string code)
     {
-        var wanted = string.IsNullOrWhiteSpace(language) ? "auto" : language.Trim().ToLowerInvariant();
-        code = wanted;
-        return wanted == "auto" || LanguageCatalog.All.Any(item => item.Code == wanted) ? null : $"\"{wanted}\" is not a supported language. GET /v1/languages lists them.";
-    }
-
-    /// <summary>As <see cref="LanguageProblem"/>, for dictation, which also takes two languages (<c>en+hu</c>; a plus in a web address arrives as a space, which is read the same).</summary>
-    private static string? LiveLanguageProblem(string? language, out string choice)
-    {
-        if (LanguageCatalog.TryParseChoice(language, out var codes)) { choice = LanguageCatalog.JoinChoice(codes); return null; }
-        choice = "auto";
+        if (LanguageCatalog.TryParseChoice(language, out var codes)) { code = LanguageCatalog.JoinChoice(codes); return null; }
+        code = "auto";
         return $"\"{language?.Trim()}\" is not a supported language, or names more than {LanguageCatalog.MaxChoice}. GET /v1/languages lists them; two are joined with + (en+hu).";
     }
 
@@ -340,7 +336,7 @@ public sealed class ApiService : IAsyncDisposable
     private async Task<HttpResponse> LiveAsync(HttpRequest request, CancellationToken token)
     {
         if (_deps.Live is not { } live) return HttpResponse.Error(501, "live_unavailable", "This server does not read live dictation.");
-        if (LiveLanguageProblem(request.Query.GetValueOrDefault("language"), out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        if (LanguageProblem(request.Query.GetValueOrDefault("language"), out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
         var recent = request.Query.GetValueOrDefault("recent")?.Trim().ToLowerInvariant() is { Length: > 0 } said && LanguageCatalog.Supports(said) ? said : null;
         if (request.ContentLength > MaxLiveBody) return HttpResponse.Error(413, "payload_too_large", LiveMessages.TooLong);
         using var buffer = new MemoryStream();
@@ -579,7 +575,7 @@ public sealed class ApiService : IAsyncDisposable
             case "verbose_json":
                 return HttpResponse.Json(200, new
                 {
-                    task = "transcribe", language = LanguageCatalog.All.FirstOrDefault(item => item.Code == transcript.Language)?.Name.ToLowerInvariant() ?? transcript.Language,
+                    task = "transcribe", language = string.Join("+", transcript.Language.Split('+').Select(spoken => LanguageCatalog.All.FirstOrDefault(item => item.Code == spoken)?.Name.ToLowerInvariant() ?? spoken)),
                     duration = transcript.Regions.Count == 0 ? 0 : transcript.Regions.Max(region => region.EndMs) / 1000.0, text = JoinedText(transcript),
                     segments = transcript.Regions.Select((region, index) => new { id = index, start = region.StartMs / 1000.0, end = region.EndMs / 1000.0, text = region.FinalText })
                 });
@@ -633,7 +629,7 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LiveLanguagePairs: _deps.Live is not null));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

@@ -12,6 +12,9 @@ public sealed class NumberComparisonTests
     [InlineData("de", "einundzwanzig", "21")]
     [InlineData("hu", "huszonöt", "25")]
     [InlineData("hu", "tizenkettő", "12")]
+    [InlineData("en+hu", "twenty five", "25")]                                                       // a recording in two languages: the number words of both count
+    [InlineData("en+hu", "huszonöt", "25")]
+    [InlineData("hu+de", "einundzwanzig", "21")]
     public void WrittenNumbersAlignWithoutChangingTheDisplayedEvidence(string language, string written, string digits)
     {
         var result = TokenAligner.Align([new TranscriptSegment(0, 1000, written)], digits, language);
@@ -32,5 +35,8 @@ public sealed class NumberComparisonTests
     {
         Assert.Equal(2, TokenAligner.Tokenize("twenty, five", "en").Length);
         Assert.Equal(2, TokenAligner.Tokenize("one one", "en").Length);
+        Assert.Equal(2, TokenAligner.Tokenize("twenty, five", "en+hu").Length);
+        Assert.Single(TokenAligner.Tokenize("twenty five", "hu+en"));                              // English number pairs are joined when English is one of the two
+        Assert.Equal(2, TokenAligner.Tokenize("twenty five", "hu+de").Length);
     }
 }

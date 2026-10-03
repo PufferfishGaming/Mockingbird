@@ -24,7 +24,7 @@ public static partial class TokenAligner
     public static ComparisonToken[] Tokenize(string text, string language, int segment = -1)
     {
         var tokens = Words().Matches(text).Select(match => new ComparisonToken(match.Value, Normalize(match.Value, language), match.Index, match.Length, segment)).Where(token => token.Normalized.Length > 0).ToArray();
-        if (language != "en") return tokens;
+        if (!language.Split('+').Contains("en")) return tokens;
         var merged = new List<ComparisonToken>();
         for (var i = 0; i < tokens.Length; i++)
         {

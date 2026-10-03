@@ -19,11 +19,34 @@ public sealed partial class ShellViewModel
     public IReadOnlyList<string> WatchOutputs { get; } = [WatchAsText, WatchAsSubtitles, WatchProjectOnly];
     [ObservableProperty] private bool _watchEnabled;
     [ObservableProperty] private string _watchFolder = "";
-    [ObservableProperty] private string _watchLanguage = "auto";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChooseWatchSecondLanguage))] private string _watchLanguage = "auto";
+    private string _watchSecondLanguage = "";
+    private IReadOnlyList<LanguageOption>? _watchSecondLanguages;
     [ObservableProperty] private string _watchOutput = WatchAsText;
     [ObservableProperty] private string _watchStatus = Loc.Key("Off");
     [ObservableProperty] private bool _isWatchBusy;
     public bool HasWatchFolder => WatchFolder.Length > 0;
+
+    /// <summary>The choices of a second language for watched recordings that switch between two: none, then every language but the first.</summary>
+    public IReadOnlyList<LanguageOption> WatchSecondLanguages => _watchSecondLanguages ??= SpeechLanguages.Second(WatchLanguage);
+
+    /// <summary>The second language of watched recordings, or empty. (A list that is being replaced sets it to null for a moment: that is not a choice.)</summary>
+    public string? WatchSecondLanguage
+    {
+        get => _watchSecondLanguage;
+        set
+        {
+            if (value is null || value == _watchSecondLanguage) return;
+            _watchSecondLanguage = value;
+            OnPropertyChanged();
+            if (_initialized && !_watchBatch) Persist();
+        }
+    }
+
+    public bool CanChooseWatchSecondLanguage => WatchLanguage != "auto";
+
+    /// <summary>What watched recordings are read in, as it is saved: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
+    public string WatchLanguageChoice => SpeechLanguages.Join(WatchLanguage, _watchSecondLanguage);
     private FolderWatcher? _watcher;
     private readonly SemaphoreSlim _watchGate = new(1, 1);
     private string _watchCurrent = "";
@@ -33,7 +56,7 @@ public sealed partial class ShellViewModel
     {
         _watchBatch = true;
         WatchFolder = settings.WatchFolder; WatchEnabled = settings.WatchEnabled && settings.WatchFolder.Length > 0;
-        WatchLanguage = settings.WatchLanguage; WatchOutput = settings.WatchOutput;
+        (WatchLanguage, WatchSecondLanguage) = SpeechLanguages.Split(settings.WatchLanguage); WatchOutput = settings.WatchOutput;
         _watchBatch = false;
     }
 
@@ -49,7 +72,12 @@ public sealed partial class ShellViewModel
 
     partial void OnWatchFolderChanged(string value) { OnPropertyChanged(nameof(HasWatchFolder)); if (_initialized && !_watchBatch) { Persist(); _ = RestartWatchAsync(); } }
     partial void OnWatchEnabledChanged(bool value) { if (_initialized && !_watchBatch) { Persist(); _ = RestartWatchAsync(); } }
-    partial void OnWatchLanguageChanged(string value) { if (_initialized) Persist(); }
+    partial void OnWatchLanguageChanged(string value)
+    {
+        if (value == "auto" || value == _watchSecondLanguage) { _watchSecondLanguage = ""; OnPropertyChanged(nameof(WatchSecondLanguage)); }
+        _watchSecondLanguages = null; OnPropertyChanged(nameof(WatchSecondLanguages));
+        if (_initialized && !_watchBatch) Persist();
+    }
     partial void OnWatchOutputChanged(string value) { if (_initialized) Persist(); }
 
     [RelayCommand]
@@ -100,7 +128,7 @@ public sealed partial class ShellViewModel
     private async Task<WatchOutcome> ProcessWatchedFileAsync(string path, CancellationToken token)
     {
         var name = Path.GetFileName(path);
-        var language = WatchLanguage;
+        var language = WatchLanguageChoice;
         var missing = Array.Empty<string>();
         OnUi(() => missing = MissingRequiredModelsFor(language));
         if (missing.Length > 0)

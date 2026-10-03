@@ -176,7 +176,7 @@ public sealed class RemoteLinkViewModel : LinkCardModel
         SetStatus(() => Loc.T("Sending to {0}…", server));
         try
         {
-            var job = await client.SendLinkAsync(text, _workspace.SelectedLanguage, token);
+            var job = await client.SendLinkAsync(text, _workspace.LanguageChoice, token);
             _workspace.ShowSent(job);
             LinkText = "";
             SetStatus(() => Loc.T("Sent. The server is working on it."));

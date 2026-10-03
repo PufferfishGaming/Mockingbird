@@ -18,8 +18,15 @@ internal static class NumberComparison
         number = tens >= 2 && unit is > 0 and < 10 ? Digits(tens * 10 + unit) : "";
         return number.Length > 0;
     }
+    /// <param name="language">A language code, or two joined with <c>+</c> for a recording in two languages: a number word of either counts.</param>
     public static string Normalize(string word, string language)
     {
+        if (language.Contains('+'))
+        {
+            foreach (var code in language.Split('+'))
+                if (Normalize(word, code) is var number && number != word) return number;
+            return word;
+        }
         var units = language switch { "en" => EnglishUnits, "de" => GermanUnits, "hu" => HungarianUnits, _ => [] };
         var tens = language switch { "en" => EnglishTens, "de" => GermanTens, "hu" => HungarianTens, _ => [] };
         var direct = Array.IndexOf(units, word);

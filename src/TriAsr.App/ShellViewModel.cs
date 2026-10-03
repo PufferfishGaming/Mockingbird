@@ -62,7 +62,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     public HardwareProfile? Hardware { get; private set; }
     public ObservableCollection<TranscriptionJob> Jobs { get; } = [];
     [ObservableProperty] private string _sourcePath = "";
-    [ObservableProperty] private string _selectedLanguage = "auto";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChooseSecondLanguage))] private string _selectedLanguage = "auto";
+    private string _selectedSecondLanguage = "";
     [ObservableProperty] private bool _isProcessing;
     [ObservableProperty] private bool _hasTranscriptionProgress;
     [ObservableProperty] private bool _isTranscriptionRunning;
@@ -71,10 +72,30 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     [ObservableProperty] private string _transcriptionProgressSummary = "0% · 0/7 stages finished";
     private Guid? _progressJob;
     [ObservableProperty] private TranscriptionJob? _selectedJob;
-    private static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
-    private IReadOnlyList<LanguageOption>? _languagesInOrder;
+    private IReadOnlyList<LanguageOption>? _languagesInOrder, _secondLanguages;
     /// <summary>Auto-detect first, then every language in alphabetical order of the names shown in the interface language.</summary>
-    public IReadOnlyList<LanguageOption> Languages => _languagesInOrder ??= LanguageText.InOrder(LanguageCatalog.All).Prepend(AutoDetect).ToArray();
+    public IReadOnlyList<LanguageOption> Languages => _languagesInOrder ??= SpeechLanguages.First();
+    /// <summary>The choices of a second language for a recording that switches between two: none, then every language but the first.</summary>
+    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= SpeechLanguages.Second(SelectedLanguage);
+
+    /// <summary>The second language of a recording that switches between two, or empty. (A list that is being replaced sets it to null for a moment: that is not a choice.)</summary>
+    public string? SelectedSecondLanguage
+    {
+        get => _selectedSecondLanguage;
+        set
+        {
+            if (value is null || value == _selectedSecondLanguage) return;
+            _selectedSecondLanguage = value;
+            OnPropertyChanged();
+            RefreshReadiness();
+        }
+    }
+
+    /// <summary>A second language can be chosen with a first one; auto-detect does without.</summary>
+    public bool CanChooseSecondLanguage => SelectedLanguage != "auto";
+
+    /// <summary>What a recording is read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
+    public string LanguageChoice => SpeechLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
     /// <summary>What still stands between the user and a transcription; empty when everything needed is installed. The correction model is listed only while Settings ask for it, and it never blocks a transcription.</summary>
     public string Readiness
     {
@@ -94,7 +115,12 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     /// <summary>The "missing files" card on New transcription; while setup runs, its banner reports the same download, so the card steps aside.</summary>
     public bool ShowReadinessCard => HasReadinessIssues && !SetupRunning;
     private void RefreshReadiness() { OnPropertyChanged(nameof(Readiness)); OnPropertyChanged(nameof(HasReadinessIssues)); OnPropertyChanged(nameof(ShowReadinessCard)); if (_initialized) RefreshSetupOffer(); }
-    partial void OnSelectedLanguageChanged(string value) => RefreshReadiness();
+    partial void OnSelectedLanguageChanged(string value)
+    {
+        if (value == "auto" || value == _selectedSecondLanguage) { _selectedSecondLanguage = ""; OnPropertyChanged(nameof(SelectedSecondLanguage)); }
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
+        RefreshReadiness();
+    }
     public ObservableCollection<ReviewRegion> Regions { get; } = [];
     public System.ComponentModel.ICollectionView ReviewItems { get; private set; } = null!;
     [ObservableProperty] private ReviewRegion? _selectedRegion;
@@ -260,7 +286,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         try
         {
             using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing");
-            var job = await queue.EnqueueAsync(SourcePath, SelectedLanguage, _jobCancellation.Token);
+            var job = await queue.EnqueueAsync(SourcePath, LanguageChoice, _jobCancellation.Token);
             job = await pipeline.RunAsync(job, _jobCancellation.Token);
             if (job.State == JobState.Complete) await OpenReviewAsync();
         }

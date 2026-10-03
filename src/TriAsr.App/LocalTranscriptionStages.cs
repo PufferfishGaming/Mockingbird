@@ -84,6 +84,17 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             case JobState.DetectingLanguage:
                 if (File.Exists(FileFor(job.Id, "language.json"))) { await Read<WhisperEngine.LanguageDetection>(job.Id, "language.json", token); return; }
                 WhisperEngine.LanguageDetection detected;
+                if (LanguageCatalog.TryParseChoice(job.Language, out var pair) && pair.Count > 1)
+                {
+                    try { detected = await DetectPairAsync(job.Id, whisper, normalized, seconds, pair, configuration.WhisperBackend, "Language", token); }
+                    catch (Exception error) when (error is not OperationCanceledException && configuration.WhisperBackend != "cpu")
+                    {
+                        await Write(job.Id, "Language/fallback.json", new { Error = error.Message, Requested = configuration.WhisperBackend, Retry = "cpu" }, token);
+                        Issue(Loc.T("GPU language detection failed"), Loc.T("Retrying on CPU. {0}", Loc.Describe(error.Message)));
+                        detected = await DetectPairAsync(job.Id, new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)), normalized, seconds, pair, "cpu", "LanguageCpu", token);
+                    }
+                    await Write(job.Id, "language.json", detected, token); break;
+                }
                 // Samples are taken on speech only for jobs that skip silence; every other job samples the start, middle and end as before.
                 var plan = configuration.SkipNonSpeech ? await TryReadPlanAsync(job.Id, token) : null;
                 var sampleStarts = plan is null ? null : LanguageSamples.From(plan, seconds);
@@ -104,58 +115,71 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
                 await Write(job.Id, "language.json", detected, token); break;
             case JobState.RunningWhisper:
                 if (File.Exists(FileFor(job.Id, "whisper.json"))) { await Read<EngineTranscript>(job.Id, "whisper.json", token); return; }
-                var language = (await Read<WhisperEngine.LanguageDetection>(job.Id, "language.json", token)).Language;
+                var detection = await Read<WhisperEngine.LanguageDetection>(job.Id, "language.json", token);
+                var language = detection.Language;
                 EngineTranscript first;
                 var vadModel = await SkipModelAsync(job.Id, configuration, "Whisper", token);
-                try { first = await whisper.TranscribeAsync(normalized, seconds, language, FileFor(job.Id, "Whisper"), configuration.WhisperBackend, token, value => Report(job.Id, stage, value), vadModel); }
+                // A recording in two languages is read block by block, each block in its own language; any other is read whole, as before.
+                Task<EngineTranscript> TranscribeWith(WhisperEngine engine, string folder, string backend) => detection.Blocks is { Count: > 1 } blocks
+                    ? TranscribeBlocksAsync(job.Id, engine, normalized, seconds, language, blocks, folder, backend, vadModel, token)
+                    : engine.TranscribeAsync(normalized, seconds, language, FileFor(job.Id, folder), backend, token, value => Report(job.Id, stage, value), vadModel);
+                try { first = await TranscribeWith(whisper, "Whisper", configuration.WhisperBackend); }
                 catch (Exception error) when (error is not OperationCanceledException && configuration.WhisperBackend != "cpu")
                 {
                     await Write(job.Id, "Whisper/fallback.json", new { Error = error.Message, Requested = configuration.WhisperBackend, Retry = "cpu" }, token);
                     Issue(Loc.T("Whisper GPU attempt failed"), Loc.T("Retrying on CPU. {0}", Loc.Describe(error.Message)));
-                    first = await new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)).TranscribeAsync(normalized, seconds, language, FileFor(job.Id, "WhisperCpu"), "cpu", token, value => Report(job.Id, stage, value), vadModel);
+                    first = await TranscribeWith(new WhisperEngine(runner, paths.Whisper, paths.WhisperModel, governor.Clamp(configuration.WhisperThreads)), "WhisperCpu", "cpu");
                 }
                 first = await RemoveLoopsAsync(job.Id, first, configuration.SkipNonSpeech, token);
                 await Write(job.Id, "whisper.json", first, token); break;
             case JobState.RunningCanary:
                 if (File.Exists(FileFor(job.Id, "canary.json"))) { await Read<CanaryNative.Result>(job.Id, "canary.json", token); return; }
-                var speechLanguage = (await Read<WhisperEngine.LanguageDetection>(job.Id, "language.json", token)).Language;
-                if (!LanguageCatalog.CanaryCodes.Contains(speechLanguage))
+                var spoken = await Read<WhisperEngine.LanguageDetection>(job.Id, "language.json", token);
+                var speechLanguage = spoken.Language;
+                LanguageCatalog.TryParseChoice(speechLanguage, out var spokenCodes);
+                if (spokenCodes.Count == 0 || spokenCodes.Any(code => !LanguageCatalog.CanaryCodes.Contains(code)))
                 {
                     await Write(job.Id, "Canary/skipped-language.json", new { Language = speechLanguage, Reason = "Outside Canary's 25-language coverage", ReviewRequired = true }, token);
                     break;
                 }
-                var raw = FileFor(job.Id, "Canary/raw.json"); Directory.CreateDirectory(Path.GetDirectoryName(raw)!);
                 if (!File.Exists(paths.CanaryModel))
                     throw new FileNotFoundException(Loc.T("Selected Canary model {0} is not downloaded. Open Models and download it, or choose the Balanced preset to use the installed Q8 model.", Path.GetFileName(paths.CanaryModel)), paths.CanaryModel);
-                // A job that skips silence and music gives Canary the speech windows of its chunk plan (cut in real pauses, finished windows
-                // are kept for a restart). Every other job reads the whole file exactly as before, so its result does not change.
-                IReadOnlyList<CanaryWindow>? windows = null;
-                if (configuration.SkipNonSpeech)
+                CanaryNative.Result second;
+                if (spoken.Blocks is { Count: > 1 } spokenBlocks)
                 {
-                    var chunkPlan = await TryReadPlanAsync(job.Id, token);
-                    windows = chunkPlan is null ? null : CanaryWindow.SpeechWindows(chunkPlan, (long)Math.Round(seconds * 1000));
-                    if (windows is null) await SkipUnavailableAsync(job.Id, "Canary", token);
+                    // A recording in two languages: Canary reads the speech of each language in that language, and the two readings are put back in time order.
+                    var pairPlan = await PlanForPairAsync(job.Id, seconds, token);
+                    var parts = new List<CanaryNative.Result>();
+                    foreach (var code in spokenCodes)
+                    {
+                        var windows = LanguageBlocks.Windows(pairPlan, spokenBlocks, code);
+                        if (windows.Count > 0) parts.Add(await RunCanaryAsync(job.Id, configuration, normalized, code, windows, $"Canary/{code}", $"CanaryCpu/{code}", token));
+                    }
+                    if (parts.Count == 0)
+                    {
+                        await Write(job.Id, "Canary/skipped-language.json", new { Language = speechLanguage, Reason = "No speech windows in either language", ReviewRequired = true }, token);
+                        break;
+                    }
+                    var segments = parts.SelectMany(part => part.Transcript.Segments).OrderBy(segment => segment.StartMs).ToArray();
+                    second = new(parts[0].Transcript with
+                    {
+                        Language = speechLanguage, AudioSeconds = seconds, InferenceSeconds = parts.Sum(part => part.Transcript.InferenceSeconds),
+                        Segments = segments, Text = string.Join(" ", segments.Select(segment => segment.Text))
+                    }, parts.SelectMany(part => part.RawChunks).ToArray(), parts[0].NativeBackend);
                 }
-                var request = new CanaryRequest(paths.CanaryFor(configuration.CanaryBackend), paths.CanaryModel, normalized, speechLanguage,
-                    configuration.CanaryBackend, governor.Clamp(configuration.CanaryThreads), raw, windows, windows is null ? null : FileFor(job.Id, "Canary/windows"));
-                await Write(job.Id, "Canary/request.json", request, token);
-                var result = await runner.RunAsync(new(paths.CanaryWorker, ["--canary", FileFor(job.Id, "Canary/request.json")],
-                    Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromHours(12), line => CanaryProgress(job.Id, line)), token);
-                await File.WriteAllTextAsync(FileFor(job.Id, "Canary/runtime.stderr.txt"), result.StandardError, token);
-                if (result.ExitCode != 0 && configuration.CanaryBackend != "cpu")
+                else
                 {
-                    await Write(job.Id, "Canary/fallback.json", new { Error = result.StandardError, Requested = configuration.CanaryBackend, Retry = "cpu" }, token);
-                    Issue(Loc.T("Canary GPU attempt failed"), Loc.T("Retrying on CPU. The attempt output is saved in the job folder."));
-                    request = request with { RuntimeDirectory = paths.CanaryRuntime, Backend = "cpu", Output = FileFor(job.Id, "CanaryCpu/raw.json") };
-                    Directory.CreateDirectory(FileFor(job.Id, "CanaryCpu"));
-                    await Write(job.Id, "CanaryCpu/request.json", request, token);
-                    result = await runner.RunAsync(new(paths.CanaryWorker, ["--canary", FileFor(job.Id, "CanaryCpu/request.json")],
-                        Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromHours(12), line => CanaryProgress(job.Id, line)), token);
-                    await File.WriteAllTextAsync(FileFor(job.Id, "CanaryCpu/runtime.stderr.txt"), result.StandardError, token);
+                    // A job that skips silence and music gives Canary the speech windows of its chunk plan (cut in real pauses, finished windows
+                    // are kept for a restart). Every other job reads the whole file exactly as before, so its result does not change.
+                    IReadOnlyList<CanaryWindow>? windows = null;
+                    if (configuration.SkipNonSpeech)
+                    {
+                        var chunkPlan = await TryReadPlanAsync(job.Id, token);
+                        windows = chunkPlan is null ? null : CanaryWindow.SpeechWindows(chunkPlan, (long)Math.Round(seconds * 1000));
+                        if (windows is null) await SkipUnavailableAsync(job.Id, "Canary", token);
+                    }
+                    second = await RunCanaryAsync(job.Id, configuration, normalized, speechLanguage, windows, "Canary", "CanaryCpu", token);
                 }
-                if (result.ExitCode != 0) throw new InvalidOperationException(Loc.T("Canary failed. Whisper evidence is saved; resume after fixing the runtime. {0}", result.StandardError[^Math.Min(500, result.StandardError.Length)..]));
-                var second = await Read<CanaryNative.Result>(job.Id, request.Backend == "cpu" && configuration.CanaryBackend != "cpu" ? "CanaryCpu/raw.json" : "Canary/raw.json", token);
-                if (second.Transcript.ActualBackend != request.Backend) throw new InvalidDataException(Loc.T("Canary backend mismatch."));
                 await Write(job.Id, "canary.json", second, token); break;
             case JobState.Aligning:
                 if (File.Exists(FileFor(job.Id, "comparison.json"))) { await Read<ComparisonResult>(job.Id, "comparison.json", token); return; }
@@ -251,6 +275,127 @@ public sealed class LocalTranscriptionStages(IJobWorkspace workspace, IAudioNorm
             default: throw new ArgumentOutOfRangeException(nameof(stage));
         }
     }
+    /// <summary>
+    /// Runs Canary once (in <paramref name="folder"/>: its request, raw output and the program's messages), and once more on the processor when the graphics card fails.
+    /// <paramref name="windows"/> null reads the whole file in Canary's own windows.
+    /// </summary>
+    private async Task<CanaryNative.Result> RunCanaryAsync(Guid id, JobConfiguration configuration, string normalized, string language, IReadOnlyList<CanaryWindow>? windows,
+        string folder, string cpuFolder, CancellationToken token)
+    {
+        var raw = FileFor(id, $"{folder}/raw.json"); Directory.CreateDirectory(Path.GetDirectoryName(raw)!);
+        var request = new CanaryRequest(paths.CanaryFor(configuration.CanaryBackend), paths.CanaryModel, normalized, language,
+            configuration.CanaryBackend, governor.Clamp(configuration.CanaryThreads), raw, windows, windows is null ? null : FileFor(id, $"{folder}/windows"));
+        await Write(id, $"{folder}/request.json", request, token);
+        var result = await runner.RunAsync(new(paths.CanaryWorker, ["--canary", FileFor(id, $"{folder}/request.json")],
+            Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromHours(12), line => CanaryProgress(id, line)), token);
+        await File.WriteAllTextAsync(FileFor(id, $"{folder}/runtime.stderr.txt"), result.StandardError, token);
+        if (result.ExitCode != 0 && configuration.CanaryBackend != "cpu")
+        {
+            await Write(id, $"{folder}/fallback.json", new { Error = result.StandardError, Requested = configuration.CanaryBackend, Retry = "cpu" }, token);
+            Issue(Loc.T("Canary GPU attempt failed"), Loc.T("Retrying on CPU. The attempt output is saved in the job folder."));
+            request = request with { RuntimeDirectory = paths.CanaryRuntime, Backend = "cpu", Output = FileFor(id, $"{cpuFolder}/raw.json") };
+            Directory.CreateDirectory(FileFor(id, cpuFolder));
+            await Write(id, $"{cpuFolder}/request.json", request, token);
+            result = await runner.RunAsync(new(paths.CanaryWorker, ["--canary", FileFor(id, $"{cpuFolder}/request.json")],
+                Path.GetDirectoryName(paths.CanaryWorker)!, TimeSpan.FromHours(12), line => CanaryProgress(id, line)), token);
+            await File.WriteAllTextAsync(FileFor(id, $"{cpuFolder}/runtime.stderr.txt"), result.StandardError, token);
+        }
+        if (result.ExitCode != 0) throw new InvalidOperationException(Loc.T("Canary failed. Whisper evidence is saved; resume after fixing the runtime. {0}", result.StandardError[^Math.Min(500, result.StandardError.Length)..]));
+        var read = await Read<CanaryNative.Result>(id, request.Backend == "cpu" && configuration.CanaryBackend != "cpu" ? $"{cpuFolder}/raw.json" : $"{folder}/raw.json", token);
+        if (read.Transcript.ActualBackend != request.Backend) throw new InvalidDataException(Loc.T("Canary backend mismatch."));
+        return read;
+    }
+
+    /// <summary>
+    /// The chunk plan a recording in two languages is divided by: the saved one when it describes this recording, otherwise stretches of about 20 s (the speech
+    /// detector is not installed or failed). The same plan is found again by every stage, so they agree on the stretches.
+    /// </summary>
+    private async Task<ChunkPlan> PlanForPairAsync(Guid id, double seconds, CancellationToken token)
+    {
+        var milliseconds = (long)Math.Round(seconds * 1000);
+        var plan = await TryReadPlanAsync(id, token);
+        return plan is not null && plan.Version == ChunkPlan.CurrentVersion && Math.Abs(plan.DurationMs - milliseconds) <= 2 ? plan : LanguageBlocks.Even(milliseconds);
+    }
+
+    /// <summary>
+    /// Finds out which of the two languages chosen each speech stretch of the recording is in (the rule of live dictation: detected when the program is sure,
+    /// otherwise read in both and the more confident reading wins) and divides the recording into blocks of one language. What was decided is saved in
+    /// Language/pair.json. A recording that turns out to be in one language only is treated as if that language had been chosen.
+    /// </summary>
+    private async Task<WhisperEngine.LanguageDetection> DetectPairAsync(Guid id, WhisperEngine whisper, string normalized, double seconds, IReadOnlyList<string> codes, string backend, string evidence, CancellationToken token)
+    {
+        var plan = await PlanForPairAsync(id, seconds, token);
+        var folder = FileFor(id, $"{evidence}/Pair");
+        var speech = plan.SpeechChunks().ToList();
+        var files = speech.Select(chunk => Path.Combine(folder, $"{chunk.Index:D5}.wav")).ToList();
+        try
+        {
+            for (var i = 0; i < speech.Count; i++) WaveSlice.Write(normalized, speech[i].StartMs, speech[i].EndMs, files[i]);
+            var detected = speech.Count == 0 ? [] : await whisper.DetectEachAsync(files, backend, token, value => Report(id, JobState.DetectingLanguage, value / 3));
+            var detections = speech.Select((chunk, i) => new ChunkDetection(chunk.Index, detected[i].Language, detected[i].Detection)).ToList();
+            var unsure = Enumerable.Range(0, detections.Count).Where(i => !LiveLanguagePicker.IsSure(detections[i].Language, detections[i].Detection, codes)).ToList();
+            var readings = unsure.ToDictionary(i => detections[i].Index, _ => new List<SpeechReading>());
+            for (var c = 0; c < codes.Count && unsure.Count > 0; c++)
+            {
+                var read = await whisper.ReadEachAsync(unsure.Select(i => files[i]).ToList(), codes[c], Path.Combine(folder, "Readings"), backend, token);
+                for (var k = 0; k < unsure.Count; k++) readings[detections[unsure[k]].Index].Add(read[k]);
+                Report(id, JobState.DetectingLanguage, (1 + c + 1) / (double)(codes.Count + 1));
+            }
+            var languages = LanguageBlocks.Decide(detections, readings.ToDictionary(item => item.Key, item => (IReadOnlyList<SpeechReading>)item.Value), codes);
+            var blocks = LanguageBlocks.From(plan, languages, codes[0]);
+            var present = LanguageBlocks.Present(blocks, codes);
+            await Write(id, $"{evidence}/pair.json", new
+            {
+                Choice = LanguageCatalog.JoinChoice(codes), Plan = plan.Source,
+                Stretches = speech.Select((chunk, i) => new
+                {
+                    chunk.Index, chunk.StartMs, chunk.EndMs, Detected = detections[i].Language, detections[i].Detection,
+                    Readings = readings.TryGetValue(chunk.Index, out var read) ? read.Select(item => new { item.Language, item.Confidence, item.Text }).ToArray() : null,
+                    Language = languages[chunk.Index]
+                }),
+                Blocks = blocks
+            }, token);
+            return present.Count > 1
+                ? new(LanguageCatalog.JoinChoice(present), 1, speech.Select(chunk => languages[chunk.Index]).ToArray(), blocks)
+                : new(present.Count == 1 ? present[0] : codes[0], 1, speech.Select(chunk => languages[chunk.Index]).ToArray());
+        }
+        finally
+        {
+            foreach (var file in files) try { File.Delete(file); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>
+    /// Reads a recording in two languages block by block, each block in its own language, and puts the segments back on the recording's timeline.
+    /// Each block's own output stays in <paramref name="folder"/>/Block000 and on.
+    /// </summary>
+    private async Task<EngineTranscript> TranscribeBlocksAsync(Guid id, WhisperEngine whisper, string normalized, double seconds, string choice, IReadOnlyList<LanguageBlock> blocks,
+        string folder, string backend, string? vadModel, CancellationToken token)
+    {
+        var segments = new List<TranscriptSegment>();
+        EngineTranscript? template = null;
+        double inference = 0, done = 0, total = Math.Max(1, blocks.Sum(block => block.DurationMs));
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
+            var directory = FileFor(id, $"{folder}/Block{i:D3}");
+            var audio = Path.Combine(directory, "block.wav");
+            WaveSlice.Write(normalized, block.StartMs, block.EndMs, audio);
+            try
+            {
+                var before = done;
+                var part = await whisper.TranscribeAsync(audio, block.DurationMs / 1000d, block.Language, directory, backend, token,
+                    value => Report(id, JobState.RunningWhisper, (before + value * block.DurationMs) / total), vadModel);
+                template ??= part;
+                inference += part.InferenceSeconds;
+                segments.AddRange(part.Segments.Select(segment => segment with { StartMs = segment.StartMs + block.StartMs, EndMs = segment.EndMs + block.StartMs }));
+            }
+            finally { try { File.Delete(audio); } catch (IOException) { } }
+            done += block.DurationMs;
+        }
+        return template! with { Language = choice, AudioSeconds = seconds, InferenceSeconds = inference, Segments = segments, Text = string.Join(" ", segments.Select(segment => segment.Text)) };
+    }
+
     /// <summary>
     /// Finds the speech in the recording and saves the shared chunk plan (chunks.json). Nothing reads the plan yet, so a missing
     /// detector or a failed run only leaves evidence in the job folder and never stops the job.

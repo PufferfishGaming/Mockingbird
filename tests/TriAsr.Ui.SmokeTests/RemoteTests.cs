@@ -298,6 +298,37 @@ public sealed class RemoteTests
     }
 
     [Fact]
+    public async Task ARecordingInTwoLanguagesIsSentAsAPairAndAnOlderServerIsSentTheFirst()
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync();
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            Assert.False(workspace.CanChooseSecondLanguage);                    // auto-detect takes no second language
+            workspace.SelectedLanguage = "en";
+            Assert.True(workspace.CanChooseSecondLanguage);
+            workspace.SelectedSecondLanguage = "hu";
+            Assert.Equal("en+hu", workspace.LanguageChoice);
+            var recording = Path.Combine(root, "talk.wav");
+            await File.WriteAllBytesAsync(recording, new byte[200_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            Assert.Equal("en+hu", Assert.Single(api.Repository.Jobs).Value.Language);
+
+            // A server from before language pairs does not say it takes them: it is offered one language and sent the first.
+            workspace.Attach(new RemoteConnection(workspace.Client!, workspace.ServerInfo! with { LanguagePairs = false }, browser.Servers[0]));
+            workspace.SelectedLanguage = "hu";
+            workspace.SelectedSecondLanguage = "en";
+            Assert.False(workspace.CanChooseSecondLanguage);
+            Assert.Equal("hu", workspace.LanguageChoice);
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task ARecordingIsSentFollowedReviewedEditedAndExported()
     {
         var root = NewRoot();

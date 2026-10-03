@@ -162,8 +162,8 @@ public sealed class WebLiveTests
         string[][] chosen = [["auto", "hu"], ["en", ""], ["en", "hu"], ["en", "en"], ["", "hu"], ["de", "auto"]];
         var known = LanguageCatalog.All.Select(language => language.Code).ToArray();
         var js = Run(new { op = "languages", live = LiveScript, saved, chosen, known });
-        Assert.Equal(saved.Select(value => LiveLanguages.Split(value)), js.GetProperty("split").EnumerateArray().Select(item => (item.GetProperty("first").GetString()!, item.GetProperty("second").GetString()!)));
-        Assert.Equal(chosen.Select(pair => LiveLanguages.Join(pair[0], pair[1])), js.GetProperty("joined").EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal(saved.Select(value => SpeechLanguages.Split(value)), js.GetProperty("split").EnumerateArray().Select(item => (item.GetProperty("first").GetString()!, item.GetProperty("second").GetString()!)));
+        Assert.Equal(chosen.Select(pair => SpeechLanguages.Join(pair[0], pair[1])), js.GetProperty("joined").EnumerateArray().Select(item => item.GetString()));
     }
 
     [NodeTheory]

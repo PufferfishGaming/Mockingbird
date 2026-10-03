@@ -178,7 +178,7 @@ public sealed class WebAppTests
     {
         var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
         Assert.Contains("api(\"/v1/links\", { method: \"POST\"", script);
-        Assert.Contains("JSON.stringify({ url, language: ui.language.value })", script);
+        Assert.Contains("JSON.stringify({ url, language: speechChoice() })", script);         // the language, or the pair of languages, chosen for recordings
         Assert.Contains("info.linksEnabled", script);                      // the button follows what the server says it can do
         Assert.Contains("info.linkPages", script);
         Assert.Contains("t(job.error)", script);                           // a link that failed says why in the page's language

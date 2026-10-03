@@ -16,3 +16,9 @@ public sealed record ChunkPlan(int Version, long DurationMs, string Source, IRea
     public IEnumerable<AudioChunk> SpeechChunks() => Chunks.Where(chunk => chunk.IsSpeech);
     public long SpeechMs() => SpeechChunks().Sum(chunk => chunk.DurationMs);
 }
+
+/// <summary>A stretch of a recording in two languages that is in one of them; together the blocks cover the whole recording, one after the other.</summary>
+public sealed record LanguageBlock(long StartMs, long EndMs, string Language)
+{
+    public long DurationMs => EndMs - StartMs;
+}

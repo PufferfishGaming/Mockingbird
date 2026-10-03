@@ -56,7 +56,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
         };
         Keybind = new KeybindViewModel(KeyCombo.ParseOr(_saved.Hotkey, DefaultKeys), DefaultKeys, RefuseKeys, Capturing, OnKeysChosen);
         _restoring = true;
-        (SelectedLanguage, SelectedSecondLanguage) = LiveLanguages.Split(_saved.Language);
+        (SelectedLanguage, SelectedSecondLanguage) = SpeechLanguages.Split(_saved.Language);
         SelectedMethod = _saved.Method == "paste" ? PasteMethod : TypeMethod;
         RefreshDevices();
         _restoring = false;
@@ -81,8 +81,8 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
     /// <summary>The keys that start and stop dictation, and choosing others by pressing them.</summary>
     public KeybindViewModel Keybind { get; }
 
-    public IReadOnlyList<LanguageOption> Languages => _languages ??= LiveLanguages.First();
-    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= LiveLanguages.Second(SelectedLanguage);
+    public IReadOnlyList<LanguageOption> Languages => _languages ??= SpeechLanguages.First();
+    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= SpeechLanguages.Second(SelectedLanguage);
     public IReadOnlyList<string> Methods { get; } = [TypeMethod, PasteMethod];
     public ObservableCollection<DeviceChoice> Devices { get; } = [];
 
@@ -106,7 +106,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
     public bool CanChooseSecondLanguage => SelectedLanguage != "auto";
 
     /// <summary>What the phrases are read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
-    public string LanguageChoice => LiveLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
+    public string LanguageChoice => SpeechLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
     [ObservableProperty] private string _selectedMethod = TypeMethod;
     [ObservableProperty] private DeviceChoice? _selectedDevice;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChoose))] private bool _isListening;

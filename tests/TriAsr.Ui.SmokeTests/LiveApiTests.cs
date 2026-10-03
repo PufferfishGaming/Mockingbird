@@ -149,9 +149,9 @@ public sealed class LiveApiTests
         Assert.Equal(new LivePhrase("Remote words.", "en"), await client.LiveAsync(Wav(), "en", null, default));
         var info = await client.InfoAsync(default);
         Assert.True(info.LiveEnabled);
-        Assert.True(info.LiveLanguagePairs);
+        Assert.True(info.LanguagePairs);
 
-        var recognizer = new RemoteLiveRecognizer(client, info.LiveLanguagePairs);
+        var recognizer = new RemoteLiveRecognizer(client, info.LanguagePairs);
         live.AnswerLanguage = "hu";
         Assert.Equal(new LivePhrase("Remote words.", "hu"), await recognizer.RecognizeAsync(Wav(), "en+hu", "en", default));
         Assert.Equal(("en+hu", "en"), (live.Calls[^1].Language, live.Calls[^1].Recent));      // the pair and the language of the previous phrase reach the server
@@ -175,7 +175,7 @@ public sealed class LiveApiTests
     }
 
     [Fact]
-    public async Task TwoLanguagesAreTakenForDictationOnlyAndTheAnswerSaysWhichOneThePhraseWasIn()
+    public async Task TwoLanguagesAreTakenForAPhraseAndARecordingAndTheAnswerSaysWhichOneThePhraseWasIn()
     {
         var live = new FakeLive { Answer = "Jó napot kívánok.", AnswerLanguage = "hu" };
         await using var api = await Harness.StartAsync(h => h.Live = live);
@@ -202,8 +202,12 @@ public sealed class LiveApiTests
         }
         Assert.Equal(calls, live.Calls.Count);
 
-        using var upload = await api.Client.PostAsync("/v1/transcriptions?language=en%2Bhu&name=a.wav", new ByteArrayContent(Wav()) { Headers = { { "Content-Type", "audio/wav" } } });
-        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);                              // a whole recording is still read in one language
+        // A recording takes the same choice: it is divided into stretches of each language.
+        using var upload = await api.Client.PostAsync("/v1/transcriptions?language=HU%2Ben&name=a.wav", new ByteArrayContent(Wav()) { Headers = { { "Content-Type", "audio/wav" } } });
+        Assert.Equal(HttpStatusCode.Accepted, upload.StatusCode);
+        Assert.Equal("hu+en", ApiTestData.Text(JsonDocument.Parse(await upload.Content.ReadAsStringAsync()).RootElement, "language"));
+        using var three = await api.Client.PostAsync("/v1/transcriptions?language=en%2Bhu%2Bde&name=a.wav", new ByteArrayContent(Wav()) { Headers = { { "Content-Type", "audio/wav" } } });
+        Assert.Equal("unsupported_language", ErrorCode(await three.Content.ReadAsStringAsync()));
     }
 
     [Fact]

@@ -88,7 +88,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
         };
         Keybind = new KeybindViewModel(KeyCombo.ParseOr(_saved.Hotkey, KeyCombo.None), KeyCombo.None, RefuseKeys, Capturing, OnKeysChosen);
         _restoring = true;
-        (SelectedLanguage, SelectedSecondLanguage) = LiveLanguages.Split(_saved.Language);
+        (SelectedLanguage, SelectedSecondLanguage) = SpeechLanguages.Split(_saved.Language);
         RefreshDevices();
         _restoring = false;
         RefreshAvailability();
@@ -119,8 +119,8 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
 
     public ObservableCollection<NoteRow> Notes { get; } = [];
     public ObservableCollection<DeviceChoice> Devices { get; } = [];
-    public IReadOnlyList<LanguageOption> Languages => _languages ??= LiveLanguages.First();
-    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= LiveLanguages.Second(SelectedLanguage);
+    public IReadOnlyList<LanguageOption> Languages => _languages ??= SpeechLanguages.First();
+    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= SpeechLanguages.Second(SelectedLanguage);
     private string _selectedSecondLanguage = "";
 
     /// <summary>The second language of a person who switches between two, or empty. (A list that is being replaced sets it to null for a moment: that is not a choice.)</summary>
@@ -140,7 +140,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
     public bool CanChooseSecondLanguage => SelectedLanguage != "auto";
 
     /// <summary>What the phrases are read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
-    public string LanguageChoice => LiveLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
+    public string LanguageChoice => SpeechLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
 
     [ObservableProperty] private NoteRow? _selectedNote;
     [ObservableProperty] private string _title = "";

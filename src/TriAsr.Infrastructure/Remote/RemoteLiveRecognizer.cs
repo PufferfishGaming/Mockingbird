@@ -4,7 +4,7 @@ using TriAsr.Domain;
 namespace TriAsr.Infrastructure;
 
 /// <summary>Reads the phrases of live dictation on the server a Client is connected to: each phrase goes to the server as a small WAV file and the words come back.</summary>
-/// <param name="languagePairs">Whether the server reads a phrase in a choice of two languages (<see cref="RemoteServerInfo.LiveLanguagePairs"/>). An older one is sent the first of the two.</param>
+/// <param name="languagePairs">Whether the server reads a phrase in a choice of two languages (<see cref="RemoteServerInfo.LanguagePairs"/>). An older one is sent the first of the two.</param>
 public sealed class RemoteLiveRecognizer(RemoteServerClient client, bool languagePairs = true) : ILiveRecognizer
 {
     public async Task<LivePhrase> RecognizeAsync(byte[] wav, string language, string? recent, CancellationToken token)

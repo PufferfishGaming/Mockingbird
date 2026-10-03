@@ -990,5 +990,8 @@
  "This note was changed on another computer. What you wrote was kept as a new note called \"{0}\".": "Esta nota se cambió en otro equipo. Lo que escribió se conservó como una nota nueva llamada «{0}».",
  "This note was deleted on another computer. It was saved again.": "Esta nota se eliminó en otro equipo. Se ha guardado de nuevo.",
  "Hold Alt (or Ctrl and Shift) while you press the key, or use a function key such as F9 on its own.": "Mantenga pulsada Alt (o Ctrl y Mayús) mientras pulsa la tecla, o use una tecla de función como F9 sola.",
- "The keys work while this page is open.": "Las teclas funcionan mientras esta página esté abierta."
+ "The keys work while this page is open.": "Las teclas funcionan mientras esta página esté abierta.",
+ "If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.": "Si la grabación alterna entre dos idiomas, elija ambos: cada parte se escribe en el idioma en que se dijo, sin traducir. Encontrar las partes tarda un poco más.",
+ "Second speech language": "Segundo idioma hablado",
+ "Second watch folder language": "Segundo idioma de la carpeta vigilada"
 }

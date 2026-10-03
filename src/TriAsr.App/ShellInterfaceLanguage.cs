@@ -86,6 +86,8 @@ public sealed partial class ShellViewModel
         if (_rawCanaryNote is { } note) RawCanary = T(note);
         foreach (var region in Regions) region.NotifyLanguageChanged();
         _languagesInOrder = null; OnPropertyChanged(nameof(Languages)); // the names, and with them the alphabetical order, are those of the new language
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
+        _watchSecondLanguages = null; OnPropertyChanged(nameof(WatchSecondLanguages));
         OnPropertyChanged(nameof(ThemeSummary)); OnPropertyChanged(nameof(StorageSummary)); OnPropertyChanged(nameof(LanguageCoverage)); OnPropertyChanged(nameof(ExpansionLanguages));
         RefreshReadiness();
         if (Hardware is not null) UpdateRecommendation();

@@ -216,9 +216,10 @@ public sealed partial class ShellViewModel
         try { await PersistSelectionAsync(); Status = T("Preset saved. Download any missing models on Models."); }
         catch (Exception error) { ReportError(T("Could not save model preset"), error.Message); }
     }
-    private string[] MissingRequiredModels() => MissingRequiredModelsFor(SelectedLanguage);
+    private string[] MissingRequiredModels() => MissingRequiredModelsFor(LanguageChoice);
+    /// <summary>The models a job in this language still needs: Whisper always, Canary when it covers the language (both of them, for two).</summary>
     private string[] MissingRequiredModelsFor(string language) => ModelCards.Where(card => card.Selected &&
-        (card.Entry.Family == "Whisper" || TriAsr.Domain.LanguageCatalog.CanaryCodes.Contains(language)))
+        (card.Entry.Family == "Whisper" || TriAsr.Domain.LanguageCatalog.TryParseChoice(language, out var codes) && codes.Count > 0 && codes.All(TriAsr.Domain.LanguageCatalog.CanaryCodes.Contains)))
         .Where(card => { var status = models.Inspect(card.Entry); return !status.Installed || status.WrongSize; }).Select(card => card.Title).ToArray();
     [RelayCommand]
     private async Task InstallSelectedModelsAsync()

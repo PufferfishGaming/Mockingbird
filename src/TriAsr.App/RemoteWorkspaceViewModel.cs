@@ -87,7 +87,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         if (_connection is not { } connection) return new(null, Loc.T("Connect to a server to dictate."));
         if (!connection.Info.LiveEnabled) return new(null, Loc.T("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet."));
-        return new(new RemoteLiveRecognizer(connection.Client, connection.Info.LiveLanguagePairs));
+        return new(new RemoteLiveRecognizer(connection.Client, connection.Info.LanguagePairs));
     }
     private RecorderViewModel? _recorder;
 
@@ -198,6 +198,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         Link.ServerChanged();
         _dictation?.RefreshAvailability();
         _notes?.RefreshAvailability();
+        OnPropertyChanged(nameof(CanChooseSecondLanguage));
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -214,18 +215,48 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         if (Regions.Count > 0) ShowReviewSummary();
         if (_rawCanaryNote is not null) RawCanary = CanaryNote(_rawCanaryNote);
         _languages = null; OnPropertyChanged(nameof(Languages));
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
         if (!IsSending && SendStatus.Length > 0 && !HasSendError) SendStatus = "";
     }
 
     // ---- sending a recording ------------------------------------------------------------------------------------------------------------
 
-    private IReadOnlyList<LanguageOption>? _languages;
-    private static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
+    private IReadOnlyList<LanguageOption>? _languages, _secondLanguages;
 
-    public IReadOnlyList<LanguageOption> Languages => _languages ??= LanguageText.InOrder(LanguageCatalog.All).Prepend(AutoDetect).ToArray();
+    public IReadOnlyList<LanguageOption> Languages => _languages ??= SpeechLanguages.First();
+    /// <summary>The choices of a second language for a recording that switches between two: none, then every language but the first.</summary>
+    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= SpeechLanguages.Second(SelectedLanguage);
 
     [ObservableProperty] private string _sourcePath = "";
-    [ObservableProperty] private string _selectedLanguage = "auto";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChooseSecondLanguage))] private string _selectedLanguage = "auto";
+    private string _selectedSecondLanguage = "";
+
+    /// <summary>The second language of a recording that switches between two, or empty. (A list that is being replaced sets it to null for a moment: that is not a choice.)</summary>
+    public string? SelectedSecondLanguage
+    {
+        get => _selectedSecondLanguage;
+        set
+        {
+            if (value is null || value == _selectedSecondLanguage) return;
+            _selectedSecondLanguage = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Whether the server reads a recording in two languages; an older one does not, and is sent the first.</summary>
+    private bool ServerTakesPairs => _connection?.Info.LanguagePairs == true;
+
+    /// <summary>A second language can be chosen with a first one, when the server takes two.</summary>
+    public bool CanChooseSecondLanguage => SelectedLanguage != "auto" && ServerTakesPairs;
+
+    /// <summary>What a recording (or a link) is sent to be read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
+    public string LanguageChoice => SpeechLanguages.Join(SelectedLanguage, ServerTakesPairs ? _selectedSecondLanguage : "");
+
+    partial void OnSelectedLanguageChanged(string value)
+    {
+        if (value == "auto" || value == _selectedSecondLanguage) { _selectedSecondLanguage = ""; OnPropertyChanged(nameof(SelectedSecondLanguage)); }
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
+    }
     [ObservableProperty] private bool _isSending;
     [ObservableProperty] private double _sendPercent;
     [ObservableProperty] private string _sendStatus = "";
@@ -243,7 +274,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         var length = Math.Max(1, new FileInfo(SourcePath).Length);
         try
         {
-            var job = await connection.Client.UploadAsync(SourcePath, SelectedLanguage, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), CancellationToken.None);
+            var job = await connection.Client.UploadAsync(SourcePath, LanguageChoice, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), CancellationToken.None);
             Interlocked.Increment(ref _localChanges);
             Merge([job]);
             SelectedJob = Jobs.FirstOrDefault(row => row.Id == job.Id);

@@ -84,6 +84,38 @@ public sealed class WatchFolderTests
     }
 
     [Fact]
+    public async Task TwoLanguagesAreRememberedForTheWatchFolderAndSentWithANewRecording()
+    {
+        var root = NewRoot();
+        try
+        {
+            using var host = App.App.CreateHost(root);
+            var store = host.Services.GetRequiredService<SettingsStore>();
+            await store.SaveAsync(new(WatchLanguage: "en+hu"));
+            var shell = host.Services.GetRequiredService<ShellViewModel>();
+            await shell.InitializeAsync();
+            Assert.Equal(("en", "hu", "en+hu"), (shell.WatchLanguage, shell.WatchSecondLanguage, shell.WatchLanguageChoice));
+            Assert.True(shell.CanChooseWatchSecondLanguage);
+            Assert.DoesNotContain(shell.WatchSecondLanguages, language => language.Code == "en");
+            shell.WatchSecondLanguage = "de";
+            await WaitForAsync(async () => (await store.LoadAsync()).WatchLanguage == "en+de", "the new pair is saved");
+            shell.WatchLanguage = "auto";                                                         // auto-detect takes no second language
+            Assert.Equal(("", "auto"), (shell.WatchSecondLanguage, shell.WatchLanguageChoice));
+            await WaitForAsync(async () => (await store.LoadAsync()).WatchLanguage == "auto", "auto-detect is saved");
+
+            // The New transcription page offers the same choice for the recording it sends.
+            Assert.False(shell.CanChooseSecondLanguage);
+            shell.SelectedLanguage = "hu";
+            shell.SelectedSecondLanguage = "en";
+            Assert.Equal("hu+en", shell.LanguageChoice);
+            shell.SelectedLanguage = "en";                                                        // the same language twice is one
+            Assert.Equal(("", "en"), (shell.SelectedSecondLanguage, shell.LanguageChoice));
+            await WaitForAsync(() => Task.FromResult(shell.Status == "Preferences saved locally"), "the background save finishes before the folder is removed");
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task AnUnknownSavedOutputFallsBackToText()
     {
         var root = NewRoot();

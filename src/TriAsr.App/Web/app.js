@@ -260,8 +260,14 @@
     const chosen = h("p", { class: "muted", "aria-live": "polite" }, "");
     const progress = h("progress", { max: "100", value: "0", hidden: true, "aria-label": t("Upload progress") });
     const status = h("p", { "aria-live": "polite" }, "");
-    const language = h("select", { id: "language", "aria-label": t("Speech language") },
+    const kept = state.speech || { first: "auto", second: "" };
+    const language = h("select", { id: "language", "aria-label": t("Speech language"), onChange: () => chooseSpeechLanguages(language.value, ui.secondLanguage.value) },
       languageOptions());
+    language.value = kept.first;
+    const secondLanguage = h("select", { id: "second-language", "aria-label": t("Second speech language"), disabled: kept.first === "auto",
+      title: t("If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer."),
+      onChange: () => chooseSpeechLanguages(language.value, secondLanguage.value) }, secondLanguageOptions(kept.first));
+    secondLanguage.value = kept.second;
     const send = h("button", { class: "btn primary", type: "button", disabled: true, onClick: () => sendFile() }, t("Send to server"));
     const drop = h("div", { class: "drop" },
       h("strong", null, t("Drop audio or video here")),
@@ -271,10 +277,12 @@
     drop.addEventListener("dragover", (event) => { event.preventDefault(); drop.classList.add("over"); });
     drop.addEventListener("dragleave", () => drop.classList.remove("over"));
     drop.addEventListener("drop", (event) => { event.preventDefault(); drop.classList.remove("over"); const file = event.dataTransfer && event.dataTransfer.files[0]; if (file) choose(file); });
-    Object.assign(ui, { fileInput: input, chosen, progress, sendStatus: status, language, send });
+    Object.assign(ui, { fileInput: input, chosen, progress, sendStatus: status, language, secondLanguage, send });
     ui.newView.replaceChildren(h("h1", null, t("New transcription")),
       h("div", { class: "card stack" }, drop, input,
-        h("div", null, h("label", { for: "language" }, t("Language")), language),
+        h("div", { class: "row" },
+          h("div", null, h("label", { for: "language" }, t("Language")), language),
+          h("div", null, h("label", { for: "second-language" }, t("Second language")), secondLanguage)),
         h("div", { class: "row" }, send),
         progress, status),
       buildRecorder(),
@@ -282,6 +290,17 @@
     if (state.file) choose(state.file);
     updateLink();
   }
+
+  /** The languages of a recording or a link were changed: the second list loses the first language, and both are kept while the page is open. */
+  function chooseSpeechLanguages(first, second) {
+    state.speech = MbLive.splitLanguages(MbLive.joinLanguages(first, second));
+    ui.secondLanguage.replaceChildren(...secondLanguageOptions(state.speech.first));
+    ui.secondLanguage.value = state.speech.second;
+    ui.secondLanguage.disabled = state.speech.first === "auto";
+  }
+
+  /** What a recording or a link is sent to be read in: "auto", "en" or "en+hu". */
+  const speechChoice = () => MbLive.joinLanguages(ui.language.value, ui.secondLanguage.value);
 
   // ---- fetch a link ------------------------------------------------------------------------------------------------------------------------
   // The server downloads the sound of the address (a video site, a podcast episode, a link to an audio file) and transcribes it; nothing is downloaded here.
@@ -319,7 +338,7 @@
     state.sendingLink = true; updateLink();
     ui.linkStatus.textContent = t("Sending to {0}…", state.health.name);
     try {
-      const response = await api("/v1/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, language: ui.language.value }) });
+      const response = await api("/v1/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, language: speechChoice() }) });
       await response.json();
       ui.linkInput.value = ""; ui.linkStatus.textContent = t("Sent. The server is working on it.");
       selectTab("projects"); refreshJobs();
@@ -463,7 +482,7 @@
     state.sending = true; ui.send.disabled = true; ui.progress.hidden = false; ui.progress.value = 0;
     ui.sendStatus.textContent = t("Sending to {0}…", state.health.name);
     const request = new XMLHttpRequest();
-    request.open("POST", "/v1/transcriptions?language=" + encodeURIComponent(ui.language.value) + "&name=" + encodeURIComponent(file.name));
+    request.open("POST", "/v1/transcriptions?language=" + encodeURIComponent(speechChoice()) + "&name=" + encodeURIComponent(file.name));
     if (state.password) request.setRequestHeader("Authorization", "Bearer " + state.password);
     request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
     request.upload.addEventListener("progress", (event) => { if (event.lengthComputable) ui.progress.value = (event.loaded * 100) / event.total; });

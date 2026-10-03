@@ -149,6 +149,96 @@ public sealed class LiveWhisperTests : IDisposable
         Assert.Empty(Directory.GetFiles(Path.Combine(_directory, "real")));
     }
 
+    [WhisperFact]
+    public async Task TheRealProgramDetectsAndReadsManyStretchesInOneRun()
+    {
+        var (tool, model) = FindWhisper()!.Value;
+        var runner = new RealRunner();
+        var engine = new WhisperEngine(runner, tool, model, 4);
+        var tone = new byte[2 * 32_000];
+        for (var i = 0; i < tone.Length / 2; i++) System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(tone.AsSpan(i * 2), (short)(Math.Sin(2 * Math.PI * 220 * i / 16_000) * 3000));
+        var files = Enumerable.Range(0, 2).Select(i => Path.Combine(_directory, $"stretch {i}.wav")).ToArray();          // a space in the path, as a user folder can have
+        foreach (var file in files) File.WriteAllBytes(file, PhraseText.Wav(tone));
+        var detected = await engine.DetectEachAsync(files, "vulkan", default);
+        Assert.Equal(2, detected.Count);
+        Assert.All(detected, item => { Assert.Matches("^[a-z]{2,3}$", item.Language); Assert.InRange(item.Detection, 0.000001, 1); });
+        var read = await engine.ReadEachAsync(files, "en", Path.Combine(_directory, "readings"), "vulkan", default);
+        Assert.Equal(2, read.Count);
+        Assert.All(read, item => Assert.Equal(("en", 1d), (item.Language, item.Detection)));
+    }
+
+    // ---- many stretches in one run ----------------------------------------------------------------------------------------------
+
+    /// <summary>Answers a run over many files the way whisper-cli does: it names each file, then (detecting) its language, or (reading) writes its JSON.</summary>
+    private sealed class BatchRunner(Func<string, string, (string Language, double Detection)> detect, Func<string, string, double> confidence) : IProcessRunner
+    {
+        public List<List<string>> Runs { get; } = [];
+
+        public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
+        {
+            var arguments = request.Arguments.ToList();
+            Runs.Add(arguments);
+            var language = arguments[arguments.IndexOf("-l") + 1];
+            var said = new System.Text.StringBuilder();
+            for (var i = 0; i < arguments.Count; i++)
+            {
+                if (arguments[i] != "-f") continue;
+                var file = arguments[i + 1];
+                said.AppendLine($"main: processing '{file}' (32000 samples, 2.0 sec), 4 threads, 1 processors, 5 beams + best of 5, lang = {language}, task = transcribe, timestamps = 0 ...");
+                if (arguments.Contains("-dl"))
+                {
+                    var (detected, p) = detect(file, language);
+                    if (detected.Length > 0) said.AppendLine($"whisper_full_with_state: auto-detected language: {detected} (p = {p.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)})");
+                }
+                else await File.WriteAllTextAsync(arguments[i + 3] + ".json", Json(language, "words of " + Path.GetFileName(file), Math.Exp(confidence(file, language))), cancellationToken);
+            }
+            return new(0, "", said.ToString(), 1);
+        }
+    }
+
+    [Fact]
+    public async Task EachStretchGetsTheLanguageTheProgramNamedRightAfterIt()
+    {
+        var files = Enumerable.Range(0, 120).Select(i => Path.Combine(_directory, $"{i:D5}.wav")).ToArray();
+        var runner = new BatchRunner((file, _) => (file.EndsWith("00007.wav") ? "en" : "hu", file.EndsWith("00007.wav") ? 0.84 : 0.998), (_, _) => 0);
+        var engine = new WhisperEngine(runner, _executable, _model, 4);
+        var detected = await engine.DetectEachAsync(files, "cpu", default);
+        Assert.Equal(120, detected.Count);
+        Assert.Equal(("en", 0.84), detected[7]);
+        Assert.All(detected.Where((_, i) => i != 7), item => Assert.Equal(("hu", 0.998), item));
+        Assert.Equal(3, runner.Runs.Count);                                                    // at most 50 files a run, so that the command line stays short
+        Assert.All(runner.Runs, run => { Assert.Contains("-dl", run); Assert.Contains("-ng", run); Assert.DoesNotContain("-np", run); });
+        Assert.Equal(50, runner.Runs[0].Count(argument => argument == "-f"));
+    }
+
+    [Fact]
+    public async Task AStretchThatTheProgramSaidNothingAboutIsAnError()
+    {
+        var runner = new BatchRunner((file, _) => file.EndsWith("b.wav") ? ("", 0) : ("de", 0.99), (_, _) => 0);
+        var engine = new WhisperEngine(runner, _executable, _model, 4);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => engine.DetectEachAsync([Path.Combine(_directory, "a.wav"), Path.Combine(_directory, "b.wav")], "vulkan", default));
+    }
+
+    [Fact]
+    public async Task EachStretchIsReadInTheLanguageGivenAndComesBackWithHowSureTheProgramWasOfItsWords()
+    {
+        var files = Enumerable.Range(0, 60).Select(i => Path.Combine(_directory, $"{i:D5}.wav")).ToArray();
+        var runner = new BatchRunner((_, _) => ("", 0), (file, language) => file.EndsWith("00003.wav") ? -0.9 : -0.05);
+        var engine = new WhisperEngine(runner, _executable, _model, 4);
+        var read = await engine.ReadEachAsync(files, "hu", Path.Combine(_directory, "readings"), "vulkan", default);
+        Assert.Equal(60, read.Count);
+        Assert.Equal(2, runner.Runs.Count);
+        Assert.All(read, item => Assert.Equal(("hu", 1d), (item.Language, item.Detection)));
+        Assert.Equal(-0.9, read[3].Confidence, 6);
+        Assert.Equal(-0.05, read[4].Confidence, 6);
+        Assert.Equal("words of 00004.wav", read[4].Text);
+        var first = runner.Runs[0];
+        Assert.Equal("hu", first[first.IndexOf("-l") + 1]);
+        Assert.All(new[] { "-np", "-ojf", "-nt" }, option => Assert.Contains(option, first));
+        Assert.Equal("0", first[first.IndexOf("-mc") + 1]);
+        Assert.DoesNotContain("-ng", first);
+    }
+
     [Fact]
     public void TheReadingIsTheTextTheLanguageHowSureTheProgramWasOfItAndOfItsWords()
     {

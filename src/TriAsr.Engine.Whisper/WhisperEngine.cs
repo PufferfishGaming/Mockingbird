@@ -9,7 +9,65 @@ namespace TriAsr.Engine.Whisper;
 
 public sealed partial class WhisperEngine(IProcessRunner runner, string executable, string model, int threads)
 {
-    public sealed record LanguageDetection(string Language, double Confidence, IReadOnlyList<string> WindowLanguages);
+    /// <param name="Language">The language the recording is read in; two joined with <c>+</c> when it was found to switch between the two languages chosen.</param>
+    /// <param name="Blocks">For a recording in two languages, the stretches that are in each; null otherwise.</param>
+    public sealed record LanguageDetection(string Language, double Confidence, IReadOnlyList<string> WindowLanguages, IReadOnlyList<LanguageBlock>? Blocks = null);
+
+    /// <summary>The most files given to one run of the program, so that its command line stays well inside what Windows allows.</summary>
+    private const int FilesPerRun = 50;
+
+    /// <summary>
+    /// Detects the language of each file, without reading the words: one run of the program for up to <see cref="FilesPerRun"/> files, so the model is loaded once.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Language, double Detection)>> DetectEachAsync(IReadOnlyList<string> files, string backend, CancellationToken token, Action<double>? progress = null)
+    {
+        var found = new Dictionary<string, (string, double)>(StringComparer.OrdinalIgnoreCase);
+        for (var first = 0; first < files.Count; first += FilesPerRun)
+        {
+            var batch = files.Skip(first).Take(FilesPerRun).ToArray();
+            var arguments = new List<string> { "-m", model, "-l", "auto", "-dl", "-t", threads.ToString(CultureInfo.InvariantCulture) };
+            if (backend == "cpu") arguments.Add("-ng");
+            foreach (var file in batch) arguments.AddRange(["-f", file]);
+            var result = await runner.RunAsync(new(executable, arguments, Path.GetDirectoryName(executable)!, TimeSpan.FromMinutes(30)), token);
+            if (result.ExitCode != 0) throw new InvalidOperationException("Whisper language detection did not return a valid language and probability.");
+            string? current = null;
+            foreach (var line in (result.StandardError + "\n" + result.StandardOutput).Split('\n'))
+            {
+                if (Processing().Match(line) is { Success: true } processing) current = processing.Groups[1].Value;
+                else if (current is not null && LanguageResult().Match(line) is { Success: true } match)
+                {
+                    found[current] = (match.Groups[1].Value, double.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture));
+                    current = null;
+                }
+            }
+            progress?.Invoke(Math.Min(1, (first + batch.Length) / (double)files.Count));
+        }
+        return files.Select(file => found.TryGetValue(file, out var detected) ? detected
+            : throw new InvalidOperationException("Whisper language detection did not return a valid language and probability.")).ToArray();
+    }
+
+    /// <summary>Reads each file in one language, as a phrase of live dictation is read, and says how sure the program was of the words (one run for many files).</summary>
+    public async Task<IReadOnlyList<SpeechReading>> ReadEachAsync(IReadOnlyList<string> files, string language, string directory, string backend, CancellationToken token)
+    {
+        Directory.CreateDirectory(directory);
+        var readings = new List<SpeechReading>();
+        for (var first = 0; first < files.Count; first += FilesPerRun)
+        {
+            var batch = files.Skip(first).Take(FilesPerRun).ToArray();
+            var outputs = batch.Select((_, i) => Path.Combine(directory, $"{language}-{first + i:D5}")).ToArray();
+            var arguments = new List<string> { "-m", model, "-l", language, "-t", threads.ToString(CultureInfo.InvariantCulture), "-mc", "0", "-nt", "-ojf", "-np" };
+            if (backend == "cpu") arguments.Add("-ng");
+            for (var i = 0; i < batch.Length; i++) arguments.AddRange(["-f", batch[i], "-of", outputs[i]]);
+            var result = await runner.RunAsync(new(executable, arguments, Path.GetDirectoryName(executable)!, TimeSpan.FromHours(2)), token);
+            if (result.ExitCode != 0) throw new InvalidOperationException($"Whisper stopped with exit code {result.ExitCode}. See the saved engine output.");
+            foreach (var output in outputs)
+            {
+                if (!File.Exists(output + ".json")) throw new InvalidOperationException("Whisper did not write its reading of a stretch of the recording.");
+                readings.Add(LiveWhisper.Parse(await File.ReadAllTextAsync(output + ".json", token), "", language));
+            }
+        }
+        return readings;
+    }
     /// <param name="sampleStarts">Where to take the 15 s samples from (seconds), chosen where there is speech; without it the start, middle and end are used.</param>
     public async Task<LanguageDetection> DetectLanguageAsync(string audio, double seconds, string directory, string backend, string ffmpeg, CancellationToken token, IReadOnlyList<double>? sampleStarts = null)
     {
@@ -94,5 +152,6 @@ public sealed partial class WhisperEngine(IProcessRunner runner, string executab
     [GeneratedRegex(@"ggml_vulkan: \d+ = (.+?) \(")] private static partial Regex VulkanDevice();
     [GeneratedRegex(@"(?:auto-detected|detected) language:\s*([a-z]+)\s*\(p\s*=\s*([0-9.]+)\)")] private static partial Regex LanguageResult();
     [GeneratedRegex(@"load time\s*=\s*([0-9.]+)\s*ms")] private static partial Regex LoadTime();
+    [GeneratedRegex(@"processing '(.+?)' \(")] private static partial Regex Processing();
     [GeneratedRegex(@"whisper_print_progress_callback:.*?progress\s*=\s*([0-9.]+)%")] private static partial Regex ProgressResult();
 }

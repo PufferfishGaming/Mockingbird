@@ -990,5 +990,8 @@
   "This note was changed on another computer. What you wrote was kept as a new note called \"{0}\".": "Ezt a jegyzetet egy másik számítógépen módosították. Amit Ön írt, új jegyzetként maradt meg „{0}” néven.",
   "This note was deleted on another computer. It was saved again.": "Ezt a jegyzetet egy másik számítógépen törölték. Újra elmentettük.",
   "Hold Alt (or Ctrl and Shift) while you press the key, or use a function key such as F9 on its own.": "Tartsa lenyomva az Alt billentyűt (vagy a Ctrl és a Shift billentyűt), miközben megnyomja a billentyűt, vagy használjon önmagában funkcióbillentyűt, például az F9-et.",
-  "The keys work while this page is open.": "A billentyűk addig működnek, amíg ez az oldal nyitva van."
+  "The keys work while this page is open.": "A billentyűk addig működnek, amíg ez az oldal nyitva van.",
+  "If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.": "Ha a felvételen két nyelv váltakozik, válassza ki mindkettőt: minden részt azon a nyelven ír le, amelyen elhangzott, fordítás nélkül. A részek megkeresése kicsit tovább tart.",
+  "Second speech language": "Második beszédnyelv",
+  "Second watch folder language": "A figyelt mappa második nyelve"
 }

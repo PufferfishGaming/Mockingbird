@@ -3,10 +3,11 @@ using TriAsr.Domain;
 namespace TriAsr.App;
 
 /// <summary>
-/// The choice of language that live dictation and live notes share: auto-detect, one language, or one language and a second one for a person who switches between
-/// two (<see cref="Application.LiveLanguagePicker"/>). It is saved and sent as one value: <c>auto</c>, <c>en</c> or <c>en+hu</c>.
+/// The choice of the language that is spoken, as every page offers it: auto-detect, one language, or one language and a second one for speech that switches between
+/// two (live dictation and notes: <see cref="Application.LiveLanguagePicker"/>; recordings: <see cref="Application.LanguageBlocks"/>). It is saved and sent as one value:
+/// <c>auto</c>, <c>en</c> or <c>en+hu</c>.
 /// </summary>
-public static class LiveLanguages
+public static class SpeechLanguages
 {
     public static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
     public static readonly LanguageOption NoSecond = new("", Loc.Key("No second language"));
