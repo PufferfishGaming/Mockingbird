@@ -4,7 +4,7 @@ A local transcription workstation for Windows x64, using Whisper and Canary to r
 
 Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
 
-**Version 0.1.19 — release candidate**
+**Version 0.1.20 — release candidate**
 
 <div align="center">
 
@@ -24,7 +24,7 @@ One file each. Download it, double-click it, accept the license and click **Inst
 | **Mockingbird Server** | Only the server: the models and the speech programs live on that computer, in a small light window. Other computers send their recordings to it. | `Mockingbird-Server-Setup.exe` |
 | **Mockingbird Client** | Only the window you work in. Nothing is transcribed on that computer: recordings go to a server and the transcripts come back to be read, edited and exported. | `Mockingbird-Client-Setup.exe` |
 
-Server and Client are new in the release after 0.1.19. Each edition installs, updates and keeps its data on its own (`TriASR`, `TriASR-Server`, `TriASR-Client`), and has its own checksum file (`SHA256SUMS.txt`, `SHA256SUMS-server.txt`, `SHA256SUMS-client.txt`) and update file (`latest.json`, `latest-server.json`, `latest-client.json`).
+Server and Client are new in 0.1.20. Each edition installs, updates and keeps its data on its own (`TriASR`, `TriASR-Server`, `TriASR-Client`), and has its own checksum file (`SHA256SUMS.txt`, `SHA256SUMS-server.txt`, `SHA256SUMS-client.txt`) and update file (`latest.json`, `latest-server.json`, `latest-client.json`).
 
 ## Quick install
 
