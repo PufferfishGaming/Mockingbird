@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace TriAsr.App;
 
 /// <summary>What the person chose for the notes. It has a small file of its own (<c>Config/notes.json</c>), the same in Studio and in the Client.</summary>
-/// <param name="Language">A language code or <c>auto</c>, for the words that are dictated into a note.</param>
+/// <param name="Language"><c>auto</c>, a language code, or two joined with <c>+</c> (<c>en+hu</c>), for the words that are dictated into a note.</param>
 /// <param name="Hotkey">The keys that start and stop recording a note from any program, as <see cref="KeyCombo.Id"/> writes them; empty for none (the usual: the person turns it on by choosing keys).</param>
 /// <param name="Microphone">The number of the microphone, or -1 for the one Windows uses.</param>
 /// <param name="Left">Where the little window was left on the screen; null until it has been moved.</param>

@@ -311,6 +311,8 @@ public sealed class NotesTests
         await setup.Model.RefreshAsync();
         await OpenAsync(setup.Model, note.Id);
         setup.Model.SelectedLanguage = "de";
+        setup.Model.SelectedSecondLanguage = "en";                                                                  // a person who switches between German and English
+        setup.Speech.Spoken = _ => "de";
         await setup.Model.StartRecordingAsync();
         Assert.True(setup.Model.IsListening);
         Assert.True(setup.Microphone.Open);
@@ -321,7 +323,7 @@ public sealed class NotesTests
         setup.Microphone.Hear(Join(Phrase(), Phrase()));
         await UntilAsync(() => setup.Model.Text == "Agenda: Welcome. Next point.", "both phrases are in the note");
         Assert.Equal("Next point.", setup.Model.LastText);
-        Assert.All(setup.Speech.Calls, call => Assert.Equal("de", call.Language));
+        Assert.Equal([("de+en", null), ("de+en", "de")], setup.Speech.Calls.Select(call => (call.Language, call.Recent)));   // the second phrase knows the language of the first
 
         await setup.Model.StopRecordingAsync();
         Assert.False(setup.Model.IsListening);
@@ -534,12 +536,14 @@ public sealed class NotesTests
         {
             using var second = Make(root, ownsHotkey: false);                                                       // the notes of the server, in the same window
             first.Model.SelectedLanguage = "hu";
+            first.Model.SelectedSecondLanguage = "en";
+            Assert.False(second.Model.CanChooseSecondLanguage);
             FakeHotkeys.Choose(first.Model.Keybind, new KeyCombo(KeyCombo.Control | KeyCombo.Alt, 0x4E));
             second.Model.SelectedDevice = second.Model.Devices.First(device => device.Id == 1);                    // another page changes something else afterwards
             first.Model.RememberPosition(120.5, 340);
             first.Model.Dispose();
             var again = Build(first);
-            Assert.Equal("hu", again.SelectedLanguage);
+            Assert.Equal(("hu", "en", "hu+en"), (again.SelectedLanguage, again.SelectedSecondLanguage, again.LanguageChoice));
             Assert.Equal("Ctrl+Alt+N", again.Keybind.Current.Id);
             Assert.Equal(1, again.SelectedDevice!.Id);
             Assert.Equal((120.5, 340d), again.Position);

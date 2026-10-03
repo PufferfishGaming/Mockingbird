@@ -27,6 +27,13 @@ public sealed class LiveSession(IMicrophone microphone, Action<Action> onUi) : I
     private CancellationTokenSource? _cancellation;
     private int _waiting;
     private volatile bool _problem;
+    private (string Language, DateTime At)? _recent;
+
+    /// <summary>After this long without a phrase the language of the last one is forgotten: the person may have gone on to the other language, or be someone else.</summary>
+    public static readonly TimeSpan RecentLifetime = TimeSpan.FromMinutes(10);
+
+    /// <summary>The language the last phrase was written in, while it is recent; with a choice of two languages it decides a phrase that reads about as well in both.</summary>
+    public string? RecentLanguage => _recent is { } recent && DateTime.UtcNow - recent.At < RecentLifetime ? recent.Language : null;
 
     public bool IsListening { get; private set; }
 
@@ -61,7 +68,7 @@ public sealed class LiveSession(IMicrophone microphone, Action<Action> onUi) : I
 
     /// <summary>Starts listening.</summary>
     /// <param name="device">The microphone, or <see cref="WindowsMicrophone.DefaultDevice"/>.</param>
-    /// <param name="language">The language code to read with; asked for every phrase, so a change takes effect at once.</param>
+    /// <param name="language">The language to read with (<c>auto</c>, a code, or two joined with <c>+</c>); asked for every phrase, so a change takes effect at once.</param>
     /// <exception cref="MicrophoneException">The microphone could not be opened; the message says why.</exception>
     public async Task StartAsync(int device, ILiveRecognizer recognizer, Func<string> language, PhraseHandler deliver)
     {
@@ -124,8 +131,12 @@ public sealed class LiveSession(IMicrophone microphone, Action<Action> onUi) : I
 
     private async Task ReadOneAsync(ILiveRecognizer recognizer, string language, PhraseHandler deliver, Utterance phrase, CancellationToken token)
     {
-        string text;
-        try { text = PhraseText.Clean(await recognizer.RecognizeAsync(PhraseText.Wav(phrase.Pcm), language, token).ConfigureAwait(false)); }
+        string text, spoken;
+        try
+        {
+            var read = await recognizer.RecognizeAsync(PhraseText.Wav(phrase.Pcm), language, RecentLanguage, token).ConfigureAwait(false);
+            (text, spoken) = (PhraseText.Clean(read.Text), read.Language);
+        }
         catch (OperationCanceledException) { throw; }
         catch (LiveException error) { var reason = error.Message; Fail(() => Loc.Describe(reason)); return; }
         catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or UnauthorizedAccessException)
@@ -135,6 +146,7 @@ public sealed class LiveSession(IMicrophone microphone, Action<Action> onUi) : I
             return;
         }
         if (text.Length == 0 || PhraseText.IsPhantom(text, phrase.Speech)) return;
+        if (spoken.Length > 0) _recent = (spoken, DateTime.UtcNow);
         try { deliver(text); }
         catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
         {

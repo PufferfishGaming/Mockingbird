@@ -146,20 +146,23 @@ public sealed class LiveApiTests
         var live = new FakeLive { Answer = "Remote words." };
         await using var api = await Harness.StartAsync(h => h.Live = live);
         using var client = new RemoteServerClient(api.Client.BaseAddress!, ApiTestData.Key, null);
-        Assert.Equal("Remote words.", await client.LiveAsync(Wav(), "en", default));
-        Assert.True((await client.InfoAsync(default)).LiveEnabled);
+        Assert.Equal(new LivePhrase("Remote words.", "en"), await client.LiveAsync(Wav(), "en", null, default));
+        var info = await client.InfoAsync(default);
+        Assert.True(info.LiveEnabled);
+        Assert.True(info.LiveLanguagePairs);
 
-        var recognizer = new RemoteLiveRecognizer(client);
-        Assert.Equal("Remote words.", await recognizer.RecognizeAsync(Wav(), "hu", default));
-        Assert.Equal("hu", live.Calls[^1].Language);
+        var recognizer = new RemoteLiveRecognizer(client, info.LiveLanguagePairs);
+        live.AnswerLanguage = "hu";
+        Assert.Equal(new LivePhrase("Remote words.", "hu"), await recognizer.RecognizeAsync(Wav(), "en+hu", "en", default));
+        Assert.Equal(("en+hu", "en"), (live.Calls[^1].Language, live.Calls[^1].Recent));      // the pair and the language of the previous phrase reach the server
 
         live.Fail = (_, _) => new LiveException(LiveMessages.NoModel);
-        var missing = await Assert.ThrowsAsync<LiveException>(() => recognizer.RecognizeAsync(Wav(), "de", default));
+        var missing = await Assert.ThrowsAsync<LiveException>(() => recognizer.RecognizeAsync(Wav(), "de", null, default));
         Assert.Equal(LiveMessages.NoModel, missing.Message);                                  // the server's own sentence, so that the window can translate it
         live.Fail = null;
 
         using var wrong = new RemoteServerClient(api.Client.BaseAddress!, "wrong", null);
-        await Assert.ThrowsAsync<LiveException>(() => new RemoteLiveRecognizer(wrong).RecognizeAsync(Wav(), "de", default));
+        await Assert.ThrowsAsync<LiveException>(() => new RemoteLiveRecognizer(wrong).RecognizeAsync(Wav(), "de", null, default));
     }
 
     [Fact]
@@ -167,7 +170,49 @@ public sealed class LiveApiTests
     {
         await using var api = await Harness.StartAsync();
         using var client = new RemoteServerClient(api.Client.BaseAddress!, ApiTestData.Key, null);
-        var error = await Assert.ThrowsAsync<LiveException>(() => new RemoteLiveRecognizer(client).RecognizeAsync(Wav(), "de", default));
+        var error = await Assert.ThrowsAsync<LiveException>(() => new RemoteLiveRecognizer(client).RecognizeAsync(Wav(), "de", null, default));
         Assert.Contains("does not read live dictation", error.Message);
+    }
+
+    [Fact]
+    public async Task TwoLanguagesAreTakenForDictationOnlyAndTheAnswerSaysWhichOneThePhraseWasIn()
+    {
+        var live = new FakeLive { Answer = "Jó napot kívánok.", AnswerLanguage = "hu" };
+        await using var api = await Harness.StartAsync(h => h.Live = live);
+        using var pair = await PostAsync(api, Wav(), "?language=en%2Bhu&recent=en");
+        var answer = JsonDocument.Parse(await pair.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(("Jó napot kívánok.", "hu"), (answer.GetProperty("text").GetString(), answer.GetProperty("language").GetString()));
+        Assert.Equal(("en+hu", "en"), (live.Calls[^1].Language, live.Calls[^1].Recent));
+
+        using var spaced = await PostAsync(api, Wav(), "?language=HU+en");                     // a plus that was not encoded arrives as a space
+        Assert.Equal(HttpStatusCode.OK, spaced.StatusCode);
+        Assert.Equal(("hu+en", (string?)null), (live.Calls[^1].Language, live.Calls[^1].Recent));
+        using var odd = await PostAsync(api, Wav(), "?language=en&recent=klingon");             // a recent language that is not one is not passed on
+        Assert.Null(live.Calls[^1].Recent);
+
+        live.Answer = "[BLANK_AUDIO]";
+        using var silent = await PostAsync(api, Wav(), "?language=en%2Bhu");
+        Assert.Equal("", JsonDocument.Parse(await silent.Content.ReadAsStringAsync()).RootElement.GetProperty("language").GetString());   // no words, no language
+
+        var calls = live.Calls.Count;
+        foreach (var refused in new[] { "?language=en%2Bhu%2Bde", "?language=auto%2Ben", "?language=en%2Bklingon" })
+        {
+            using var response = await PostAsync(api, Wav(), refused);
+            Assert.Equal("unsupported_language", ErrorCode(await response.Content.ReadAsStringAsync()));
+        }
+        Assert.Equal(calls, live.Calls.Count);
+
+        using var upload = await api.Client.PostAsync("/v1/transcriptions?language=en%2Bhu&name=a.wav", new ByteArrayContent(Wav()) { Headers = { { "Content-Type", "audio/wav" } } });
+        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);                              // a whole recording is still read in one language
+    }
+
+    [Fact]
+    public async Task AClientOfAnOlderServerSendsTheFirstOfTwoLanguages()
+    {
+        var live = new FakeLive();
+        await using var api = await Harness.StartAsync(h => h.Live = live);
+        using var client = new RemoteServerClient(api.Client.BaseAddress!, ApiTestData.Key, null);
+        await new RemoteLiveRecognizer(client, languagePairs: false).RecognizeAsync(Wav(), "hu+en", "en", default);
+        Assert.Equal("hu", live.Calls[^1].Language);
     }
 }

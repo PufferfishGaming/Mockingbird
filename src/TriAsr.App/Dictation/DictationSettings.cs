@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace TriAsr.App;
 
 /// <summary>What the person chose for live dictation. It has a small file of its own (<c>Config/dictation.json</c>), the same in Studio and in the Client.</summary>
-/// <param name="Language">A language code or <c>auto</c>.</param>
+/// <param name="Language"><c>auto</c>, a language code, or two joined with <c>+</c> (<c>en+hu</c>) for a person who switches between them.</param>
 /// <param name="Hotkey">The keys that start and stop dictation from any program, as <see cref="KeyCombo.Id"/> writes them ("Ctrl+Alt+Space"); empty for none.</param>
 /// <param name="Method"><c>type</c> (the words are typed key by key) or <c>paste</c> (they are put on the clipboard and pasted).</param>
 /// <param name="Microphone">The number of the microphone, or -1 for the one Windows uses.</param>

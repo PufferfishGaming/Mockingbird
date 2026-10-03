@@ -249,6 +249,14 @@ public sealed class ApiService : IAsyncDisposable
         return wanted == "auto" || LanguageCatalog.All.Any(item => item.Code == wanted) ? null : $"\"{wanted}\" is not a supported language. GET /v1/languages lists them.";
     }
 
+    /// <summary>As <see cref="LanguageProblem"/>, for dictation, which also takes two languages (<c>en+hu</c>; a plus in a web address arrives as a space, which is read the same).</summary>
+    private static string? LiveLanguageProblem(string? language, out string choice)
+    {
+        if (LanguageCatalog.TryParseChoice(language, out var codes)) { choice = LanguageCatalog.JoinChoice(codes); return null; }
+        choice = "auto";
+        return $"\"{language?.Trim()}\" is not a supported language, or names more than {LanguageCatalog.MaxChoice}. GET /v1/languages lists them; two are joined with + (en+hu).";
+    }
+
     private async Task<(string Path, string Name, long Bytes)> SaveUploadAsync(Stream content, string? name, long? declaredLength, CancellationToken token)
     {
         var safe = SafeName(name, "recording");
@@ -325,13 +333,15 @@ public sealed class ApiService : IAsyncDisposable
     private const int MaxLiveBody = 2 * 1024 * 1024;       // a minute of sound is 1.9 MB: far more than a phrase
 
     /// <summary>
-    /// <c>POST /v1/live?language=xx</c>: the body is one phrase as a WAV file; the answer is <c>{"text": "..."}</c>. This is what a Client types with while its person dictates:
-    /// only the speech program runs (no second engine, no comparison), so that the answer comes back within a second or two.
+    /// <c>POST /v1/live?language=xx</c>: the body is one phrase as a WAV file; the answer is <c>{"text": "...", "language": "xx"}</c>. This is what a Client types with while its person dictates:
+    /// only the speech program runs (no second engine, no comparison), so that the answer comes back within a second or two. <c>language=en+hu</c> reads the phrase in
+    /// whichever of the two it was spoken in; <c>recent</c> (the language the previous phrase came back in) decides a close call.
     /// </summary>
     private async Task<HttpResponse> LiveAsync(HttpRequest request, CancellationToken token)
     {
         if (_deps.Live is not { } live) return HttpResponse.Error(501, "live_unavailable", "This server does not read live dictation.");
-        if (LanguageProblem(request.Query.GetValueOrDefault("language"), out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        if (LiveLanguageProblem(request.Query.GetValueOrDefault("language"), out var language) is { } problem) return HttpResponse.Error(400, "unsupported_language", problem);
+        var recent = request.Query.GetValueOrDefault("recent")?.Trim().ToLowerInvariant() is { Length: > 0 } said && LanguageCatalog.Supports(said) ? said : null;
         if (request.ContentLength > MaxLiveBody) return HttpResponse.Error(413, "payload_too_large", LiveMessages.TooLong);
         using var buffer = new MemoryStream();
         var piece = new byte[64 * 1024]; int read;
@@ -345,9 +355,10 @@ public sealed class ApiService : IAsyncDisposable
         {
             // The words come back without the program's markers. A client that says how much of the phrase was speech (?speech=milliseconds) also gets nothing for the few words
             // Whisper invents for a cough or a click, as the programs' own dictation does.
-            var text = PhraseText.Clean(await live.RecognizeAsync(buffer.ToArray(), language, token));
+            var phrase = await live.RecognizeAsync(buffer.ToArray(), language, recent, token);
+            var text = PhraseText.Clean(phrase.Text);
             if (int.TryParse(request.Query.GetValueOrDefault("speech"), out var speech) && speech >= 0 && PhraseText.IsPhantom(text, TimeSpan.FromMilliseconds(speech))) text = "";
-            return HttpResponse.Json(200, new { text });
+            return HttpResponse.Json(200, new { text, language = text.Length > 0 ? phrase.Language : "" });
         }
         catch (LiveException error) when (error.Message == LiveMessages.NoModel) { return HttpResponse.Error(409, "models_missing", error.Message); }
         catch (LiveException error) when (error.Message == LiveMessages.TooLong) { return HttpResponse.Error(413, "payload_too_large", error.Message); }
@@ -622,7 +633,7 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LiveLanguagePairs: _deps.Live is not null));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

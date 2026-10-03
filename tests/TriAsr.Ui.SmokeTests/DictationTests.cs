@@ -92,6 +92,43 @@ public sealed class DictationTests
     }
 
     [Fact]
+    public async Task ASecondLanguageIsChosenWithAFirstOneAndEachPhraseIsReadKnowingTheLanguageOfThePreviousOne()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));
+        using var setup = Make(root);
+        var model = setup.Model;
+        Assert.False(model.CanChooseSecondLanguage);                                             // auto-detect takes no second language
+        model.SelectedLanguage = "en";
+        Assert.True(model.CanChooseSecondLanguage);
+        Assert.Equal("", model.SecondLanguages[0].Code);                                         // "no second language" comes first
+        Assert.DoesNotContain(model.SecondLanguages, language => language.Code == "en");        // and the first language is not offered again
+        model.SelectedSecondLanguage = "hu";
+        Assert.Equal("en+hu", model.LanguageChoice);
+        Assert.Equal("en+hu", setup.Store.Load().Language);
+        model.SelectedSecondLanguage = null;                                                     // a list being replaced is not a choice
+        Assert.Equal("en+hu", model.LanguageChoice);
+
+        var again = Build(setup);
+        Assert.Equal(("en", "hu"), (again.SelectedLanguage, again.SelectedSecondLanguage));
+        again.Dispose();
+
+        setup.Speech.Spoken = number => number == 1 ? "hu" : "en";
+        await model.StartAsync();
+        setup.Microphone.Hear(Join(Phrase(), Phrase()));
+        await UntilAsync(() => setup.Keys.Typed.Count == 2, "both phrases are typed");
+        await model.StopAsync();
+        Assert.Equal([("en+hu", null), ("en+hu", "hu")], setup.Speech.Calls.Select(call => (call.Language, call.Recent)));
+
+        model.SelectedLanguage = "hu";                                                           // the same language twice is one language
+        Assert.Equal(("hu", ""), (model.SelectedLanguage, model.SelectedSecondLanguage));
+        Assert.Equal("hu", setup.Store.Load().Language);
+        model.SelectedSecondLanguage = "de";
+        model.SelectedLanguage = "auto";
+        Assert.Equal(("auto", "auto"), (model.LanguageChoice, setup.Store.Load().Language));
+        Assert.Equal("", model.SelectedSecondLanguage);
+    }
+
+    [Fact]
     public async Task PhrasesAreTypedInTheOrderTheyWereSpokenEvenWhenAnEarlierOneIsSlowerToRead()
     {
         using var setup = Make();

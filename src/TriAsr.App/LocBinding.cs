@@ -55,7 +55,7 @@ public sealed class TranslateConverter : IMultiValueConverter
 /// <summary>Names of languages the way the interface shows them.</summary>
 public static class LanguageText
 {
-    public static string Of(LanguageOption language) => language.Code == "auto" ? Loc.T(language.Name) : $"{Loc.T(language.Name)} ({language.Code})";
+    public static string Of(LanguageOption language) => language.Code is "auto" or "" ? Loc.T(language.Name) : $"{Loc.T(language.Name)} ({language.Code})";
 
     /// <summary>The languages in alphabetical order of the names the interface shows, by the rules of the interface language (the catalog itself keeps Whisper's order).</summary>
     public static IReadOnlyList<LanguageOption> InOrder(IEnumerable<LanguageOption> languages)

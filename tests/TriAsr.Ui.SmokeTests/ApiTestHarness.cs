@@ -71,16 +71,17 @@ internal sealed class FakeLive : ILiveRecognizer
 {
     public bool Ready { get; set; } = true;
     public string Answer { get; set; } = "Hello there.";
+    public string AnswerLanguage { get; set; } = "en";
     public Func<byte[], string, Exception?>? Fail { get; set; }
     public TimeSpan Delay { get; set; }
-    public List<(byte[] Wav, string Language)> Calls { get; } = [];
+    public List<(byte[] Wav, string Language, string? Recent)> Calls { get; } = [];
 
-    public async Task<string> RecognizeAsync(byte[] wav, string language, CancellationToken token)
+    public async Task<LivePhrase> RecognizeAsync(byte[] wav, string language, string? recent, CancellationToken token)
     {
-        lock (Calls) Calls.Add((wav, language));
+        lock (Calls) Calls.Add((wav, language, recent));
         if (Delay > TimeSpan.Zero) await Task.Delay(Delay, token);
         if (Fail?.Invoke(wav, language) is { } error) throw error;
-        return Answer;
+        return new(Answer, AnswerLanguage);
     }
 }
 

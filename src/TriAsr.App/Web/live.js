@@ -209,7 +209,19 @@
 
   const same = (first, second) => !!first && !!second && comboId(first) === comboId(second);
 
-  const api = { SAMPLE_RATE, FRAME_MS, DEFAULTS, UtteranceDetector, encodeWav, Resampler, appendWords, comboOf, comboLabel, comboId, parseCombo, comboProblem, same, keyName };
+  // ---- the language a recording is read in: auto-detect, one language, or two for a person who switches ("en+hu"), as LiveLanguages.cs keeps it ----------
+
+  /** The two languages of a saved choice; the second is "" when there is none. A choice that cannot be read (or names a language not in known, when given) is auto-detect. */
+  function splitLanguages(value, known) {
+    const parts = String(value || "").split(/[+, ]+/).map((part) => part.trim().toLowerCase()).filter((part, index, all) => part && all.indexOf(part) === index);
+    if (parts.length === 0 || parts.length > 2 || parts.includes("auto") || (known && parts.some((part) => !known.includes(part)))) return { first: "auto", second: "" };
+    return { first: parts[0], second: parts[1] || "" };
+  }
+
+  /** The value to save and send: "auto", "en" or "en+hu". Auto-detect takes no second language. */
+  const joinLanguages = (first, second) => !first || first === "auto" ? "auto" : second && second !== first && second !== "auto" ? first + "+" + second : first;
+
+  const api = { SAMPLE_RATE, FRAME_MS, DEFAULTS, UtteranceDetector, encodeWav, Resampler, appendWords, comboOf, comboLabel, comboId, parseCombo, comboProblem, same, keyName, splitLanguages, joinLanguages };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else window.MbLive = api;
 })();

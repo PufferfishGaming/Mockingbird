@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Text.Json;
+using TriAsr.Application;
 using TriAsr.Domain;
 
 namespace TriAsr.Infrastructure;
@@ -125,15 +126,18 @@ public sealed class RemoteServerClient : IDisposable
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }
 
-    /// <summary>Has the server read one phrase of live dictation (a WAV file of a few seconds) and returns the words.</summary>
-    public async Task<string> LiveAsync(byte[] wav, string language, CancellationToken token)
+    /// <summary>Has the server read one phrase of live dictation (a WAV file of a few seconds) and returns the words and the language they are in.</summary>
+    /// <param name="recent">The language of the previous phrase, for a choice of two languages; null when there is none.</param>
+    public async Task<LivePhrase> LiveAsync(byte[] wav, string language, string? recent, CancellationToken token)
     {
         using var content = new ByteArrayContent(wav);
         content.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/live?language={Uri.EscapeDataString(language)}") { Content = content };
+        var query = $"/v1/live?language={Uri.EscapeDataString(language)}" + (string.IsNullOrEmpty(recent) ? "" : $"&recent={Uri.EscapeDataString(recent)}");
+        using var request = new HttpRequestMessage(HttpMethod.Post, query) { Content = content };
         using var response = await SendAsync(request, 120, token);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
-        return document.RootElement.TryGetProperty("text", out var text) ? text.GetString() ?? "" : "";
+        var root = document.RootElement;
+        return new(root.TryGetProperty("text", out var text) ? text.GetString() ?? "" : "", root.TryGetProperty("language", out var spoken) ? spoken.GetString() ?? "" : "");
     }
 
     // ---- notes ------------------------------------------------------------------------------------------------------------------------

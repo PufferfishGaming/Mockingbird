@@ -36,13 +36,16 @@ internal sealed class FakeRoom : IMicrophone
 internal sealed class FakeReader : ILiveRecognizer
 {
     public Func<int, byte[], string, Task<string>> Read { get; set; } = (_, _, _) => Task.FromResult("Hello there.");
-    public List<(byte[] Wav, string Language)> Calls { get; } = [];
 
-    public Task<string> RecognizeAsync(byte[] wav, string language, CancellationToken token)
+    /// <summary>The language the answer of each phrase (numbered from 1) is in.</summary>
+    public Func<int, string> Spoken { get; set; } = _ => "";
+    public List<(byte[] Wav, string Language, string? Recent)> Calls { get; } = [];
+
+    public async Task<LivePhrase> RecognizeAsync(byte[] wav, string language, string? recent, CancellationToken token)
     {
         int number;
-        lock (Calls) { Calls.Add((wav, language)); number = Calls.Count; }
-        return Read(number, wav, language);
+        lock (Calls) { Calls.Add((wav, language, recent)); number = Calls.Count; }
+        return new(await Read(number, wav, language), Spoken(number));
     }
 }
 

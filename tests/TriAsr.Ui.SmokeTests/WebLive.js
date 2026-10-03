@@ -46,6 +46,7 @@ function keys() {
 const operations = {
   detect, wav, resample, keys,
   append: () => request.cases.map(([text, words]) => live.appendWords(text, words)),
+  languages: () => ({ split: request.saved.map((value) => live.splitLanguages(value, request.known)), joined: request.chosen.map(([first, second]) => live.joinLanguages(first, second)) }),
   defaults: () => live.DEFAULTS
 };
 process.stdout.write(JSON.stringify(operations[request.op]()));

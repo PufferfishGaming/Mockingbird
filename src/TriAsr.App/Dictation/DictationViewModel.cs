@@ -25,7 +25,6 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
     /// <summary>The keys that start and stop dictation until the person chooses others.</summary>
     public static readonly KeyCombo DefaultKeys = new(KeyCombo.Control | KeyCombo.Alt, 0x20);
 
-    private static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
     private static readonly string TypeMethod = Loc.Key("Type the words"), PasteMethod = Loc.Key("Paste the words");
 
     private readonly IMicrophone _microphone;
@@ -37,7 +36,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
     private Func<string>? _statusMake;
     private DictationSettings _saved;
     private bool _restoring;
-    private IReadOnlyList<LanguageOption>? _languages;
+    private IReadOnlyList<LanguageOption>? _languages, _secondLanguages;
     private IHotkeys? _hotkeys;
     private IDisposable? _paused;
     private System.Windows.Threading.DispatcherTimer? _timer;
@@ -57,7 +56,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
         };
         Keybind = new KeybindViewModel(KeyCombo.ParseOr(_saved.Hotkey, DefaultKeys), DefaultKeys, RefuseKeys, Capturing, OnKeysChosen);
         _restoring = true;
-        SelectedLanguage = _saved.Language;
+        (SelectedLanguage, SelectedSecondLanguage) = LiveLanguages.Split(_saved.Language);
         SelectedMethod = _saved.Method == "paste" ? PasteMethod : TypeMethod;
         RefreshDevices();
         _restoring = false;
@@ -82,11 +81,32 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
     /// <summary>The keys that start and stop dictation, and choosing others by pressing them.</summary>
     public KeybindViewModel Keybind { get; }
 
-    public IReadOnlyList<LanguageOption> Languages => _languages ??= LanguageText.InOrder(LanguageCatalog.All).Prepend(AutoDetect).ToArray();
+    public IReadOnlyList<LanguageOption> Languages => _languages ??= LiveLanguages.First();
+    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= LiveLanguages.Second(SelectedLanguage);
     public IReadOnlyList<string> Methods { get; } = [TypeMethod, PasteMethod];
     public ObservableCollection<DeviceChoice> Devices { get; } = [];
 
-    [ObservableProperty] private string _selectedLanguage = "auto";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChooseSecondLanguage))] private string _selectedLanguage = "auto";
+    private string _selectedSecondLanguage = "";
+
+    /// <summary>The second language of a person who switches between two, or empty. (A list that is being replaced sets it to null for a moment: that is not a choice.)</summary>
+    public string? SelectedSecondLanguage
+    {
+        get => _selectedSecondLanguage;
+        set
+        {
+            if (value is null || value == _selectedSecondLanguage) return;
+            _selectedSecondLanguage = value;
+            OnPropertyChanged();
+            Change(settings => settings with { Language = LanguageChoice });
+        }
+    }
+
+    /// <summary>A second language can be chosen with a first one; auto-detect does without.</summary>
+    public bool CanChooseSecondLanguage => SelectedLanguage != "auto";
+
+    /// <summary>What the phrases are read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
+    public string LanguageChoice => LiveLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
     [ObservableProperty] private string _selectedMethod = TypeMethod;
     [ObservableProperty] private DeviceChoice? _selectedDevice;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChoose))] private bool _isListening;
@@ -107,7 +127,12 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
 
     partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(HasNote));
     partial void OnHotkeyNoteChanged(string value) => OnPropertyChanged(nameof(HasHotkeyNote));
-    partial void OnSelectedLanguageChanged(string value) => Change(settings => settings with { Language = value });
+    partial void OnSelectedLanguageChanged(string value)
+    {
+        if (value == "auto" || value == _selectedSecondLanguage) { _selectedSecondLanguage = ""; OnPropertyChanged(nameof(SelectedSecondLanguage)); }
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
+        Change(settings => settings with { Language = LanguageChoice });
+    }
     partial void OnSelectedMethodChanged(string value) => Change(settings => settings with { Method = value == PasteMethod ? "paste" : "type" });
     partial void OnSelectedDeviceChanged(DeviceChoice? value) => Change(settings => settings with { Microphone = value?.Id ?? WindowsMicrophone.DefaultDevice });
 
@@ -211,7 +236,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
         if (IsListening) return;
         var engine = _engine();
         if (engine.Recognizer is not { } recognizer) { SetStatus(() => _engine().Note); return; }
-        try { await _session.StartAsync(SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice, recognizer, () => SelectedLanguage, Deliver); }
+        try { await _session.StartAsync(SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice, recognizer, () => LanguageChoice, Deliver); }
         catch (MicrophoneException error)
         {
             var reason = error.Message;
@@ -259,6 +284,7 @@ public sealed partial class DictationViewModel : ObservableObject, IDisposable, 
     {
         foreach (var device in Devices) device.NotifyLanguageChanged();
         _languages = null; OnPropertyChanged(nameof(Languages));
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
         OnPropertyChanged(nameof(OverlayButtonLabel));
         Keybind.RefreshTexts();
         RefreshAvailability();

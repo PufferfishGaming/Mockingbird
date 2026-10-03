@@ -6,9 +6,13 @@ namespace TriAsr.Application;
 /// <summary>The text of a recognised phrase, tidied up for typing, and the sound of a phrase wrapped as a WAV file.</summary>
 public static partial class PhraseText
 {
-    // What Whisper writes in brackets for sounds it heard: [BLANK_AUDIO], [Music], (applause)... It is not something a person said.
-    [GeneratedRegex(@"\[[^\]]*\]|♪[^♪]*♪?|\((?:[^)]*\b)?(?:music|applause|laughter|laughs|silence|noise|inaudible|crosstalk|coughs|coughing|sighs|beep|singing)\b[^)]*\)", RegexOptions.IgnoreCase)]
+    // What Whisper writes in brackets for sounds it heard: [BLANK_AUDIO], [Music], (applause), *whistling*... It is not something a person said.
+    [GeneratedRegex(@"\[[^\]]*\]|♪[^♪]*♪?|\*\s?\p{L}[^*\n]{0,38}\*|\((?:[^)]*\b)?(?:music|applause|laughter|laughs|silence|noise|inaudible|crosstalk|coughs|coughing|sighs|beep|singing)\b[^)]*\)", RegexOptions.IgnoreCase)]
     private static partial Regex Markers();
+
+    // The credits of the subtitled videos Whisper learnt from, which it writes for sound without speech when it reads it as German, Hungarian, French...
+    [GeneratedRegex(@"amara\.org|untertitelung des (?:zdf|ard|br|wdr|swr|ndr|mdr)|untertitel im auftrag des|subtitles by the|sous-titres réalisés par", RegexOptions.IgnoreCase)]
+    private static partial Regex Credits();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
@@ -34,10 +38,17 @@ public static partial class PhraseText
     /// </summary>
     public static bool IsPhantom(string text, TimeSpan speech)
     {
+        if (IsCredit(text)) return true;
         if (speech >= TimeSpan.FromMilliseconds(1200)) return false;
         var plain = new string(text.Where(c => char.IsLetterOrDigit(c) || c == ' ' || c == '\'').ToArray()).Trim();
         return plain.Length == 0 || Phantoms.Contains(plain);
     }
+
+    /// <summary>
+    /// Whether the text is only the credit line of a subtitled video ("Feliratok az Amara.org közösségétől", "Untertitelung des ZDF, 2020"), which Whisper writes
+    /// for sound without speech. However long the sound was, nobody said it. A long text that mentions such a credit is not judged this way.
+    /// </summary>
+    public static bool IsCredit(string text) => Credits().IsMatch(text) && Whitespace().Split(text.Trim()).Length <= 12;
 
     /// <summary>Chinese, Japanese and Korean (and the full-width forms) are written without a space between words and phrases.</summary>
     public static bool IsUnspacedScript(char c) =>

@@ -45,7 +45,6 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
     /// <summary>The name of the notes among the hotkeys of the program.</summary>
     public const string HotkeyAction = "notes";
 
-    private static readonly LanguageOption AutoDetect = new("auto", Loc.Key("Auto-detect language"));
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(900), RetryDelay = TimeSpan.FromSeconds(5);
 
     private readonly Func<INoteSource?> _source;
@@ -66,7 +65,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
     private int _revision;
     private int _openVersion;
     private Task _opening = Task.CompletedTask;
-    private IReadOnlyList<LanguageOption>? _languages;
+    private IReadOnlyList<LanguageOption>? _languages, _secondLanguages;
     private IHotkeys? _hotkeys;
     private IDisposable? _paused;
     private System.Windows.Threading.DispatcherTimer? _saveTimer, _levelTimer;
@@ -89,7 +88,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
         };
         Keybind = new KeybindViewModel(KeyCombo.ParseOr(_saved.Hotkey, KeyCombo.None), KeyCombo.None, RefuseKeys, Capturing, OnKeysChosen);
         _restoring = true;
-        SelectedLanguage = _saved.Language;
+        (SelectedLanguage, SelectedSecondLanguage) = LiveLanguages.Split(_saved.Language);
         RefreshDevices();
         _restoring = false;
         RefreshAvailability();
@@ -120,12 +119,33 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
 
     public ObservableCollection<NoteRow> Notes { get; } = [];
     public ObservableCollection<DeviceChoice> Devices { get; } = [];
-    public IReadOnlyList<LanguageOption> Languages => _languages ??= LanguageText.InOrder(LanguageCatalog.All).Prepend(AutoDetect).ToArray();
+    public IReadOnlyList<LanguageOption> Languages => _languages ??= LiveLanguages.First();
+    public IReadOnlyList<LanguageOption> SecondLanguages => _secondLanguages ??= LiveLanguages.Second(SelectedLanguage);
+    private string _selectedSecondLanguage = "";
+
+    /// <summary>The second language of a person who switches between two, or empty. (A list that is being replaced sets it to null for a moment: that is not a choice.)</summary>
+    public string? SelectedSecondLanguage
+    {
+        get => _selectedSecondLanguage;
+        set
+        {
+            if (value is null || value == _selectedSecondLanguage) return;
+            _selectedSecondLanguage = value;
+            OnPropertyChanged();
+            Change(settings => settings with { Language = LanguageChoice });
+        }
+    }
+
+    /// <summary>A second language can be chosen with a first one; auto-detect does without.</summary>
+    public bool CanChooseSecondLanguage => SelectedLanguage != "auto";
+
+    /// <summary>What the phrases are read in: <c>auto</c>, <c>en</c> or <c>en+hu</c>.</summary>
+    public string LanguageChoice => LiveLanguages.Join(SelectedLanguage, _selectedSecondLanguage);
 
     [ObservableProperty] private NoteRow? _selectedNote;
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _text = "";
-    [ObservableProperty] private string _selectedLanguage = "auto";
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanChooseSecondLanguage))] private string _selectedLanguage = "auto";
     [ObservableProperty] private DeviceChoice? _selectedDevice;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(CanSwitch)), NotifyCanExecuteChangedFor(nameof(NewNoteCommand))] private bool _isListening;
     [ObservableProperty] private bool _isOverlayVisible;
@@ -157,7 +177,12 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
 
     partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(HasNote));
     partial void OnHotkeyNoteChanged(string value) => OnPropertyChanged(nameof(HasHotkeyNote));
-    partial void OnSelectedLanguageChanged(string value) => Change(settings => settings with { Language = value });
+    partial void OnSelectedLanguageChanged(string value)
+    {
+        if (value == "auto" || value == _selectedSecondLanguage) { _selectedSecondLanguage = ""; OnPropertyChanged(nameof(SelectedSecondLanguage)); }
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
+        Change(settings => settings with { Language = LanguageChoice });
+    }
     partial void OnSelectedDeviceChanged(DeviceChoice? value) => Change(settings => settings with { Microphone = value?.Id ?? WindowsMicrophone.DefaultDevice });
     partial void OnIsListeningChanged(bool value) => OnPropertyChanged(nameof(RecordButtonLabel));
     partial void OnSelectedNoteChanged(NoteRow? value) { if (!_silentSelection) _opening = OpenAsync(value); }
@@ -537,7 +562,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
             await NewNoteAsync();
             if (_openId is null) return;
         }
-        try { await _session.StartAsync(SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice, recognizer, () => SelectedLanguage, Deliver); }
+        try { await _session.StartAsync(SelectedDevice?.Id ?? WindowsMicrophone.DefaultDevice, recognizer, () => LanguageChoice, Deliver); }
         catch (MicrophoneException error)
         {
             var reason = error.Message;
@@ -623,6 +648,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable, ILiv
         foreach (var device in Devices) device.NotifyLanguageChanged();
         foreach (var row in Notes) row.RefreshTexts();
         _languages = null; OnPropertyChanged(nameof(Languages));
+        _secondLanguages = null; OnPropertyChanged(nameof(SecondLanguages));
         OnPropertyChanged(nameof(RecordButtonLabel)); OnPropertyChanged(nameof(NoSourceText));
         Keybind.RefreshTexts();
         RefreshAvailability();

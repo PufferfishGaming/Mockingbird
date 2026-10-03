@@ -87,7 +87,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         if (_connection is not { } connection) return new(null, Loc.T("Connect to a server to dictate."));
         if (!connection.Info.LiveEnabled) return new(null, Loc.T("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet."));
-        return new(new RemoteLiveRecognizer(connection.Client));
+        return new(new RemoteLiveRecognizer(connection.Client, connection.Info.LiveLanguagePairs));
     }
     private RecorderViewModel? _recorder;
 

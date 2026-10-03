@@ -13,8 +13,9 @@ public sealed record RemoteHealth(string Status, string Name, string Edition, st
 /// <param name="LiveEnabled">The server can read the phrases of live dictation right now (<c>POST /v1/live</c>): it has a speech model and the program that reads it.</param>
 /// <param name="NotesEnabled">The server keeps notes for the computers that use it (<c>/v1/notes</c>).</param>
 /// <param name="LinkPages">The server can also fetch the sound of web pages, not only of links straight to a file: its link helper is installed.</param>
+/// <param name="LiveLanguagePairs">The server reads a phrase of live dictation in a choice of two languages (<c>POST /v1/live?language=en+hu</c>) and says which it was in.</param>
 public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
-    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false);
+    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LiveLanguagePairs = false);
 
 /// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
 public sealed record RemoteLinkRequest(string Url, string? Language);

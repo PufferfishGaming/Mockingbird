@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
+using TriAsr.App;
 using TriAsr.Application;
 using TriAsr.Audio.Live;
+using TriAsr.Domain;
 using static TriAsr.Ui.SmokeTests.Sound;
 
 namespace TriAsr.Ui.SmokeTests;
@@ -151,6 +153,17 @@ public sealed class WebLiveTests
         ];
         var js = Run(new { op = "append", live = LiveScript, cases }).EnumerateArray().Select(item => item.GetString()).ToArray();
         Assert.Equal(cases.Select(item => PhraseText.Append(item[0], item[1])), js);
+    }
+
+    [NodeFact]
+    public void TheLanguagesOfARecordingAreReadAndWrittenTheSameWayInTheBrowserAsInTheProgram()
+    {
+        string?[] saved = [null, "", "auto", "en", "en+hu", " HU + en ", "en hu", "en+en", "auto+en", "en+hu+de", "klingon", "en+klingon"];
+        string[][] chosen = [["auto", "hu"], ["en", ""], ["en", "hu"], ["en", "en"], ["", "hu"], ["de", "auto"]];
+        var known = LanguageCatalog.All.Select(language => language.Code).ToArray();
+        var js = Run(new { op = "languages", live = LiveScript, saved, chosen, known });
+        Assert.Equal(saved.Select(value => LiveLanguages.Split(value)), js.GetProperty("split").EnumerateArray().Select(item => (item.GetProperty("first").GetString()!, item.GetProperty("second").GetString()!)));
+        Assert.Equal(chosen.Select(pair => LiveLanguages.Join(pair[0], pair[1])), js.GetProperty("joined").EnumerateArray().Select(item => item.GetString()));
     }
 
     [NodeTheory]

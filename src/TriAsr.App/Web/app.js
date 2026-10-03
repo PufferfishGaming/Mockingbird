@@ -435,12 +435,19 @@
 
 
   function languageOptions() {
+    return [{ code: "auto", label: t("Auto-detect language") }, ...sortedLanguages()].map((entry) => h("option", { value: entry.code }, entry.label));
+  }
+
+  /** The choices of a second language: none, then every language but the first. */
+  function secondLanguageOptions(first) {
+    return [{ code: "", label: t("No second language") }, ...sortedLanguages().filter((entry) => entry.code !== first)].map((entry) => h("option", { value: entry.code }, entry.label));
+  }
+
+  function sortedLanguages() {
     const names = new Intl.Collator(text.lang);
-    const entries = state.languages.filter((language) => language.code !== "auto")
+    return state.languages.filter((language) => language.code !== "auto")
       .map((language) => ({ code: language.code, label: t(language.name) + " (" + language.code + ")" }))
       .sort((first, second) => names.compare(first.label, second.label));
-    entries.unshift({ code: "auto", label: t("Auto-detect language") });
-    return entries.map((entry) => h("option", { value: entry.code }, entry.label));
   }
 
   function choose(file) {
@@ -860,9 +867,15 @@
     ui.nStatus = h("span", { class: "muted", "aria-live": "polite" }, notes.status || defaultNoteStatus());
     ui.nRecord = h("button", { class: "btn primary", type: "button", onClick: () => toggleNoteRecording() }, recording ? t("Stop recording") : t("Record"));
     ui.nLevel = h("progress", { max: "100", value: "0", hidden: !recording, "aria-label": t("Microphone level") });
-    ui.nLanguage = h("select", { "aria-label": t("Language of the recording"), title: t("Choosing the language is more reliable than detecting it, because a phrase is short."), disabled: recording,
-      onChange: (event) => { notes.language = event.target.value; keep.set("localStorage", "mb-notes-language", notes.language); } }, languageOptions());
-    ui.nLanguage.value = notes.language;
+    const chosen = MbLive.splitLanguages(notes.language, state.languages.map((language) => language.code));
+    ui.nLanguage = h("select", { "aria-label": t("Language of the recording"), disabled: recording,
+      title: t("Choosing the language is more reliable than detecting it, because a phrase is short. Whatever is said in another language is written translated into this one, unless that language is chosen as the second language."),
+      onChange: (event) => chooseNoteLanguages(event.target.value, ui.nSecond.value) }, languageOptions());
+    ui.nLanguage.value = chosen.first;
+    ui.nSecond = h("select", { "aria-label": t("Second language of the recording"), disabled: recording || chosen.first === "auto",
+      title: t("If you switch between two languages, choose both: each phrase is written in the language it was spoken in, not translated. When the two are hard to tell apart, a phrase takes a moment longer."),
+      onChange: (event) => chooseNoteLanguages(ui.nLanguage.value, event.target.value) }, secondLanguageOptions(chosen.first));
+    ui.nSecond.value = chosen.second;
     ui.nMic = h("select", { "aria-label": t("Microphone"), disabled: recording }, h("option", { value: "" }, t("Default microphone")));
     ui.nHint = h("p", { class: "note", hidden: !(info && info.liveEnabled === false), style: "margin-top:12px" }, t("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet."));
     ui.nKeys = h("div", { style: "margin-top:14px" });
@@ -870,6 +883,7 @@
       h("div", { class: "card", style: "margin-top:14px" },
         h("div", { class: "row" }, ui.nRecord,
           h("div", null, h("label", null, t("Language")), ui.nLanguage),
+          h("div", null, h("label", null, t("Second language")), ui.nSecond),
           h("div", null, h("label", null, t("Microphone")), ui.nMic)),
         ui.nLevel, ui.nHint, ui.nKeys),
       ui.nText,
@@ -878,6 +892,16 @@
         h("button", { class: "btn", type: "button", disabled: recording, title: t("Delete this note"), "aria-label": t("Delete note"), onClick: () => deleteNote() }, t("Delete"))));
     renderNoteKeys();
     listNoteMicrophones();
+  }
+
+  /** The languages of the recording were changed: they are kept for next time, and the second list loses the first language. */
+  function chooseNoteLanguages(first, second) {
+    notes.language = MbLive.joinLanguages(first, second);
+    keep.set("localStorage", "mb-notes-language", notes.language);
+    const chosen = MbLive.splitLanguages(notes.language);
+    ui.nSecond.replaceChildren(...secondLanguageOptions(chosen.first));
+    ui.nSecond.value = chosen.second;
+    ui.nSecond.disabled = !!notes.rec || chosen.first === "auto";
   }
 
   async function copyNote() {
@@ -1074,7 +1098,7 @@
       silent.gain.value = 0;                                  // the sound goes through the page and out of no speaker
       source.connect(node); node.connect(silent); silent.connect(context.destination);
       const resampler = new MbLive.Resampler(context.sampleRate);
-      const rec = { context, stream, node, source, language: notes.language, queue: [], busy: null, problem: false, meter: 0 };
+      const rec = { context, stream, node, source, language: notes.language, recent: "", queue: [], busy: null, problem: false, meter: 0 };
       rec.detector = new MbLive.UtteranceDetector((phrase) => { rec.queue.push(phrase); pumpPhrases(rec); });
       node.port.onmessage = (event) => { const pcm = resampler.push(event.data); if (pcm.length) rec.detector.feed(pcm); };
       rec.meter = window.setInterval(() => { if (ui.nLevel) ui.nLevel.value = Math.min(100, rec.detector.level * 600); }, 100);
@@ -1093,8 +1117,12 @@
         const phrase = rec.queue.shift();
         if (notes.rec === rec) setNoteStatus(t("Reading what you said…"));
         try {
-          const response = await api("/v1/live?language=" + encodeURIComponent(rec.language) + "&speech=" + Math.round(phrase.speechMs), { method: "POST", headers: { "Content-Type": "audio/wav" }, body: MbLive.encodeWav(phrase.pcm) });
-          const words = ((await response.json()).text || "").trim();
+          // With two languages, the language of the previous phrase decides a phrase that reads about as well in both.
+          const response = await api("/v1/live?language=" + encodeURIComponent(rec.language) + "&speech=" + Math.round(phrase.speechMs) + (rec.recent ? "&recent=" + encodeURIComponent(rec.recent) : ""),
+            { method: "POST", headers: { "Content-Type": "audio/wav" }, body: MbLive.encodeWav(phrase.pcm) });
+          const answer = await response.json();
+          const words = (answer.text || "").trim();
+          if (words && answer.language) rec.recent = answer.language;
           rec.problem = false;
           if (words && notes.open) addWords(words);
         } catch (error) {

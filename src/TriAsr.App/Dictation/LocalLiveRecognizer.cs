@@ -27,7 +27,7 @@ public sealed class LocalLiveRecognizer(IProcessRunner runner, RuntimePaths path
     /// <summary>Whether a phrase can be read at all: the program and a model are there.</summary>
     public bool IsReady => File.Exists(paths.Whisper) && Model() is not null;
 
-    public async Task<string> RecognizeAsync(byte[] wav, string language, CancellationToken token)
+    public async Task<LivePhrase> RecognizeAsync(byte[] wav, string language, string? recent, CancellationToken token)
     {
         var model = Model() ?? throw new LiveException(LiveMessages.NoModel);
         await _one.WaitAsync(token).ConfigureAwait(false);
@@ -42,7 +42,7 @@ public sealed class LocalLiveRecognizer(IProcessRunner runner, RuntimePaths path
             var executable = paths.WhisperFor(backend);
             if (!File.Exists(executable)) throw new LiveException(LiveMessages.Failed);
             var whisper = new LiveWhisper(runner, executable, model, governor.Clamp(threads), backend, Path.Combine(storage.Root, "Temp", "Live"));
-            return await whisper.RecognizeAsync(wav, language, token).ConfigureAwait(false);
+            return await whisper.RecognizeAsync(wav, language, recent, token).ConfigureAwait(false);
         }
         finally { _one.Release(); }
     }
