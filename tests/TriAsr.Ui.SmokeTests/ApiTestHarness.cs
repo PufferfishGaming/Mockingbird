@@ -25,6 +25,13 @@ internal static class ApiTestData
         new FinalRegion(2500, 6000, "Willkommen   zur  Sitzung .", "Willkommen zur Sitzung", "willkommen zur Sitzung", "uncertain", NativeTimestamps: native)
     ]);
 
+    /// <summary>A transcript whose two speakers were told apart, with the names given to them.</summary>
+    internal static FinalTranscript Conversation(Guid id, IReadOnlyDictionary<string, string>? names) => new(id, "en",
+    [
+        new FinalRegion(0, 2_000, "Are you coming?", "Are you coming?", "", "agreement", Speaker: "1"),
+        new FinalRegion(2_000, 4_000, "Yes, at nine.", "Yes, at nine.", "", "agreement", Speaker: "2")
+    ], names);
+
     internal static string Text(JsonElement element, string name) => element.GetProperty(name).GetString()!;
 }
 
@@ -139,6 +146,9 @@ internal sealed class Harness : IAsyncDisposable
     public INoteStore? Notes { get; set; }
     /// <summary>Whether the server tells speakers apart (has the speaker program).</summary>
     public bool Speakers { get; set; }
+    /// <summary>The transcript of a finished job, as it was last saved; by default the two German regions of <see cref="ApiTestData.Transcript"/>.</summary>
+    public Func<Guid, FinalTranscript>? Transcript { get; set; }
+    private FinalTranscript TranscriptOf(Guid id) => Transcript?.Invoke(id) ?? ApiTestData.Transcript(id, Native);
     /// <summary>The job folders, with what was chosen for each job beyond its language.</summary>
     public FakeWorkspace Workspace { get; private set; } = null!;
     /// <summary>Deletes a finished recording with its files, the real thing over the harness's repository and folders.</summary>
@@ -161,9 +171,9 @@ internal sealed class Harness : IAsyncDisposable
         var pipeline = new TranscriptionPipeline(harness.Repository, harness.Stages);
         harness.Removal = new ProjectRemoval(harness.Repository, new FakeWorkspace(harness.Root), new StoragePaths(harness.Root));
         harness.Service = new ApiService(new ApiServiceDependencies(queue, pipeline, harness.Repository,
-            (id, _) => Task.FromResult(ApiTestData.Transcript(id, harness.Native)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
+            (id, _) => Task.FromResult(harness.TranscriptOf(id)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
-            () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(ApiTestData.Transcript(id, harness.Native), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
+            () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(harness.TranscriptOf(id), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
             (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes, () => harness.Speakers));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();

@@ -16,8 +16,11 @@ public sealed partial class ReviewRegion(FinalRegion original, string? machineTe
     public string Canary => Original.CanaryText;
     public string CanaryHeading => Original.NativeTimestamps ? Loc.T("CANARY · projected onto Whisper timing") : Loc.T("CANARY · original untimed text");
     public string Source => Original.Source;
-    /// <summary>Who says it ("Speaker 2"), when the speakers were told apart; empty otherwise.</summary>
-    public string SpeakerLabel => Original.Speaker is { Length: > 0 } speaker ? Loc.T("Speaker {0}", speaker) : "";
+    private string? _speakerName;
+    /// <summary>Who says it: the speaker's name, or "Speaker 2"; empty when the speakers were not told apart.</summary>
+    public string SpeakerLabel => Original.Speaker is { Length: > 0 } speaker ? _speakerName ?? Loc.T("Speaker {0}", speaker) : "";
+    /// <summary>Shows the name the person gave this region's speaker (null: none).</summary>
+    public void ShowSpeakerName(string? name) { _speakerName = string.IsNullOrWhiteSpace(name) ? null : name; OnPropertyChanged(nameof(SpeakerLabel)); }
     public bool HasSpeaker => Original.Speaker is { Length: > 0 };
     public bool IsUncertain => NeedsListening(Original);
     /// <summary>Whether a region has to be listened to before it is trusted (the engines disagreed unresolved, only one engine heard it, or a check flagged it).</summary>

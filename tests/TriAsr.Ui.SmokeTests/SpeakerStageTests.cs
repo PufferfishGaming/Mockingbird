@@ -190,6 +190,25 @@ public sealed class SpeakerStageTests : IDisposable
     }
 
     [Fact]
+    public async Task TheExportsUseTheNamesGivenToTheSpeakers()
+    {
+        var transcript = Transcript(speakers: true) with { SpeakerNames = new Dictionary<string, string> { ["2"] = "Bea Kovács" } };
+        Assert.Equal(string.Join(Environment.NewLine + Environment.NewLine, "Speaker 1: Are you coming?", "Bea Kovács: Yes, at nine.", "Speaker 1: Good. See you."), await ExportAsync(transcript, ".txt"));
+        Assert.Contains("00:00:03,000 --> 00:00:05,000\nBea Kovács: Yes, at nine.", await ExportAsync(transcript, ".srt"));
+        Assert.Contains("00:00:03.000 --> 00:00:05.000\n<v Bea Kovács>Yes, at nine.", await ExportAsync(transcript, ".vtt"));
+        Assert.EndsWith(",\"Bea Kovács\"", (await ExportAsync(transcript, ".csv")).Split("\r\n")[2]);
+        Assert.Contains("**00:00:03.000** · Bea Kovács", await ExportAsync(transcript, ".md"));
+        var json = await ExportAsync(transcript, ".json");
+        Assert.Contains("\"Speaker\": \"2\"", json);                                                  // the region keeps the speaker's number
+        Assert.Contains("Bea Kov", json);
+        var docx = Path.Combine(_root, "named.docx");
+        await TranscriptExporter.SaveAsync(transcript, docx);
+        using var document = System.IO.Compression.ZipFile.OpenRead(docx);
+        using var reader = new StreamReader(document.GetEntry("word/document.xml")!.Open());
+        Assert.Contains("00:00:03.000 · Bea Kovács", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
     public async Task ATranscriptWithoutSpeakersIsExportedExactlyAsBefore()
     {
         var transcript = Transcript(speakers: false);
@@ -251,5 +270,53 @@ public sealed class SpeakerStageTests : IDisposable
         var job = await client.SendLinkAsync("https://media.example/talk.mp3", "en", default, "auto");
         for (var i = 0; i < 100 && !api.Workspace.Options.ContainsKey(job.Id); i++) await Task.Delay(50);
         Assert.Equal("auto", api.Workspace.Options[job.Id].Speakers);
+    }
+
+    // ---- naming the speakers through the API ---------------------------------------------------------------------------------------------
+
+    private static StringContent Body(string json) => new(json, System.Text.Encoding.UTF8, "application/json");
+
+    private static string Names(IReadOnlyDictionary<string, string>? names) => names is null ? "none" : string.Join(", ", names.OrderBy(name => name.Key).Select(name => name.Key + "=" + name.Value));
+
+    [Fact]
+    public async Task TheSpeakersAreNamedFromAnotherComputerAndTheNamesComeBackInTheReviewTheTranscriptAndTheFiles()
+    {
+        var kept = new Dictionary<string, string> { ["1"] = "Anna" };
+        await using var api = await Harness.StartAsync(h => { h.Speakers = true; h.Transcript = id => ApiTestData.Conversation(id, kept); });
+        Assert.True(JsonDocument.Parse(await api.Client.GetStringAsync("/v1/server")).RootElement.GetProperty("speakerNames").GetBoolean());
+        var id = (await api.UploadAsync()).GetProperty("id").GetString()!;
+        await api.WaitAsync(id);
+
+        var review = JsonDocument.Parse(await api.Client.GetStringAsync($"/v1/transcriptions/{id}/review")).RootElement;
+        Assert.Equal("Anna", review.GetProperty("speakerNames").GetProperty("1").GetString());
+        var transcript = JsonDocument.Parse(await api.Client.GetStringAsync($"/v1/transcriptions/{id}/transcript")).RootElement;
+        Assert.Equal("Anna", transcript.GetProperty("speakerNames").GetProperty("1").GetString());
+        Assert.Equal(("1", "Anna"), (transcript.GetProperty("segments")[0].GetProperty("speaker").GetString(), transcript.GetProperty("segments")[0].GetProperty("speakerName").GetString()));
+        Assert.Equal(JsonValueKind.Null, transcript.GetProperty("segments")[1].GetProperty("speakerName").ValueKind);
+        var text = await api.Client.GetStringAsync($"/v1/transcriptions/{id}/transcript?format=txt");
+        Assert.Contains("Anna: Are you coming?", text);
+        Assert.Contains("Speaker 2: Yes, at nine.", text);
+
+        // The names are sent as they now stand: cleaned, and only for speakers the transcript has.
+        using (var named = await api.Client.PutAsync($"/v1/transcriptions/{id}/review", Body("{\"edits\":[],\"speakerNames\":{\"1\":\"  Anna   Kovács \",\"2\":\"Bea\",\"9\":\"Nobody\"}}")))
+            Assert.Equal(HttpStatusCode.OK, named.StatusCode);
+        Assert.Equal("1=Anna Kovács, 2=Bea", Names(api.Saved!.SpeakerNames));
+        Assert.Equal("Are you coming?", api.Saved.Regions[0].FinalText);                                  // no text was changed
+
+        // Edits without names leave the names as they are; an empty set takes them all away.
+        using (var edited = await api.Client.PutAsync($"/v1/transcriptions/{id}/review", Body("{\"edits\":[{\"index\":0,\"text\":\"Coming?\"}]}"))) Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        Assert.Equal("1=Anna", Names(api.Saved.SpeakerNames));
+        Assert.Equal("Coming?", api.Saved.Regions[0].FinalText);
+        using (var cleared = await api.Client.PutAsync($"/v1/transcriptions/{id}/review", Body("{\"edits\":[],\"speakerNames\":{}}"))) Assert.Equal(HttpStatusCode.OK, cleared.StatusCode);
+        Assert.Equal("none", Names(api.Saved.SpeakerNames));
+
+        // The Client library reads and sends them the same way.
+        using var client = new RemoteServerClient(api.Client.BaseAddress!, ApiTestData.Key, null);
+        Assert.True((await client.InfoAsync(default)).SpeakerNames);
+        Assert.Equal("Anna", (await client.ReviewAsync(Guid.Parse(id), default)).SpeakerNames!["1"]);
+        await client.SaveEditsAsync(Guid.Parse(id), [], default, new Dictionary<string, string> { ["2"] = "Bea" });
+        Assert.Equal("2=Bea", Names(api.Saved.SpeakerNames));
+        await client.SaveEditsAsync(Guid.Parse(id), [new RemoteEdit(1, "Yes.")], default);
+        Assert.Equal("1=Anna", Names(api.Saved.SpeakerNames));
     }
 }

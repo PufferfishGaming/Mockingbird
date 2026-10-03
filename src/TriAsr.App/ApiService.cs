@@ -644,7 +644,7 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true, SpeakerNames: true));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)
@@ -653,7 +653,7 @@ public sealed class ApiService : IAsyncDisposable
         if (entry.Job.State != JobState.Complete) return HttpResponse.Error(409, "not_ready", $"The transcription is {StateName(entry.Job.State)}; it can be reviewed once it is complete.");
         var bundle = await _deps.LoadReview(entry.Id, token);
         return HttpResponse.Json(200, new RemoteReview(entry.Id, bundle.Review.Language, bundle.Review.Regions, bundle.Automatic.Regions.Select(region => region.FinalText).ToArray(),
-            bundle.RawWhisper, bundle.RawCanary, bundle.RawCanaryNote));
+            bundle.RawWhisper, bundle.RawCanary, bundle.RawCanaryNote, bundle.Review.SpeakerNames));
     }
 
     private async Task<HttpResponse> SaveEditsAsync(string id, HttpRequest request, CancellationToken token)
@@ -681,7 +681,9 @@ public sealed class ApiService : IAsyncDisposable
                 return HttpResponse.Error(400, "bad_edit", "An edit names a region that does not exist, or its text is missing or too long.");
             regions[edit.Index] = ReviewRegion.WithEdit(regions[edit.Index], edit.Text);
         }
-        await _deps.SaveReview(review with { Regions = regions }, token);
+        // Names come as they now stand, so a name left out is taken away; without them the names stay as they are.
+        var names = edits.SpeakerNames is { } given ? SpeakerNames.Clean(given, review.Speakers) : review.SpeakerNames;
+        await _deps.SaveReview(review with { Regions = regions, SpeakerNames = names }, token);
         return HttpResponse.Json(200, new { saved = list.Count });
     }
 
@@ -766,10 +768,12 @@ public sealed class ApiService : IAsyncDisposable
             return HttpResponse.Json(200, new
             {
                 id = transcript.JobId, language = transcript.Language, text = JoinedText(transcript), hasTimestamps = transcript.Regions.All(region => region.NativeTimestamps),
+                speakerNames = transcript.SpeakerNames,
                 segments = transcript.Regions.Select((region, index) => new
                 {
                     index, startMs = region.NativeTimestamps ? (long?)region.StartMs : null, endMs = region.NativeTimestamps ? (long?)region.EndMs : null,
-                    text = region.FinalText, needsListening = ReviewRegion.NeedsListening(region), source = region.Source, speaker = region.Speaker
+                    text = region.FinalText, needsListening = ReviewRegion.NeedsListening(region), source = region.Source, speaker = region.Speaker,
+                    speakerName = transcript.NameOf(region.Speaker)
                 })
             });
         var extension = format == "full-json" ? "json" : format;

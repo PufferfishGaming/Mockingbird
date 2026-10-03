@@ -41,13 +41,13 @@ public static class TranscriptExporter
                 var text = extension switch
                 {
                     ".txt" => speakers ? SpeakerText(transcript) : string.Join(Environment.NewLine + Environment.NewLine, transcript.Regions.Select(region => region.FinalText)),
-                    ".md" => "# Transcript\n\n" + string.Join("\n\n", transcript.Regions.Select(region => $"**{(region.NativeTimestamps ? Timestamp(region.StartMs) : "No native timestamps")}**{(Who(region) is { } who ? " · " + who : "")}\n\n{EscapeMarkdown(region.FinalText)}")),
+                    ".md" => "# Transcript\n\n" + string.Join("\n\n", transcript.Regions.Select(region => $"**{(region.NativeTimestamps ? Timestamp(region.StartMs) : "No native timestamps")}**{(Who(transcript, region) is { } who ? " · " + who : "")}\n\n{EscapeMarkdown(region.FinalText)}")),
                     ".json" => JsonSerializer.Serialize(transcript, new JsonSerializerOptions { WriteIndented = true }),
                     ".csv" => "startMs,endMs,finalText,whisperText,canaryText,source,confidence" + (speakers ? ",speaker" : "") + "\r\n" + string.Join("\r\n", transcript.Regions.Select(region =>
                         $"{(region.NativeTimestamps ? region.StartMs.ToString(CultureInfo.InvariantCulture) : "")},{(region.NativeTimestamps ? region.EndMs.ToString(CultureInfo.InvariantCulture) : "")},{Csv(region.FinalText)},{Csv(region.WhisperText)},{Csv(region.CanaryText)},{Csv(region.Source)},{region.Confidence?.ToString(CultureInfo.InvariantCulture)}"
-                        + (speakers ? "," + Csv(Who(region) ?? "") : ""))),
-                    ".srt" => string.Join("\n", transcript.Regions.Where(region => region.FinalText.Length > 0).Select((region, index) => $"{index + 1}\n{Timestamp(region.StartMs, ',')} --> {Timestamp(region.EndMs, ',')}\n{(Who(region) is { } who ? who + ": " : "")}{SubtitleText(region.FinalText)}\n")),
-                    ".vtt" => "WEBVTT\n\n" + string.Join("\n", transcript.Regions.Where(region => region.FinalText.Length > 0).Select(region => $"{Timestamp(region.StartMs)} --> {Timestamp(region.EndMs)}\n{(Who(region) is { } who ? "<v " + who + ">" : "")}{SubtitleText(region.FinalText)}\n")),
+                        + (speakers ? "," + Csv(Who(transcript, region) ?? "") : ""))),
+                    ".srt" => string.Join("\n", transcript.Regions.Where(region => region.FinalText.Length > 0).Select((region, index) => $"{index + 1}\n{Timestamp(region.StartMs, ',')} --> {Timestamp(region.EndMs, ',')}\n{(Who(transcript, region) is { } who ? who + ": " : "")}{SubtitleText(region.FinalText)}\n")),
+                    ".vtt" => "WEBVTT\n\n" + string.Join("\n", transcript.Regions.Where(region => region.FinalText.Length > 0).Select(region => $"{Timestamp(region.StartMs)} --> {Timestamp(region.EndMs)}\n{(Who(transcript, region) is { } who ? "<v " + who + ">" : "")}{SubtitleText(region.FinalText)}\n")),
                     _ => throw new ArgumentException("Choose a supported export format: TXT, MD, JSON, CSV, SRT, VTT or DOCX.")
                 };
                 await File.WriteAllTextAsync(temporary, text, new UTF8Encoding(false), token);
@@ -56,8 +56,8 @@ public static class TranscriptExporter
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
-    /// <summary>Who says a region ("Speaker 2"), when the speakers were told apart; null otherwise.</summary>
-    public static string? Who(FinalRegion region) => region.Speaker is { Length: > 0 } speaker ? "Speaker " + speaker : null;
+    /// <summary>Who says a region: the name the person gave the speaker, or "Speaker 2"; null when the speakers were not told apart.</summary>
+    public static string? Who(FinalTranscript transcript, FinalRegion region) => region.Speaker is { Length: > 0 } speaker ? transcript.NameOf(speaker) ?? "Speaker " + speaker : null;
 
     /// <summary>The text of a transcript whose speakers were told apart: a paragraph for each turn, which says who speaks.</summary>
     private static string SpeakerText(FinalTranscript transcript)
@@ -65,7 +65,7 @@ public static class TranscriptExporter
         var paragraphs = new List<(string? Who, List<string> Texts)>();
         foreach (var region in transcript.Regions.Where(region => region.FinalText.Trim().Length > 0))
         {
-            var who = Who(region);
+            var who = Who(transcript, region);
             if (paragraphs.Count > 0 && paragraphs[^1].Who == who) paragraphs[^1].Texts.Add(region.FinalText.Trim());
             else paragraphs.Add((who, [region.FinalText.Trim()]));
         }
@@ -80,7 +80,7 @@ public static class TranscriptExporter
         static XElement Paragraph(XNamespace ns, string text, bool bold = false) => new(ns + "p", new XElement(ns + "r",
             bold ? new XElement(ns + "rPr", new XElement(ns + "b")) : null, new XElement(ns + "t", new XAttribute(XNamespace.Xml + "space", "preserve"), text)));
         var body = new XElement(w + "body", Paragraph(w, "Transcript", true));
-        foreach (var region in transcript.Regions) { body.Add(Paragraph(w, (region.NativeTimestamps ? Timestamp(region.StartMs) : "No native timestamps") + (Who(region) is { } who ? " · " + who : ""), true)); body.Add(Paragraph(w, region.FinalText)); }
+        foreach (var region in transcript.Regions) { body.Add(Paragraph(w, (region.NativeTimestamps ? Timestamp(region.StartMs) : "No native timestamps") + (Who(transcript, region) is { } who ? " · " + who : ""), true)); body.Add(Paragraph(w, region.FinalText)); }
         body.Add(new XElement(w + "sectPr", new XElement(w + "pgSz", new XAttribute(w + "w", 11906), new XAttribute(w + "h", 16838)),
             new XElement(w + "pgMar", new XAttribute(w + "top", 1134), new XAttribute(w + "right", 1134), new XAttribute(w + "bottom", 1134), new XAttribute(w + "left", 1134))));
         using var zip = ZipFile.Open(path, ZipArchiveMode.Create);

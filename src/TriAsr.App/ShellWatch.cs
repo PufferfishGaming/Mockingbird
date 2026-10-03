@@ -23,6 +23,8 @@ public sealed partial class ShellViewModel
     private string _watchSecondLanguage = "";
     private IReadOnlyList<LanguageOption>? _watchSecondLanguages;
     [ObservableProperty] private string _watchOutput = WatchAsText;
+    /// <summary>Whether watched recordings have their speakers told apart: <c>off</c>, <c>auto</c> or how many there are.</summary>
+    [ObservableProperty] private string _watchSpeakers = "off";
     [ObservableProperty] private string _watchStatus = Loc.Key("Off");
     [ObservableProperty] private bool _isWatchBusy;
     public bool HasWatchFolder => WatchFolder.Length > 0;
@@ -57,6 +59,7 @@ public sealed partial class ShellViewModel
         _watchBatch = true;
         WatchFolder = settings.WatchFolder; WatchEnabled = settings.WatchEnabled && settings.WatchFolder.Length > 0;
         (WatchLanguage, WatchSecondLanguage) = SpeechLanguages.Split(settings.WatchLanguage); WatchOutput = settings.WatchOutput;
+        WatchSpeakers = settings.WatchSpeakers;
         _watchBatch = false;
     }
 
@@ -79,6 +82,7 @@ public sealed partial class ShellViewModel
         if (_initialized && !_watchBatch) Persist();
     }
     partial void OnWatchOutputChanged(string value) { if (_initialized) Persist(); }
+    partial void OnWatchSpeakersChanged(string value) { if (_initialized && !_watchBatch) Persist(); }
 
     [RelayCommand]
     private void OpenWatchFolder()
@@ -129,6 +133,8 @@ public sealed partial class ShellViewModel
     {
         var name = Path.GetFileName(path);
         var language = WatchLanguageChoice;
+        // Without the speaker program (a build that does not ship it) the recording is transcribed without speakers rather than failing.
+        var options = new JobOptions(CanTellSpeakersApart ? WatchSpeakers : "off");
         var missing = Array.Empty<string>();
         OnUi(() => missing = MissingRequiredModelsFor(language));
         if (missing.Length > 0)
@@ -145,7 +151,7 @@ public sealed partial class ShellViewModel
         try
         {
             using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing a watched recording");
-            var job = await queue.EnqueueAsync(path, language, token);
+            var job = await queue.EnqueueAsync(path, language, token, options: options);
             job = await pipeline.RunAsync(job, token);
             if (token.IsCancellationRequested) return WatchOutcome.Retry;
             if (job.State != JobState.Complete) return WatchOutcome.Failed; // the job's own error already reached the alert and the project list

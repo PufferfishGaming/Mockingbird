@@ -359,6 +359,8 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             _review = TriAsr.Fusion.TranscriptQuality.FlagRepetition(await stages.LoadReviewAsync(SelectedJob.Id));
             var machine = await stages.LoadFinalAsync(SelectedJob.Id);
             Regions.Clear(); for (var i = 0; i < _review.Regions.Count; i++) Regions.Add(new(_review.Regions[i], machine.Regions[i].FinalText));
+            SpeakerNaming.Changed -= ShowSpeakerNames; SpeakerNaming.Load(_review); SpeakerNaming.Changed += ShowSpeakerNames;
+            ShowSpeakerNames();
             SelectedRegion = Regions.FirstOrDefault();
             NormalizedAudioPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "normalized.wav");
             var listeningCopy = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "playback.m4a");
@@ -392,7 +394,12 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         if (_review is null) return;
         ReviewSummary = T("{0} · regions: {1} · to listen to: {2}", _review.Language.ToUpperInvariant(), Regions.Count, Regions.Count(region => region.IsUncertain));
     }
-    public FinalTranscript? CurrentTranscript => _review is null ? null : _review with { Regions = Regions.Select(region => region.Snapshot()).ToArray() };
+    public FinalTranscript? CurrentTranscript => _review is null ? null : _review with { Regions = Regions.Select(region => region.Snapshot()).ToArray(), SpeakerNames = SpeakerNaming.Current() };
+
+    /// <summary>The names given to the speakers of the open transcript.</summary>
+    public SpeakerNamesEditor SpeakerNaming { get; } = new();
+
+    private void ShowSpeakerNames() => SpeakerNaming.ShowOn(Regions);
     [RelayCommand] private void UseWhisper() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.Whisper; }
     [RelayCommand] private void UseCanary() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.Canary; }
     [RelayCommand] private void UseAutomatic() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.MachineText; }
@@ -407,7 +414,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private async Task SaveReviewAsync()
     {
         if (CurrentTranscript is not { } transcript) return;
-        try { await stages.SaveManualAsync(transcript); foreach (var region in Regions) region.AcceptSaved(); Status = T("Edits saved with revision history"); ReviewItems.Refresh(); }
+        try { await stages.SaveManualAsync(transcript); foreach (var region in Regions) region.AcceptSaved(); SpeakerNaming.AcceptSaved(); Status = T("Edits saved with revision history"); ReviewItems.Refresh(); }
         catch (Exception error) { ReportError(T("Save failed"), error.Message); }
     }
     public async Task ExportAsync(string path)

@@ -195,9 +195,10 @@ public sealed class RemoteServerClient : IDisposable
 
     public Task<RemoteReview> ReviewAsync(Guid id, CancellationToken token) => GetAsync<RemoteReview>($"/v1/transcriptions/{id}/review", token);
 
-    public async Task SaveEditsAsync(Guid id, IReadOnlyList<RemoteEdit> edits, CancellationToken token)
+    /// <param name="speakerNames">The names of the speakers as they now stand (empty to take them all away); null leaves them as they are.</param>
+    public async Task SaveEditsAsync(Guid id, IReadOnlyList<RemoteEdit> edits, CancellationToken token, IReadOnlyDictionary<string, string>? speakerNames = null)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"/v1/transcriptions/{id}/review") { Content = JsonContent.Create(new RemoteEdits(edits), options: Json) };
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"/v1/transcriptions/{id}/review") { Content = JsonContent.Create(new RemoteEdits(edits, speakerNames), options: Json) };
         using var response = await SendAsync(request, 60, token);
     }
 

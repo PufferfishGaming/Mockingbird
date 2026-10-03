@@ -15,8 +15,9 @@ public sealed record RemoteHealth(string Status, string Name, string Edition, st
 /// <param name="LinkPages">The server can also fetch the sound of web pages, not only of links straight to a file: its link helper is installed.</param>
 /// <param name="Speakers">The server tells the speakers of a recording apart when asked (<c>speakers=auto</c> or how many there are).</param>
 /// <param name="LanguagePairs">The server takes two languages for speech that switches between them (<c>language=en+hu</c>), for a phrase of live dictation and for a recording.</param>
+/// <param name="SpeakerNames">The server keeps the names given to the speakers of a transcript (<see cref="RemoteEdits.SpeakerNames"/>).</param>
 public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
-    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false);
+    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false, bool SpeakerNames = false);
 
 /// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
 /// <param name="Speakers"><c>off</c> (or null), <c>auto</c>, or how many speakers there are.</param>
@@ -47,11 +48,14 @@ public sealed record RemoteJobs(IReadOnlyList<RemoteJob> Data);
 
 /// <param name="AutomaticTexts">For each region, the text the programs produced before any manual edit (what "restore automatic result" puts back).</param>
 /// <param name="RawCanaryNote">Why there is no raw Canary text, when there is none.</param>
-public sealed record RemoteReview(Guid Id, string Language, IReadOnlyList<FinalRegion> Regions, IReadOnlyList<string> AutomaticTexts, string RawWhisper, string RawCanary, string? RawCanaryNote);
+/// <param name="SpeakerNames">The names given to the speakers ("1" -> "Anna"), or null.</param>
+public sealed record RemoteReview(Guid Id, string Language, IReadOnlyList<FinalRegion> Regions, IReadOnlyList<string> AutomaticTexts, string RawWhisper, string RawCanary, string? RawCanaryNote,
+    IReadOnlyDictionary<string, string>? SpeakerNames = null);
 
 public sealed record RemoteEdit(int Index, string Text);
 
-public sealed record RemoteEdits(IReadOnlyList<RemoteEdit> Edits);
+/// <param name="SpeakerNames">The names of the speakers as they now stand (an empty name takes the name away); null leaves them as they are.</param>
+public sealed record RemoteEdits(IReadOnlyList<RemoteEdit> Edits, IReadOnlyDictionary<string, string>? SpeakerNames = null);
 
 /// <summary>A request the server refused or could not serve. <see cref="Code"/> is the server's machine-readable code (<c>unauthorized</c>, <c>models_missing</c>...).</summary>
 public sealed class RemoteException(int status, string code, string message, Exception? inner = null) : Exception(message, inner)

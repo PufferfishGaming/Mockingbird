@@ -188,6 +188,27 @@ public sealed class WebAppTests
     }
 
     [Fact]
+    public async Task ThePageNamesTheSpeakersAndSavesTheNamesWithTheEdits()
+    {
+        var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
+        Assert.Contains("const names = namesChanged(review) ? speakerNames(review) : undefined;", script);     // only names that changed are sent ...
+        Assert.Contains("JSON.stringify({ edits, speakerNames: names })", script);                             // ... with the edits
+        Assert.Contains("speakerLabel(review, entry.region.speaker)", script);                                 // the transcript shows them
+        Assert.Contains("maxlength: \"" + TriAsr.Domain.SpeakerNames.MaxLength + "\"", script);                // no longer than the server keeps
+        await using var api = await Harness.StartAsync();
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        foreach (var code in new[] { "hu", "de", "es", "fr" })
+        {
+            var table = JsonSerializer.Deserialize<Dictionary<string, string>>(await anonymous.GetStringAsync("/ui/strings.json?lang=" + code))!;
+            foreach (var text in new[] { "Speaker names", "Speaker {0}", "The name shown and exported for this speaker. Leave it empty to keep the number." })
+            {
+                Assert.True(table.ContainsKey(text), $"{code}: {text}");
+                Assert.NotEqual(text, table[text]);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ThePagesTranslationsIncludeWhyALinkFailedAndWhatAServerDoesWhileItFetchesOne()
     {
         await using var api = await Harness.StartAsync();

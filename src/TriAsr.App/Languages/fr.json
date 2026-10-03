@@ -1005,5 +1005,8 @@
  "The transcript is made without speakers. {0}": "La transcription est faite sans locuteurs. {0}",
  "Speaker detection failed. {0}": "La détection des locuteurs a échoué. {0}",
  "The speaker program did not report a result.": "Le programme des locuteurs n'a renvoyé aucun résultat.",
- "The speaker program listed a turn that ends before it starts.": "Le programme des locuteurs a indiqué un tour qui se termine avant de commencer."
+ "The speaker program listed a turn that ends before it starts.": "Le programme des locuteurs a indiqué un tour qui se termine avant de commencer.",
+ "Speaker names": "Noms des locuteurs",
+ "The name shown and exported for this speaker. Leave it empty to keep the number.": "Le nom affiché et exporté pour ce locuteur. Laissez-le vide pour garder le numéro.",
+ "Watch folder speakers": "Locuteurs du dossier surveillé"
 }

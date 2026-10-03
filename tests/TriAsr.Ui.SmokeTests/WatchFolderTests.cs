@@ -116,6 +116,34 @@ public sealed class WatchFolderTests
     }
 
     [Fact]
+    public async Task TheSpeakersToTellApartInWatchedRecordingsAreRemembered()
+    {
+        var root = NewRoot();
+        try
+        {
+            using var host = App.App.CreateHost(root);
+            var store = host.Services.GetRequiredService<SettingsStore>();
+            await store.SaveAsync(new(WatchSpeakers: "3"));
+            var shell = host.Services.GetRequiredService<ShellViewModel>();
+            await shell.InitializeAsync();
+            Assert.Equal("3", shell.WatchSpeakers);
+            Assert.Contains(shell.SpeakerChoices, choice => choice.Value == "auto");                // the same choices as for a recording sent by hand
+            shell.WatchSpeakers = "auto";
+            await WaitForAsync(async () => (await store.LoadAsync()).WatchSpeakers == "auto", "the new choice is saved");
+            shell.WatchSpeakers = "off";
+            await WaitForAsync(async () => (await store.LoadAsync()).WatchSpeakers == "off", "switching it off is saved");
+            await WaitForAsync(() => Task.FromResult(shell.Status == "Preferences saved locally"), "the background save finishes before the folder is removed");
+
+            // A settings file from before the choice, or with a choice that is not one, means off.
+            await File.WriteAllTextAsync(store.FilePath, JsonSerializer.Serialize(new { watchSpeakers = "lots" }));
+            Assert.Equal("off", (await store.LoadAsync()).WatchSpeakers);
+            await File.WriteAllTextAsync(store.FilePath, "{}");
+            Assert.Equal("off", (await store.LoadAsync()).WatchSpeakers);
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task AnUnknownSavedOutputFallsBackToText()
     {
         var root = NewRoot();

@@ -1005,5 +1005,8 @@
   "The transcript is made without speakers. {0}": "Az átirat beszélők nélkül készül el. {0}",
   "Speaker detection failed. {0}": "A beszélők felismerése nem sikerült. {0}",
   "The speaker program did not report a result.": "A beszélőfelismerő program nem adott eredményt.",
-  "The speaker program listed a turn that ends before it starts.": "A beszélőfelismerő program olyan szakaszt adott, amely előbb ér véget, mint ahogy kezdődik."
+  "The speaker program listed a turn that ends before it starts.": "A beszélőfelismerő program olyan szakaszt adott, amely előbb ér véget, mint ahogy kezdődik.",
+  "Speaker names": "Beszélők neve",
+  "The name shown and exported for this speaker. Leave it empty to keep the number.": "Ez a név jelenik meg és kerül az exportba ennél a beszélőnél. Ha üresen hagyja, a sorszám marad.",
+  "Watch folder speakers": "Figyelt mappa beszélői"
 }

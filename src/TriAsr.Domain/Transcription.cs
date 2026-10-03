@@ -17,7 +17,42 @@ public sealed record ManualRevision(DateTimeOffset AtUtc, string PreviousText, s
 public sealed record FinalRegion(long StartMs, long EndMs, string FinalText, string WhisperText, string CanaryText,
     string Source, string? LlmChoice = null, double? Confidence = null, IReadOnlyList<ManualRevision>? Revisions = null, bool NativeTimestamps = true,
     IReadOnlyList<string>? Warnings = null, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Speaker = null);
-public sealed record FinalTranscript(Guid JobId, string Language, IReadOnlyList<FinalRegion> Regions);
+/// <param name="SpeakerNames">The names the person gave the speakers ("1" -> "Anna"); the regions keep their speakers' numbers. Null when no name was given.</param>
+public sealed record FinalTranscript(Guid JobId, string Language, IReadOnlyList<FinalRegion> Regions,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, string>? SpeakerNames = null)
+{
+    /// <summary>The speakers of the transcript, in the order of their numbers.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> Speakers => Regions.Select(region => region.Speaker).OfType<string>().Where(speaker => speaker.Length > 0).Distinct()
+        .OrderBy(speaker => int.TryParse(speaker, out var number) ? number : int.MaxValue).ThenBy(speaker => speaker, StringComparer.Ordinal).ToArray();
+
+    /// <summary>The name given to a speaker, or null.</summary>
+    public string? NameOf(string? speaker) => speaker is not null && SpeakerNames?.TryGetValue(speaker, out var name) == true && name.Length > 0 ? name : null;
+}
+
+/// <summary>The names people give the speakers of a transcript.</summary>
+public static class SpeakerNames
+{
+    public const int MaxLength = 60;
+
+    /// <summary>
+    /// The names worth keeping: for speakers the transcript has, on one line with single spaces, at most <see cref="MaxLength"/> long, the empty ones left out.
+    /// Null when none is left.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string>? Clean(IReadOnlyDictionary<string, string>? names, IEnumerable<string> speakers)
+    {
+        if (names is null) return null;
+        var kept = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var speaker in speakers)
+        {
+            if (!names.TryGetValue(speaker, out var name) || name is null) continue;
+            var clean = string.Join(' ', name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(word => new string(word.Where(c => !char.IsControl(c)).ToArray())).Where(word => word.Length > 0));
+            if (clean.Length > MaxLength) clean = clean[..MaxLength].TrimEnd();
+            if (clean.Length > 0) kept[speaker] = clean;
+        }
+        return kept.Count > 0 ? kept : null;
+    }
+}
 
 /// <summary>A stretch of a recording in which one speaker talks, as the speaker program found it. Speakers are numbered "1", "2"... in the order they first speak.</summary>
 public sealed record SpeakerTurn(long StartMs, long EndMs, string Speaker);

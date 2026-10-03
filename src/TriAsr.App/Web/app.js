@@ -605,7 +605,8 @@
       state.review = {
         id, name: job ? job.name : "", data, selected: previous ? Math.min(previous.selected, data.regions.length - 1) : 0, view: previous ? previous.view : "final",
         search: previous ? previous.search : "", only: previous ? previous.only : false, audio: previous ? previous.audio : null, follow: previous ? previous.follow : true,
-        regions: data.regions.map((region, index) => ({ index, region, original: region.finalText, text: region.finalText, automatic: data.automaticTexts[index] }))
+        regions: data.regions.map((region, index) => ({ index, region, original: region.finalText, text: region.finalText, automatic: data.automaticTexts[index] })),
+        speakers: speakersOf(data.regions), names: Object.assign({}, data.speakerNames || {}), savedNames: data.speakerNames || {}
       };
       state.dirty = false;
       selectTab("review");
@@ -699,6 +700,24 @@
     if (ui.player && !ui.player.paused) window.requestAnimationFrame(tickPlayback);
   }
 
+  // ---- the speakers' names: given here, kept by the server with the edits, used in the review and in every export ------------------------
+
+  /** The speakers of a transcript, in the order of their numbers. */
+  const speakersOf = (regions) => [...new Set(regions.map((region) => region.speaker).filter(Boolean))].sort((a, b) => (Number(a) || Infinity) - (Number(b) || Infinity) || (a < b ? -1 : a > b ? 1 : 0));
+  /** The names as they stand: the speakers that have one, trimmed (the server cleans them the same way). */
+  const speakerNames = (review) => Object.fromEntries(review.speakers.map((speaker) => [speaker, (review.names[speaker] || "").trim()]).filter(([, name]) => name));
+  const speakerLabel = (review, speaker) => speakerNames(review)[speaker] || t("Speaker {0}", speaker);
+  const namesChanged = (review) => review.speakers.some((speaker) => (speakerNames(review)[speaker] || "") !== (review.savedNames[speaker] || ""));
+
+  function renderSpeakerNames(review) {
+    if (!review.speakers.length) return null;
+    return h("div", { class: "card speaker-names" }, h("div", { class: "eyebrow" }, t("Speaker names")),
+      h("div", { class: "row" }, review.speakers.map((speaker) => h("label", { class: "speaker-name" }, h("span", { class: "muted" }, t("Speaker {0}", speaker)),
+        h("input", { type: "text", maxlength: "60", value: review.names[speaker] || "", "aria-label": t("Speaker {0}", speaker),
+          title: t("The name shown and exported for this speaker. Leave it empty to keep the number."),
+          onInput: (event) => { review.names[speaker] = event.target.value; markDirty(); renderRegionList(); } })))));
+  }
+
   const needsListening = (region) => region.source === "uncertain" || region.source === "single-asr-needs-listening" || (region.warnings && region.warnings.length > 0);
   const sourceLabel = (source) => source === "single-asr-needs-listening" ? t("one engine · needs listening") : source === "llm-arbitrated" ? t("chosen by the correction model") : t(source);
 
@@ -734,6 +753,7 @@
     if (review.audio) ui.player.src = review.audio;
     ui.reviewView.replaceChildren(h("h1", null, t("Review")), summary,
       h("div", { class: "row card" }, search, h("label", { for: "only" }, only, " ", t("Needs listening")), ui.saveButton, format, mode, exportButton),
+      renderSpeakerNames(review),
       h("div", { class: "review" }, ui.regionList, h("div", { class: "card" }, ui.editor)),
       h("div", { class: "card" }, h("div", { class: "row" },
         h("button", { class: "btn", type: "button", onClick: () => playRegion() }, t("Play region")),
@@ -750,7 +770,7 @@
       class: "region" + (needsListening(entry.region) ? " uncertain" : "") + (entry.text !== entry.original ? " edited" : ""), role: "option", "aria-selected": String(entry.index === review.selected), "data-index": String(entry.index),
       onClick: () => select(entry.index)
     }, h("div", null, h("div", { class: "time" }, clock(entry.region.startMs) + " – " + clock(entry.region.endMs)),
-        entry.region.speaker && h("div", { class: "speaker" }, t("Speaker {0}", entry.region.speaker)), h("div", { class: "source" }, sourceLabel(entry.region.source))),
+        entry.region.speaker && h("div", { class: "speaker" }, speakerLabel(review, entry.region.speaker)), h("div", { class: "source" }, sourceLabel(entry.region.source))),
       h("div", { class: "text" }, entry.text))));
     if (review.spoken !== undefined && review.spoken >= 0) paintText(review.regions[review.spoken], review.spokenWord);
   }
@@ -808,7 +828,7 @@
   }
 
   function markDirty() {
-    state.dirty = state.review.regions.some((entry) => entry.text !== entry.original);
+    state.dirty = state.review.regions.some((entry) => entry.text !== entry.original) || namesChanged(state.review);
     if (ui.saveButton) ui.saveButton.disabled = !state.dirty;
   }
 
@@ -831,9 +851,11 @@
   async function saveEdits() {
     const review = state.review;
     const edits = review.regions.filter((entry) => entry.text !== entry.original).map((entry) => ({ index: entry.index, text: entry.text }));
-    if (!edits.length) return;
+    // The names go as they now stand (an empty set takes them all away); unchanged ones are not sent.
+    const names = namesChanged(review) ? speakerNames(review) : undefined;
+    if (!edits.length && !names) return;
     await guard(async () => {
-      await api("/v1/transcriptions/" + review.id + "/review", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edits }) });
+      await api("/v1/transcriptions/" + review.id + "/review", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edits, speakerNames: names }) });
       await openReview(review.id, true);
       notice("info", t("Edits saved with revision history"));
     }, (message) => t("Save failed") + ": " + message);

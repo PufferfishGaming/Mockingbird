@@ -324,6 +324,59 @@ public sealed class RemoteTests
     }
 
     [Fact]
+    public async Task TheSpeakersOfATranscriptOnAServerAreNamedHereAndTheNamesAreKeptThere()
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync(h => { h.Speakers = true; h.Transcript = id => ApiTestData.Conversation(id, new Dictionary<string, string> { ["1"] = "Anna" }); });
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var recording = Path.Combine(root, "interview.wav");
+            await File.WriteAllBytesAsync(recording, new byte[200_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            var row = await EventuallyAsync(() => workspace.Jobs.FirstOrDefault(job => job.CanOpen), "the job completes");
+            await workspace.OpenReviewAsync(row.Id);
+
+            var naming = workspace.SpeakerNaming;
+            Assert.True(naming.HasSpeakers);
+            Assert.Equal([("1", "Anna", "Speaker 1"), ("2", "", "Speaker 2")], naming.Rows.Select(name => (name.Speaker, name.Name, name.Heading)));
+            Assert.Equal(["Anna", "Speaker 2"], workspace.Regions.Select(region => region.SpeakerLabel));
+
+            naming.Rows[1].Name = "Bea";
+            Assert.Equal("Bea", workspace.Regions[1].SpeakerLabel);                                    // the transcript shows the name at once
+            var saved = false;
+            workspace.ReviewSaved += () => saved = true;
+            await workspace.SaveReviewCommand.ExecuteAsync(null);                                     // only a name changed: that is worth saving too
+            Assert.True(saved);
+            Assert.Equal("Bea", api.Saved!.SpeakerNames!["2"]);
+            Assert.Equal("Anna", api.Saved.SpeakerNames["1"]);
+            Assert.False(naming.IsChanged);
+
+            var txt = Path.Combine(root, "interview.txt");
+            await workspace.ExportAsync(txt);
+            Assert.Contains("Bea: Yes, at nine.", await File.ReadAllTextAsync(txt));
+
+            // Taking every name away is a change too, and goes as an empty set.
+            naming.Rows[0].Name = ""; naming.Rows[1].Name = "  ";
+            Assert.Equal(["Speaker 1", "Speaker 2"], workspace.Regions.Select(region => region.SpeakerLabel));
+            await workspace.SaveReviewCommand.ExecuteAsync(null);
+            Assert.Null(api.Saved.SpeakerNames);
+
+            // A server from before names does not keep them, so none are offered.
+            using var older = new RemoteWorkspaceViewModel(action => action(), (_, _) => { }, Path.Combine(root, "older"));
+            older.Attach(new RemoteConnection(workspace.Client!, workspace.ServerInfo! with { SpeakerNames = false }, browser.Servers[0]));
+            await older.OpenReviewAsync(row.Id);
+            Assert.Equal(2, older.Regions.Count);
+            Assert.False(older.SpeakerNaming.HasSpeakers);
+            Assert.Equal(["Speaker 1", "Speaker 2"], older.Regions.Select(region => region.SpeakerLabel));
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task ARecordingInTwoLanguagesIsSentAsAPairAndAnOlderServerIsSentTheFirst()
     {
         var root = NewRoot();

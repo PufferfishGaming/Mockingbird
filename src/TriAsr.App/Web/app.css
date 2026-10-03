@@ -72,7 +72,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .region[aria-selected="true"] { background: var(--accent-surface); }
 .region .time { color: var(--accent); font-size: 12px; font-variant-numeric: tabular-nums; }
 .region .source { color: var(--muted); font-size: 10px; margin-top: 3px; }
-.region .speaker { font-size: 12px; font-weight: 600; margin-top: 3px; }
+.region .speaker { font-size: 12px; font-weight: 600; margin-top: 3px; overflow-wrap: anywhere; }
+.speaker-names { padding: 14px 22px; }
+.speaker-names .eyebrow { margin-top: 0; }
+.speaker-name { flex: 0 1 200px; margin: 0; }
+.speaker-name span { display: block; font-weight: 400; font-size: 12px; margin-bottom: 3px; }
 .region .text { overflow-wrap: anywhere; }
 .region.uncertain .time::after { content: " \25CF"; color: var(--warn); }
 .region.edited .text { font-style: italic; }

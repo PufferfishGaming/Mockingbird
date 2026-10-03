@@ -19,6 +19,49 @@ public sealed class SpeakerTests
         Assert.Equal((true, 3), (new JobOptions("3").TellsSpeakersApart, new JobOptions("3").SpeakerCount));
     }
 
+    // ---- the names people give the speakers ----------------------------------------------------------------------------------------------
+
+    private static FinalRegion Said(string text, string? speaker) => new(0, 1000, text, text, "", "agreement", Speaker: speaker);
+
+    [Fact]
+    public void ATranscriptListsItsSpeakersInTheOrderOfTheirNumbersAndNamesThemOnlyWithAName()
+    {
+        var transcript = new FinalTranscript(Guid.NewGuid(), "en", [Said("a", "2"), Said("b", "10"), Said("c", null), Said("d", "1"), Said("e", "2")],
+            new Dictionary<string, string> { ["2"] = "Bea", ["10"] = "" });
+        Assert.Equal(["1", "2", "10"], transcript.Speakers);
+        Assert.Equal("Bea", transcript.NameOf("2"));
+        Assert.Null(transcript.NameOf("10"));                                                      // an empty name is no name
+        Assert.Null(transcript.NameOf("1"));
+        Assert.Null(transcript.NameOf(null));
+        Assert.Empty(new FinalTranscript(Guid.NewGuid(), "en", [Said("a", null)]).Speakers);
+    }
+
+    [Fact]
+    public void OnlyTheNamesWorthKeepingAreKept()
+    {
+        string[] speakers = ["1", "2", "3"];
+        var names = SpeakerNames.Clean(new Dictionary<string, string>
+        {
+            ["1"] = "  Anna\tKovács \n\u0007", ["2"] = "   ", ["3"] = new string('x', 80), ["7"] = "Nobody"
+        }, speakers)!;
+        Assert.Equal("Anna Kovács", names["1"]);                                                   // on one line, single spaces, no control characters
+        Assert.False(names.ContainsKey("2"));                                                      // empty
+        Assert.Equal(SpeakerNames.MaxLength, names["3"].Length);
+        Assert.False(names.ContainsKey("7"));                                                      // the transcript has no such speaker
+        Assert.Null(SpeakerNames.Clean(new Dictionary<string, string> { ["1"] = " " }, speakers)); // nothing left: no names at all
+        Assert.Null(SpeakerNames.Clean(null, speakers));
+    }
+
+    [Fact]
+    public void TheNamesAreKeptWithTheTranscriptAndATranscriptWithoutThemIsWrittenAsBefore()
+    {
+        var named = new FinalTranscript(Guid.NewGuid(), "en", [Said("a", "1")], new Dictionary<string, string> { ["1"] = "Anna" });
+        var json = System.Text.Json.JsonSerializer.Serialize(named);
+        Assert.Equal("Anna", System.Text.Json.JsonSerializer.Deserialize<FinalTranscript>(json)!.NameOf("1"));
+        Assert.DoesNotContain("SpeakerNames", System.Text.Json.JsonSerializer.Serialize(named with { SpeakerNames = null }));
+        Assert.DoesNotContain("Speakers", System.Text.Json.JsonSerializer.Serialize(named with { SpeakerNames = null }));   // the list of speakers is worked out, not stored
+    }
+
     private static SpeakerTurn Turn(double start, double end, string speaker) => new((long)(start * 1000), (long)(end * 1000), speaker);
 
     [Fact]

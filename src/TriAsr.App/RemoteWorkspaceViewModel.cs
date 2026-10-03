@@ -132,6 +132,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         _onUi = onUi; _reportError = reportError; _tempRoot = tempRoot; _dataRoot = dataRoot ?? tempRoot;
         Link = new RemoteLinkViewModel(this);
+        SpeakerNaming.Changed += ShowSpeakerNames;
         _recordingsFolder = recordingsFolder ?? System.IO.Path.Combine(tempRoot, "Recordings");
         Loc.Instance.PropertyChanged += (_, change) => { if (change.PropertyName == nameof(Loc.Version)) _onUi(RefreshTexts); };
     }
@@ -179,7 +180,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         _polling?.Cancel(); _audio?.Cancel();
         _connection = connection;
-        Jobs.Clear(); Regions.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
+        Jobs.Clear(); Regions.Clear(); SpeakerNaming.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
         if (connection is null && _dictation is { IsListening: true } running) _ = running.StopAsync();      // the server is gone: nothing can read the phrases
         if (_notes is not null) _ = _notes.SourceChangedAsync();
         IsConnected = connection is not null;
@@ -213,6 +214,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _notes?.RefreshTexts();
         foreach (var row in Jobs) row.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
+        SpeakerNaming.RefreshTexts();
         if (Regions.Count > 0) ShowReviewSummary();
         if (_rawCanaryNote is not null) RawCanary = CanaryNote(_rawCanaryNote);
         _languages = null; OnPropertyChanged(nameof(Languages));
@@ -415,7 +417,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private void ClearReview()
     {
         _audio?.Cancel();
-        Regions.Clear(); SelectedRegion = null;
+        Regions.Clear(); SelectedRegion = null; SpeakerNaming.Clear();
         _reviewJob = Guid.Empty; _rawCanaryNote = null;
         ReviewName = ""; ReviewSummary = ""; RawWhisper = ""; RawCanary = ""; AudioStatus = "";
         AudioSource = null; NormalizedAudioPath = "";
@@ -486,6 +488,10 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
             InitializeReviewViewIfNeeded();
             Regions.Clear();
             for (var i = 0; i < review.Regions.Count; i++) Regions.Add(new ReviewRegion(review.Regions[i], i < review.AutomaticTexts.Count ? review.AutomaticTexts[i] : null));
+            // A server that does not keep the names (an older version) is not offered any: they would be lost on saving.
+            if (connection.Info.SpeakerNames) SpeakerNaming.Load(new FinalTranscript(id, review.Language, review.Regions, review.SpeakerNames));
+            else SpeakerNaming.Clear();
+            ShowSpeakerNames();
             _reviewJob = id; _reviewLanguage = review.Language;
             ReviewName = Jobs.FirstOrDefault(row => row.Id == id)?.Name ?? "";
             RawWhisper = review.RawWhisper; _rawCanaryNote = review.RawCanaryNote;
@@ -541,19 +547,28 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     }
 
     /// <summary>The transcript as it stands, with the edits made so far.</summary>
-    public FinalTranscript? CurrentTranscript => Regions.Count == 0 ? null : new FinalTranscript(_reviewJob, _reviewLanguage, Regions.Select(region => region.Snapshot()).ToArray());
+    public FinalTranscript? CurrentTranscript => Regions.Count == 0 ? null
+        : new FinalTranscript(_reviewJob, _reviewLanguage, Regions.Select(region => region.Snapshot()).ToArray(), SpeakerNaming.Current());
 
-    /// <summary>Sends the changed texts to the server, which keeps them with the project.</summary>
+    /// <summary>The names given to the speakers of the open transcript.</summary>
+    public SpeakerNamesEditor SpeakerNaming { get; } = new();
+
+    private void ShowSpeakerNames() => SpeakerNaming.ShowOn(Regions);
+
+    /// <summary>Sends the changed texts (and the speakers' names, when they changed) to the server, which keeps them with the project.</summary>
     [RelayCommand]
     private async Task SaveReviewAsync()
     {
         if (_connection is not { } connection || Regions.Count == 0) return;
         var edits = Regions.Select((region, index) => (region, index)).Where(item => item.region.Text != item.region.Original.FinalText).Select(item => new RemoteEdit(item.index, item.region.Text)).ToArray();
-        if (edits.Length == 0) return;
+        // Names are sent as they now stand; with every name taken away that is an empty list, not "unchanged".
+        var names = SpeakerNaming.IsChanged ? SpeakerNaming.Current() ?? new Dictionary<string, string>() : null;
+        if (edits.Length == 0 && names is null) return;
         try
         {
-            await connection.Client.SaveEditsAsync(_reviewJob, edits, CancellationToken.None);
+            await connection.Client.SaveEditsAsync(_reviewJob, edits, CancellationToken.None, names);
             foreach (var region in Regions) region.AcceptSaved();
+            SpeakerNaming.AcceptSaved();
             ReviewItems.Refresh();
             ReviewSaved?.Invoke();
         }
