@@ -15,8 +15,11 @@ namespace TriAsr.App;
 /// </summary>
 public static partial class WebApp
 {
-    /// <summary>The page may load its own script and style, show media it made itself (the recording it fetched), and talk to its own server. Nothing else.</summary>
-    public const string ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+    /// <summary>
+    /// The page may load its own script, style, icons and manifest (for a phone's home screen), show media it made itself (the recording it fetched), and talk
+    /// to its own server. Nothing else.
+    /// </summary>
+    public const string ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; media-src blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     private static readonly ConcurrentDictionary<string, byte[]> Embedded = new();
     private static readonly Lazy<string[]> Wanted = new(WantedTexts);
@@ -32,6 +35,12 @@ public static partial class WebApp
             "/app.css" => File("app.css", "text/css; charset=utf-8"),
             "/live.js" => File("live.js", "text/javascript; charset=utf-8"),
             "/worklet.js" => File("worklet.js", "text/javascript; charset=utf-8"),
+            // A phone can put the page on its home screen, where it opens like an app.
+            "/manifest.webmanifest" => File("manifest.webmanifest", "application/manifest+json; charset=utf-8"),
+            "/icon-192.png" => File("icon-192.png", "image/png"),
+            "/icon-512.png" => File("icon-512.png", "image/png"),
+            "/icon-maskable-512.png" => File("icon-maskable-512.png", "image/png"),
+            "/apple-touch-icon.png" => File("apple-touch-icon.png", "image/png"),
             "/ui/strings.json" => Strings(request),
             _ => null
         };

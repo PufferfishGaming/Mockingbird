@@ -1054,5 +1054,6 @@
   "Only a finished transcription can be summarized.": "Csak elkészült átiratot lehet összefoglalni.",
   "The server stopped before the summary was finished.": "A szerver leállt, mielőtt az összefoglaló elkészült.",
   "The summary model stopped while loading ({0}). {1}": "Az összefoglaló modell betöltés közben leállt ({0}). {1}",
-  "The summary model refused the request ({0}). {1}": "Az összefoglaló modell elutasította a kérést ({0}). {1}"
+  "The summary model refused the request ({0}). {1}": "Az összefoglaló modell elutasította a kérést ({0}). {1}",
+  "Open the encrypted page": "A titkosított oldal megnyitása"
 }

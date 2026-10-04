@@ -1054,5 +1054,6 @@
  "Only a finished transcription can be summarized.": "Solo se puede resumir una transcripción terminada.",
  "The server stopped before the summary was finished.": "El servidor se detuvo antes de terminar el resumen.",
  "The summary model stopped while loading ({0}). {1}": "El modelo de resumen se detuvo al cargarse ({0}). {1}",
- "The summary model refused the request ({0}). {1}": "El modelo de resumen rechazó la solicitud ({0}). {1}"
+ "The summary model refused the request ({0}). {1}": "El modelo de resumen rechazó la solicitud ({0}). {1}",
+ "Open the encrypted page": "Abrir la página cifrada"
 }

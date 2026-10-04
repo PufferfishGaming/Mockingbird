@@ -151,3 +151,31 @@ textarea.notetext { min-height: 340px; padding: 14px; line-height: 1.55; }
 .summary-text ul { margin: 0; padding-left: 20px; }
 .summary-text li { margin: 3px 0; }
 .small { font-size: 12px; }
+
+/* ---- phones ----------------------------------------------------------------------------------------------------------------------------
+   The tabs become a bar at the bottom of the screen with icons (where a thumb reaches them, as in a phone's own apps), the header gets small,
+   and every field uses 16 px text so that a phone does not zoom in when it is tapped. The page can be put on the home screen (manifest). */
+.tab svg { display: none; }
+@media (max-width: 640px) {
+  html, body { font-size: 16px; overflow-x: hidden; }   /* never sideways: a page that wiggles under the thumb feels broken */
+  .bar { padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top)); gap: 8px; }
+  .brand { font-size: 17px; gap: 10px; }
+  .brand .version { display: none; }
+  main { padding: 14px 12px calc(86px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; margin-bottom: 10px; }
+  .card { padding: 16px; border-radius: 12px; margin-bottom: 14px; }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--border); border-bottom: 0; box-shadow: 0 -4px 16px -8px rgba(0, 0, 0, .25); }
+  .tab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border-radius: 12px;
+    border-bottom: 0; font-size: 11px; line-height: 1.2; }
+  .tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tab[aria-selected="true"] { background: var(--accent-surface); }
+  input, select, textarea, button { font-size: 16px; }
+  input[type="text"], input[type="password"], input[type="search"], select, textarea { max-width: none; }
+  .row { gap: 10px; }
+  .row > button.btn { flex: 1 1 auto; }
+  .regions { max-height: 48vh; }
+  .region { grid-template-columns: 72px 1fr; }
+  .drop { padding: 22px 14px; }
+}

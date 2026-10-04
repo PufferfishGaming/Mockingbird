@@ -215,9 +215,22 @@
     startPolling();
   }
 
+  // The tabs, with the icons of the desktop windows; on a phone they are a bar at the bottom of the screen, where a thumb reaches them.
+  const TAB_ICONS = { new: "M12 5v14M5 12h14", projects: "M3 7h6l2 2h10v10H3z", review: "M5 12.5l4.5 4.5L19 7", notes: "M7 3h7l4 4v14H7zM10 11h6M10 15h6" };
+
+  function tabIcon(id) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", TAB_ICONS[id]);
+    svg.append(path);
+    return svg;
+  }
+
   function renderTabs() {
     const items = [["new", t("New transcription")], ["projects", t("Projects")], ["review", t("Review")], ["notes", t("Notes")]];
-    ui.tabs.replaceChildren(...items.map(([id, label]) => h("button", { class: "tab", type: "button", role: "tab", id: "tab-" + id, "aria-selected": String(state.tab === id), onClick: () => selectTab(id) }, label)));
+    ui.tabs.replaceChildren(...items.map(([id, label]) => h("button", { class: "tab", type: "button", role: "tab", id: "tab-" + id, "aria-selected": String(state.tab === id), onClick: () => selectTab(id) },
+      tabIcon(id), h("span", null, label))));
   }
 
   function selectTab(id) {
@@ -394,9 +407,19 @@
     return ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
   }
 
+  /**
+   * Why the microphone cannot be used here, with the way out: a page opened over plain http from another device (a phone on the network) is
+   * not secure to the browser, and the same server answers encrypted at the same address with https.
+   */
+  function insecureHint() {
+    const message = t("The browser only allows recording on a secure page (https, or localhost).");
+    if (location.protocol !== "http:") return [message];
+    return [message, " ", h("a", { href: "https://" + location.host + "/" }, t("Open the encrypted page"))];
+  }
+
   async function startRecording() {
     if (recorder.media) return;
-    if (!window.isSecureContext || !navigator.mediaDevices) { ui.recMessage.textContent = t("The browser only allows recording on a secure page (https, or localhost)."); return; }
+    if (!window.isSecureContext || !navigator.mediaDevices) { ui.recMessage.replaceChildren(...insecureHint()); return; }
     const type = recordingType();
     if (type === null) { ui.recMessage.textContent = t("Recording is not available in this browser."); return; }
     try {
@@ -1291,7 +1314,7 @@
     if (notes.rec || notes.starting) return;
     if (state.info && state.info.notesEnabled === false) return;
     if (!state.info || state.info.liveEnabled !== true) { setNoteStatus(t("This server cannot read dictation. It may be an older version, or have no speech model downloaded yet.")); return; }
-    if (!window.isSecureContext || !navigator.mediaDevices) { setNoteStatus(t("The browser only allows recording on a secure page (https, or localhost).")); return; }
+    if (!window.isSecureContext || !navigator.mediaDevices) { setNoteStatus(t("The browser only allows recording on a secure page (https, or localhost).")); if (ui.nStatus && location.protocol === "http:") ui.nStatus.replaceChildren(...insecureHint()); return; }
     if (typeof AudioWorkletNode === "undefined") { setNoteStatus(t("Recording is not available in this browser.")); return; }
     notes.starting = true;
     try {

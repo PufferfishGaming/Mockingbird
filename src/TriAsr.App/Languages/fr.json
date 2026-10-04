@@ -1054,5 +1054,6 @@
  "Only a finished transcription can be summarized.": "Seule une transcription terminée peut être résumée.",
  "The server stopped before the summary was finished.": "Le serveur s'est arrêté avant la fin du résumé.",
  "The summary model stopped while loading ({0}). {1}": "Le modèle de résumé s'est arrêté pendant le chargement ({0}). {1}",
- "The summary model refused the request ({0}). {1}": "Le modèle de résumé a refusé la requête ({0}). {1}"
+ "The summary model refused the request ({0}). {1}": "Le modèle de résumé a refusé la requête ({0}). {1}",
+ "Open the encrypted page": "Ouvrir la page chiffrée"
 }

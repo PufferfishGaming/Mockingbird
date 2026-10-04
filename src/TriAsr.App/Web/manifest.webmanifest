@@ -1,0 +1,15 @@
+{
+  "name": "Mockingbird Client Webview",
+  "short_name": "Mockingbird",
+  "description": "Send recordings to your Mockingbird server, follow them and review the transcripts.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#141a26",
+  "theme_color": "#2563d0",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

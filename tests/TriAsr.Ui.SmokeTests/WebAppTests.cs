@@ -150,8 +150,9 @@ public sealed class WebAppTests
     public void ThePageNeverBuildsMarkupFromWhatTheServerSendsAndNeverReachesOutsideItsServer()
     {
         var files = Directory.GetFiles(WebFolder()).ToArray();
-        Assert.Equal(["app.css", "app.js", "index.html", "live.js", "worklet.js"], files.Select(path => Path.GetFileName(path)!).Order().ToArray());
-        foreach (var path in files)
+        Assert.Equal(["app.css", "app.js", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "index.html", "live.js", "manifest.webmanifest", "worklet.js"],
+            files.Select(path => Path.GetFileName(path)!).Order().ToArray());
+        foreach (var path in files.Where(path => Path.GetExtension(path) != ".png"))
         {
             var source = File.ReadAllText(path);
             foreach (var forbidden in new[] { "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function", "setTimeout(\"", "javascript:" })
@@ -161,6 +162,37 @@ public sealed class WebAppTests
             Assert.True(addresses.Length == 0, Path.GetFileName(path) + ": " + string.Join(", ", addresses));
         }
         Assert.DoesNotContain("<script>", File.ReadAllText(Path.Combine(WebFolder(), "index.html")));
+    }
+
+    [Fact]
+    public async Task OnAPhoneThePageHasItsTabsAtTheBottomAndCanBePutOnTheHomeScreen()
+    {
+        await using var api = await Harness.StartAsync();
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        using (var manifest = await anonymous.GetAsync("/manifest.webmanifest"))
+        {
+            Assert.Equal("application/manifest+json", manifest.Content.Headers.ContentType!.MediaType);
+            var app = JsonDocument.Parse(await manifest.Content.ReadAsStringAsync()).RootElement;
+            Assert.Equal(("standalone", "/"), (app.GetProperty("display").GetString(), app.GetProperty("start_url").GetString()));
+            foreach (var icon in app.GetProperty("icons").EnumerateArray())
+            {
+                using var image = await anonymous.GetAsync(icon.GetProperty("src").GetString());
+                Assert.Equal("image/png", image.Content.Headers.ContentType!.MediaType);
+                Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, (await image.Content.ReadAsByteArrayAsync())[..4]);
+            }
+        }
+        using (var touch = await anonymous.GetAsync("/apple-touch-icon.png")) Assert.Equal("image/png", touch.Content.Headers.ContentType!.MediaType);
+        Assert.Contains("manifest-src 'self'", WebApp.ContentSecurityPolicy);                  // the policy lets the page read its own manifest, and nothing more
+        var page = File.ReadAllText(Path.Combine(WebFolder(), "index.html"));
+        Assert.Contains("<link rel=\"manifest\" href=\"/manifest.webmanifest\">", page);
+        Assert.Contains("viewport-fit=cover", page);                                               // the bar keeps clear of a phone's rounded corners and home bar
+        var style = File.ReadAllText(Path.Combine(WebFolder(), "app.css")).Replace("\r", "");
+        var phone = style[style.IndexOf("@media (max-width: 640px) {\n  html, body", StringComparison.Ordinal)..];
+        Assert.Contains(".tabs { position: fixed; left: 0; right: 0; bottom: 0;", phone);
+        Assert.Contains("input, select, textarea, button { font-size: 16px; }", phone);           // a phone does not zoom in when a field is tapped
+        var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
+        Assert.Contains("tabIcon(id), h(\"span\", null, label)", script);
+        Assert.Contains("h(\"a\", { href: \"https://\" + location.host + \"/\" }, t(\"Open the encrypted page\"))", script);   // recording on a phone needs the encrypted page
     }
 
     [Fact]
