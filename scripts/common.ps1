@@ -7,7 +7,10 @@ $env:DOTNET_NOLOGO = '1'
 $env:DOTNET_CLI_HOME = Join-Path $repoRoot '.tools/cli-home'
 $env:NUGET_PACKAGES = Join-Path $repoRoot '.tools/nuget-packages'
 Set-Location -LiteralPath $repoRoot
+# When the output is captured (release-chain.ps1 writes it to a log), Windows PowerShell turns each line dotnet writes to stderr into an error record;
+# under Stop the first one (a failing test's [FAIL] line) would end the script before the test's message and stack are written. Only the exit code counts.
 function Invoke-Dotnet {
+    $ErrorActionPreference = 'Continue'
     & $script:Dotnet @args
     if ($LASTEXITCODE -ne 0) { throw "dotnet failed with exit code $LASTEXITCODE" }
 }

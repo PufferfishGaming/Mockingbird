@@ -32,7 +32,13 @@ foreach ($step in $steps) {
     Write-Host "=== $step ===" -ForegroundColor Cyan
     try {
         $arguments = if ($step -eq 'build-setup') { @{ Notes = $Notes; Edition = $Edition } } elseif ($step -eq 'verify') { @{} } else { @{ Edition = $Edition } }
-        & (Join-Path $PSScriptRoot "$step.ps1") @arguments *>&1 | Out-String -Width 250 | Add-Content -LiteralPath $log -Encoding utf8
+        # Line by line, so that a step that fails keeps everything it wrote before (Out-String would hold it all until the step ends). Lines a program
+        # wrote to stderr arrive as error records and are written as the text they are; only objects (a table of hashes, say) are formatted.
+        & (Join-Path $PSScriptRoot "$step.ps1") @arguments *>&1 | ForEach-Object {
+            if ($_ -is [string]) { $_ }
+            elseif ($_ -is [System.Management.Automation.ErrorRecord] -and $_.FullyQualifiedErrorId -like 'NativeCommandError*') { $_.Exception.Message }
+            else { ($_ | Out-String -Width 250).TrimEnd() }
+        } | Add-Content -LiteralPath $log -Encoding utf8
         "=== $step OK ===" | Add-Content -LiteralPath $log -Encoding utf8
     }
     catch {
