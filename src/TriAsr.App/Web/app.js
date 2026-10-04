@@ -677,6 +677,7 @@
       state.review = {
         id, name: job ? job.name : "", data, selected: previous ? Math.min(previous.selected, data.regions.length - 1) : 0, view: previous ? previous.view : "final",
         search: previous ? previous.search : "", only: previous ? previous.only : false, audio: previous ? previous.audio : null, follow: previous ? previous.follow : true,
+        summaryOpen: previous ? previous.summaryOpen : false, summary: null, summaryState: "unknown", summaryError: "",
         regions: data.regions.map((region, index) => ({ index, region, original: region.finalText, text: region.finalText, automatic: data.automaticTexts[index] })),
         speakers: speakersOf(data.regions), names: Object.assign({}, data.speakerNames || {}), savedNames: data.speakerNames || {}
       };
@@ -825,6 +826,7 @@
     if (review.audio) ui.player.src = review.audio;
     ui.reviewView.replaceChildren(h("h1", null, t("Review")), summary,
       h("div", { class: "row card" }, search, h("label", { for: "only" }, only, " ", t("Needs listening")), ui.saveButton, format, mode, exportButton),
+      summaryCard(review),
       renderSpeakerNames(review),
       h("div", { class: "review" }, ui.regionList, h("div", { class: "card" }, ui.editor)),
       h("div", { class: "card" }, h("div", { class: "row" },
@@ -833,6 +835,88 @@
         h("label", { for: "follow", title: t("While the recording plays, the transcript moves with it: the words already said are coloured and the region being said is selected.") }, ui.follow, " ", t("Follow the playback"))), ui.player, ui.audioStatus));
     renderRegionList();
     renderEditor();
+  }
+
+  // ---- the summary of the open transcript ------------------------------------------------------------------------------------------------
+  // The server's language model writes it on request (POST .../summary), and the page asks how far it is (GET) until it is there. It is a
+  // draft to check against the transcript; it is kept with the project on the server, so every window sees the same one.
+
+  function summaryCard(review) {
+    if (!(state.info && state.info.summaries)) return null;
+    ui.summaryBody = h("div", { class: "summary-body" });
+    const card = h("details", { class: "card summary", open: review.summaryOpen || undefined,
+      onToggle: (event) => { review.summaryOpen = event.target.open; if (event.target.open && review.summaryState === "unknown") loadSummary(review); } },
+      h("summary", null, t("Summary")), ui.summaryBody);
+    if (review.summaryOpen && review.summaryState === "unknown") loadSummary(review);
+    renderSummary(review);
+    return card;
+  }
+
+  async function loadSummary(review) {
+    try {
+      const answer = await getJson("/v1/transcriptions/" + review.id + "/summary");
+      if (state.review !== review) return;
+      takeSummary(review, answer);
+      if (answer.state === "running") waitForSummary(review);
+    } catch (error) { review.summaryState = "failed"; review.summaryError = error.message; renderSummary(review); }
+  }
+
+  async function startSummary(review) {
+    review.summaryState = "running"; review.summaryError = ""; renderSummary(review);
+    try {
+      takeSummary(review, await (await api("/v1/transcriptions/" + review.id + "/summary", { method: "POST" })).json());
+      waitForSummary(review);
+    } catch (error) { review.summaryState = "failed"; review.summaryError = error.message; renderSummary(review); }
+  }
+
+  async function waitForSummary(review) {
+    while (state.review === review && review.summaryState === "running") {
+      await new Promise((done) => window.setTimeout(done, 1500));
+      if (state.review !== review) return;
+      try { takeSummary(review, await getJson("/v1/transcriptions/" + review.id + "/summary")); }
+      catch (error) { review.summaryState = "failed"; review.summaryError = error.message; renderSummary(review); return; }
+    }
+  }
+
+  function takeSummary(review, answer) {
+    review.summaryState = answer.state;
+    review.summaryError = answer.error || "";
+    if (answer.summary) review.summary = answer.summary;
+    renderSummary(review);
+  }
+
+  const actionLine = (item) => (item.who ? item.who + ": " : "") + item.what + (item.when ? " (" + item.when + ")" : "");
+
+  function summaryMarkdown(review) {
+    const s = review.summary;
+    const section = (heading, lines) => lines.length ? "## " + heading + "\n\n" + lines.map((line) => "- " + line).join("\n") + "\n\n" : "";
+    return "# " + t("Summary") + ": " + review.name + "\n\n## " + t("Summary") + "\n\n" + s.summary + "\n\n"
+      + section(t("Key points"), s.keyPoints) + section(t("Decisions"), s.decisions) + section(t("Action items"), s.actionItems.map(actionLine))
+      + section(t("Open questions"), s.openQuestions) + "_" + t("Written by a language model on the server from the transcript; check it before you rely on it.") + "_\n";
+  }
+
+  function renderSummary(review) {
+    if (!ui.summaryBody || state.review !== review) return;
+    const s = review.summary;
+    const running = review.summaryState === "running";
+    const list = (heading, lines) => lines && lines.length ? [h("h3", null, heading), h("ul", null, lines.map((line) => h("li", null, line)))] : [];
+    const copy = h("button", { class: "btn", type: "button", onClick: async () => {
+      try { await navigator.clipboard.writeText(summaryMarkdown(review)); notice("info", t("The summary was copied.")); }
+      catch (error) { notice("error", t("The summary could not be copied: {0}", error.message)); } } }, t("Copy"));
+    const save = h("button", { class: "btn", type: "button", onClick: () => {
+      const link = h("a", { href: URL.createObjectURL(new Blob([summaryMarkdown(review)], { type: "text/markdown" })), download: (review.name.replace(/\.[^.]*$/, "") || "transcript") + " - " + t("summary") + ".md" });
+      document.body.append(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(link.href), 10000); } }, t("Save as…"));
+    ui.summaryBody.replaceChildren(
+      h("p", { class: "muted" }, t("A language model on the server writes what the conversation was about, what was decided and who does what. It is a draft: check it against the transcript.")),
+      h("div", { class: "row" },
+        h("button", { class: "btn primary", type: "button", disabled: running, onClick: () => startSummary(review) }, s ? t("Summarize again") : t("Summarize")),
+        s && !running ? copy : null, s && !running ? save : null),
+      running ? h("p", { class: "muted", "aria-live": "polite" }, t("Summarizing… this takes from a few seconds to a few minutes, depending on the length and the computer.")) : null,
+      review.summaryState === "failed" ? h("p", { class: "note error" }, t("The summary could not be made: {0}", review.summaryError)) : null,
+      s ? h("div", { class: "summary-text" }, h("p", null, s.summary), list(t("Key points"), s.keyPoints), list(t("Decisions"), s.decisions),
+        list(t("Action items"), s.actionItems.map(actionLine)), list(t("Open questions"), s.openQuestions),
+        h("p", { class: "muted small" }, t("Written by the language model {0} on {1}. It is a draft: check it against the transcript before you rely on it.",
+          s.model.replace(/\.gguf$/i, ""), new Date(s.createdUtc).toLocaleString(text.lang)))) : null);
   }
 
   function renderRegionList() {

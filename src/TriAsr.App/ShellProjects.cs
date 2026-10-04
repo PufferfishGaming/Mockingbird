@@ -58,5 +58,6 @@ public sealed partial class ShellViewModel
         AudioSource = null; NormalizedAudioPath = "";
         RawWhisper = ""; RawCanary = "";
         ReviewSummary = T("Open a completed project to review its transcript.");
+        Summary.Clear();
     }
 }

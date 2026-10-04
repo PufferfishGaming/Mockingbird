@@ -57,6 +57,7 @@ public static class ShellSmoke
         count += await LanguageRendersAsync(window, shell, output);
         await KaraokeRendersAsync(window, shell, output);       // extra pictures for a look at the colours; not counted in the matrix
         DictationRenders(shell, output);
+        SummaryRenders(shell, output);
         await NotesRendersAsync(window, shell, output);
         shell.ReportError("Download needs attention", "The download host is unavailable. Your downloaded models and partial files are retained. Retry when the connection is restored.");
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
@@ -87,6 +88,31 @@ public static class ShellSmoke
             Capture(window, Path.Combine(output, $"karaoke-{requested}.png"), 1220, 900, 1);
         }
         shell.Regions.Remove(before); shell.Regions.Remove(region);
+        shell.SelectedTheme = "Light";
+    }
+
+    /// <summary>The summary panel of the Review page, unfolded with a summary in it, in both themes (the review's own pictures have no project open, so no panel).</summary>
+    private static void SummaryRenders(ShellViewModel shell, string output)
+    {
+        var summary = new SummaryViewModel(action => action());
+        summary.Open("weekly-meeting.wav", new TriAsr.Domain.MeetingSummary(
+            "The team planned the launch of the new remote control. They chose a plastic case to keep the price at 25 euros and agreed to test the menu with older users first.",
+            ["The selling price stays at 25 euros.", "A menu like a mobile phone's is easier than many small buttons.", "Older users need large print."],
+            ["The case is made of plastic, not metal."],
+            [new TriAsr.Domain.SummaryAction("Anna", "Send the cost figures to the team", "Friday"), new TriAsr.Domain.SummaryAction("Speaker 2", "Draw the first menu layout", "")],
+            ["Should the remote light up when it is lost?"], "en", "gemma-3-12b-it-Q4_K_M.gguf", DateTimeOffset.Now),
+            true, () => "", (_, _) => throw new InvalidOperationException());
+        summary.IsOpen = true;
+        var card = new Window { Content = new System.Windows.Controls.Grid { Children = { new SummaryPanel { DataContext = summary, Margin = new Thickness(24) } } } };
+        try
+        {
+            foreach (var requested in new[] { "Dark", "Light" })
+            {
+                shell.SelectedTheme = requested;
+                Capture(card, Path.Combine(output, $"summary-{requested}.png"), 960, double.PositiveInfinity, 1);
+            }
+        }
+        finally { card.Close(); }
         shell.SelectedTheme = "Light";
     }
 

@@ -25,8 +25,13 @@ public static class ModelManifest
         Canary("canary-f16", "F16", 1966111456, "eadda53cd1652d65cd12ff7ac4b7dc64cba1ce9837aae0c86e4222e8db89e320"),
         Qwen("correction-q4", "Q4_K_M", 2497281120, "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597"),
         Qwen("correction-q6", "Q6_K", 3306261600, "cd7b21b38b3e71400587c184b6a9b04d3beb4d13fdae6464d4075dee4f1bc5ad"),
-        Qwen("correction-q8", "Q8_0", 4280405600, "391c1e410fd9f4cf2de2b510273b56a84c19ce18f4fa3bfb3774031dac4ef068")
+        Qwen("correction-q8", "Q8_0", 4280405600, "391c1e410fd9f4cf2de2b510273b56a84c19ce18f4fa3bfb3774031dac4ef068"),
+        // Optional: summaries are written with it when it is installed (ADR: summaries); measured clearly better than the correction model, above all in Hungarian.
+        new("summary-gemma3-12b", "Summary", "Gemma 3 12B Instruct", "Q4_K_M", GemmaRevision, 7300574976,
+            "7bb69bff3f48a7b642355d64a90e481182a7794707b3133890646b1efa778ff5", $"https://huggingface.co/ggml-org/gemma-3-12b-it-GGUF/resolve/{GemmaRevision}/gemma-3-12b-it-Q4_K_M.gguf",
+            "Models/Summary/gemma-3-12b-it-Q4_K_M.gguf", "Gemma Terms of Use")
     ];
+    private const string GemmaRevision = "ec0cbabd8dbff316f659876a50202295c3c4a314";
     private static ModelEntry Canary(string id, string quant, long bytes, string hash) => new(id, "Canary", "Canary 1B v2", quant,
         CanaryRevision, bytes, hash, $"https://huggingface.co/handy-computer/canary-1b-v2-GGUF/resolve/{CanaryRevision}/canary-1b-v2-{quant}.gguf", $"Models/Canary/canary-1b-v2-{quant}.gguf", "CC-BY-4.0");
     private static ModelEntry Qwen(string id, string quant, long bytes, string hash) => new(id, "Correction", "Qwen3 4B Instruct 2507", quant,

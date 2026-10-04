@@ -181,7 +181,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _polling?.Cancel(); _audio?.Cancel();
         _connection = connection;
         _search?.Cancel(); SearchResults.Clear(); ProjectSearchStatus = ""; ProjectSearchText = "";
-        Jobs.Clear(); Regions.Clear(); SpeakerNaming.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
+        Jobs.Clear(); Regions.Clear(); SpeakerNaming.Clear(); _summary?.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
         if (connection is null && _dictation is { IsListening: true } running) _ = running.StopAsync();      // the server is gone: nothing can read the phrases
         if (_notes is not null) _ = _notes.SourceChangedAsync();
         IsConnected = connection is not null;
@@ -218,6 +218,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         foreach (var hit in SearchResults) hit.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
         SpeakerNaming.RefreshTexts();
+        _summary?.RefreshTexts();
         if (Regions.Count > 0) ShowReviewSummary();
         if (_rawCanaryNote is not null) RawCanary = CanaryNote(_rawCanaryNote);
         _languages = null; OnPropertyChanged(nameof(Languages));
@@ -421,7 +422,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     private void ClearReview()
     {
         _audio?.Cancel();
-        Regions.Clear(); SelectedRegion = null; SpeakerNaming.Clear();
+        Regions.Clear(); SelectedRegion = null; SpeakerNaming.Clear(); _summary?.Clear();
         _reviewJob = Guid.Empty; _rawCanaryNote = null;
         ReviewName = ""; ReviewSummary = ""; RawWhisper = ""; RawCanary = ""; AudioStatus = "";
         AudioSource = null; NormalizedAudioPath = "";
@@ -556,6 +557,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
             else SpeakerNaming.Clear();
             ShowSpeakerNames();
             _reviewJob = id; _reviewLanguage = review.Language;
+            await OpenSummaryAsync(connection, id, Jobs.FirstOrDefault(row => row.Id == id)?.Name ?? "");
             ReviewName = Jobs.FirstOrDefault(row => row.Id == id)?.Name ?? "";
             RawWhisper = review.RawWhisper; _rawCanaryNote = review.RawCanaryNote;
             RawCanary = review.RawCanaryNote is { } note ? CanaryNote(note) : review.RawCanary;
@@ -615,6 +617,33 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
 
     /// <summary>The names given to the speakers of the open transcript.</summary>
     public SpeakerNamesEditor SpeakerNaming { get; } = new();
+
+    /// <summary>The summary of the open transcript, written by the server (it has the language model).</summary>
+    public SummaryViewModel Summary => _summary ??= new SummaryViewModel(_onUi, onServer: true);
+    private SummaryViewModel? _summary;
+
+    private async Task OpenSummaryAsync(RemoteConnection connection, Guid id, string name)
+    {
+        MeetingSummary? kept = null;
+        if (connection.Info.Summaries)
+            try { kept = (await connection.Client.SummaryAsync(id, CancellationToken.None)).Summary; }
+            catch (RemoteException) { }                                  // an older server, or a moment of no connection: a summary can still be asked for
+        Summary.Open(name, kept, connection.Info.Summaries,
+            () => Loc.T("This server cannot write summaries: it has no language model for them, or it is an older version."),
+            async (progress, token) =>
+            {
+                var state = await connection.Client.StartSummaryAsync(id, token);
+                var waited = 0.0;
+                while (state.State == "running")
+                {
+                    await Task.Delay(1500, token);
+                    waited += 1.5;
+                    progress.Report(Math.Min(0.95, waited / (waited + 30)));          // the server does not say how far it is: a bar that slows down
+                    state = await connection.Client.SummaryAsync(id, token);
+                }
+                return state.State == "done" && state.Summary is { } done ? done : throw new InvalidOperationException(state.Error ?? Loc.T("The server did not write the summary."));
+            });
+    }
 
     private void ShowSpeakerNames() => SpeakerNaming.ShowOn(Regions);
 

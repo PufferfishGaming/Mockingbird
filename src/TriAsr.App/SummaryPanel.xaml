@@ -1,0 +1,40 @@
+<UserControl x:Class="TriAsr.App.SummaryPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: SummaryViewModel. The summary of the open transcript (Studio's Review page, a server's Review tab), folded away until it is asked for. -->
+  <Border Visibility="{Binding HasProject, Converter={StaticResource BoolVisibility}}" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,14">
+    <Expander IsExpanded="{Binding IsOpen}" AutomationProperties.Name="{local:T 'Summary'}">
+      <Expander.Header><TextBlock Text="{local:T 'Summary'}" FontWeight="SemiBold" FontSize="15" /></Expander.Header>
+      <StackPanel Margin="0,12,0,0">
+        <TextBlock Text="{Binding Intro}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+        <TextBlock Text="{Binding Unavailable}" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,0,0,12" Visibility="{Binding IsAvailable, Converter={StaticResource InverseBoolVisibility}}" />
+        <WrapPanel>
+          <Button Style="{StaticResource PrimaryButton}" Content="{Binding SummarizeLabel}" Command="{Binding SummarizeCommand}" Margin="0,0,10,8" AutomationProperties.Name="{Binding SummarizeLabel}" />
+          <Button Content="{local:T 'Cancel'}" Command="{Binding CancelCommand}" Margin="0,0,10,8" Visibility="{Binding IsWorking, Converter={StaticResource BoolVisibility}}" />
+          <Button Content="{local:T 'Copy'}" Command="{Binding CopyCommand}" Margin="0,0,10,8" Visibility="{Binding HasSummary, Converter={StaticResource BoolVisibility}}" ToolTip="{local:T 'Copies the summary as text, with its headings'}" />
+          <Button Content="{local:T 'Save as…'}" Click="SaveClick" Margin="0,0,10,8" Visibility="{Binding HasSummary, Converter={StaticResource BoolVisibility}}" ToolTip="{local:T 'Saves the summary as a Markdown or text file'}" />
+        </WrapPanel>
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Percent, Mode=OneWay}" Height="4" Margin="0,4,0,8" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding IsWorking, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Summary progress'}" />
+        <TextBlock Text="{Binding Status}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8" AutomationProperties.LiveSetting="Polite"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+        <StackPanel Visibility="{Binding HasSummary, Converter={StaticResource BoolVisibility}}">
+          <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="15" Margin="0,4,0,12" />
+          <StackPanel Visibility="{Binding HasKeyPoints, Converter={StaticResource BoolVisibility}}" Margin="0,0,0,10">
+            <TextBlock Text="{local:T 'Key points'}" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding KeyPoints}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="16" /><ColumnDefinition /></Grid.ColumnDefinitions><Ellipse Width="5" Height="5" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Top" Margin="2,8,0,0" HorizontalAlignment="Left" /><TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          </StackPanel>
+          <StackPanel Visibility="{Binding HasDecisions, Converter={StaticResource BoolVisibility}}" Margin="0,0,0,10">
+            <TextBlock Text="{local:T 'Decisions'}" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding Decisions}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="16" /><ColumnDefinition /></Grid.ColumnDefinitions><Ellipse Width="5" Height="5" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Top" Margin="2,8,0,0" HorizontalAlignment="Left" /><TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          </StackPanel>
+          <StackPanel Visibility="{Binding HasActionItems, Converter={StaticResource BoolVisibility}}" Margin="0,0,0,10">
+            <TextBlock Text="{local:T 'Action items'}" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding ActionItems}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="16" /><ColumnDefinition /></Grid.ColumnDefinitions><Rectangle Width="8" Height="8" RadiusX="1.5" RadiusY="1.5" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.4" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,6,0,0" /><TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          </StackPanel>
+          <StackPanel Visibility="{Binding HasOpenQuestions, Converter={StaticResource BoolVisibility}}" Margin="0,0,0,10">
+            <TextBlock Text="{local:T 'Open questions'}" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding OpenQuestions}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="16" /><ColumnDefinition /></Grid.ColumnDefinitions><Ellipse Width="5" Height="5" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Top" Margin="2,8,0,0" HorizontalAlignment="Left" /><TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          </StackPanel>
+          <TextBlock Text="{Binding MadeWith}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap" />
+        </StackPanel>
+      </StackPanel>
+    </Expander>
+  </Border>
+</UserControl>

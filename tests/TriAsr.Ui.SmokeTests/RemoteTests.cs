@@ -414,6 +414,41 @@ public sealed class RemoteTests
     }
 
     [Fact]
+    public async Task TheClientHasTheServerWriteTheSummaryOfTheOpenTranscript()
+    {
+        var root = NewRoot();
+        var summaries = new FakeSummaries();
+        await using var api = await Harness.StartAsync(h => { h.Summaries = summaries; h.Transcript = id => ApiTestData.Conversation(id, null); });
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            var recording = Path.Combine(root, "standup.wav");
+            await File.WriteAllBytesAsync(recording, new byte[200_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            var row = await EventuallyAsync(() => workspace.Jobs.FirstOrDefault(job => job.CanOpen), "the job completes");
+            await workspace.OpenReviewAsync(row.Id);
+
+            var summary = workspace.Summary;
+            Assert.True(summary.HasProject && summary.IsAvailable && summary.NoSummary);
+            Assert.StartsWith("A language model on the server", summary.Intro);
+            await summary.SummarizeCommand.ExecuteAsync(null);
+            Assert.Equal("They talked about: Are you coming?", summary.Text);
+            Assert.Equal(["Anna: Send the figures (Friday)"], summary.ActionItems);
+            Assert.True(summaries.Kept.ContainsKey(row.Id));                                  // kept on the server, with the project
+
+            // A failure on the server is told, with its reason.
+            summaries.Fail = "The summary model did not load in five minutes.";
+            await summary.SummarizeCommand.ExecuteAsync(null);
+            Assert.Equal("The summary could not be made: The summary model did not load in five minutes.", summary.Status);
+            Assert.Equal("They talked about: Are you coming?", summary.Text);                 // the summary that was there stays
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task ARecordingInTwoLanguagesIsSentAsAPairAndAnOlderServerIsSentTheFirst()
     {
         var root = NewRoot();

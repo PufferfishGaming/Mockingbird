@@ -195,6 +195,16 @@ public sealed class RemoteServerClient : IDisposable
 
     public Task<RemoteReview> ReviewAsync(Guid id, CancellationToken token) => GetAsync<RemoteReview>($"/v1/transcriptions/{id}/review", token);
 
+    /// <summary>The summary of a finished transcript, or how far it is.</summary>
+    public Task<RemoteSummary> SummaryAsync(Guid id, CancellationToken token) => GetAsync<RemoteSummary>($"/v1/transcriptions/{id}/summary", token);
+
+    /// <summary>Asks the server to write (or write again) the summary of a finished transcript; ask <see cref="SummaryAsync"/> until it is done.</summary>
+    public async Task<RemoteSummary> StartSummaryAsync(Guid id, CancellationToken token)
+    {
+        using var response = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"/v1/transcriptions/{id}/summary"), 60, token);
+        return (await response.Content.ReadJsonAsync<RemoteSummary>(token))!;
+    }
+
     /// <summary>Every transcript on the server searched at once; ask only a server whose <see cref="RemoteServerInfo.Search"/> is true.</summary>
     public Task<RemoteSearch> SearchAsync(string query, CancellationToken token) => GetAsync<RemoteSearch>($"/v1/search?q={Uri.EscapeDataString(query)}", token);
 

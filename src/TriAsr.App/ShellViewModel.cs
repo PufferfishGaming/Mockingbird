@@ -361,6 +361,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
             Regions.Clear(); for (var i = 0; i < _review.Regions.Count; i++) Regions.Add(new(_review.Regions[i], machine.Regions[i].FinalText));
             SpeakerNaming.Changed -= ShowSpeakerNames; SpeakerNaming.Load(_review); SpeakerNaming.Changed += ShowSpeakerNames;
             ShowSpeakerNames();
+            await OpenSummaryAsync(SelectedJob);
             SelectedRegion = Regions.FirstOrDefault();
             NormalizedAudioPath = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "normalized.wav");
             var listeningCopy = System.IO.Path.Combine(workspace.DirectoryFor(SelectedJob.Id), "playback.m4a");
@@ -398,6 +399,28 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
 
     /// <summary>The names given to the speakers of the open transcript.</summary>
     public SpeakerNamesEditor SpeakerNaming { get; } = new();
+
+    /// <summary>The summary of the open transcript, made on this computer.</summary>
+    public SummaryViewModel Summary => _summary ??= new SummaryViewModel(OnUi);
+    private SummaryViewModel? _summary;
+    private ISummaryEngine? _summaryEngine;
+    /// <summary>Makes summaries with the local language model (the API's clients use the same). Only a test sets another.</summary>
+    public ISummaryEngine SummaryEngine { get => _summaryEngine ??= new LocalSummaryEngine(processes, runtimes, storage.Root, models); set => _summaryEngine = value; }
+
+    private async Task OpenSummaryAsync(TranscriptionJob job)
+    {
+        var id = job.Id;
+        Summary.Open(System.IO.Path.GetFileName(job.SourcePath), await SummaryStore.LoadAsync(workspace, id), SummaryEngine.IsReady,
+            () => T("No language model for summaries is installed. Download the correction model on the Models page."),
+            async (progress, token) =>
+            {
+                // The transcript as it is on screen: edits and speaker names included, saved or not.
+                var transcript = _review?.JobId == id ? CurrentTranscript! : await stages.LoadReviewAsync(id, token);
+                var made = await Task.Run(() => SummaryEngine.SummarizeAsync(transcript, progress, token), token);
+                await SummaryStore.SaveAsync(workspace, id, made, token);
+                return made;
+            });
+    }
 
     private void ShowSpeakerNames() => SpeakerNaming.ShowOn(Regions);
     [RelayCommand] private void UseWhisper() { if (SelectedRegion is not null) SelectedRegion.Text = SelectedRegion.Whisper; }

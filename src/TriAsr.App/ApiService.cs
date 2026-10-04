@@ -28,12 +28,22 @@ namespace TriAsr.App;
 /// <param name="Notes">Keeps the notes for <c>/v1/notes</c>. Null: this server does not keep notes.</param>
 /// <param name="DeleteJob">Deletes a finished recording with everything stored for it, for <c>DELETE /v1/transcriptions/{id}</c>. Null: this server does not delete recordings.</param>
 /// <param name="SpeakersReady">Whether this server can tell the speakers of a recording apart (the speaker program and its models are installed); null means it cannot.</param>
+/// <param name="Summaries">Writes the summary of a transcript for <c>/v1/transcriptions/{id}/summary</c>. Null: this server does not make summaries.</param>
+/// <param name="SummaryStore">Reads and keeps the summary of a job (beside its transcript); needed with <paramref name="Summaries"/>.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
     Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null,
-    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null, INoteStore? Notes = null, Func<bool>? SpeakersReady = null);
+    ILiveRecognizer? Live = null, Func<bool>? LiveReady = null, INoteStore? Notes = null, Func<bool>? SpeakersReady = null,
+    ISummaryEngine? Summaries = null, ISummaryKeeper? SummaryStore = null);
+
+/// <summary>Where the summary of a job is kept.</summary>
+public interface ISummaryKeeper
+{
+    Task<MeetingSummary?> LoadAsync(Guid id, CancellationToken token);
+    Task SaveAsync(Guid id, MeetingSummary summary, CancellationToken token);
+}
 
 /// <summary>Everything the remote review page needs about a finished job.</summary>
 public sealed record ReviewBundle(FinalTranscript Review, FinalTranscript Automatic, string RawWhisper, string RawCanary, string? RawCanaryNote);
@@ -189,6 +199,8 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "POST" ? await CancelAsync(id) : MethodNotAllowed("POST");
             case ["v1", "transcriptions", var id, "review"]:
                 return request.Method switch { "GET" => await ReviewAsync(id, token), "PUT" => await SaveEditsAsync(id, request, token), _ => MethodNotAllowed("GET, PUT") };
+            case ["v1", "transcriptions", var id, "summary"]:
+                return request.Method switch { "GET" => await SummaryAsync(id, token), "POST" => StartSummary(id), _ => MethodNotAllowed("GET, POST") };
             case ["v1", "transcriptions", var id, "audio"]:
                 return request.Method is "GET" or "HEAD" ? Audio(id, request) : MethodNotAllowed("GET");
             case ["v1", "audio", "transcriptions"]:
@@ -631,6 +643,53 @@ public sealed class ApiService : IAsyncDisposable
         };
     }
 
+    // ---- summaries ------------------------------------------------------------------------------------------------------------------------
+    // POST starts writing the summary of a finished transcript (seconds on a graphics card, a minute or more on a processor); GET tells how far
+    // it is and gives it when it is there. One at a time per job; the summary is kept beside the transcript.
+
+    private readonly ConcurrentDictionary<Guid, (Task Work, string? Error)> _summaries = new();
+    private readonly CancellationTokenSource _summaryLifetime = new();
+
+    private async Task<HttpResponse> SummaryAsync(string id, CancellationToken token)
+    {
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        if (_summaries.TryGetValue(entry.Id, out var work))
+        {
+            if (!work.Work.IsCompleted) return HttpResponse.Json(200, new RemoteSummary("running", null, null));
+            if (work.Error is { } error) return HttpResponse.Json(200, new RemoteSummary("failed", null, error));
+        }
+        var kept = _deps.SummaryStore is { } store ? await store.LoadAsync(entry.Id, token) : null;
+        return HttpResponse.Json(200, kept is null ? new RemoteSummary("none", null, null) : new RemoteSummary("done", kept, null));
+    }
+
+    private HttpResponse StartSummary(string id)
+    {
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        if (_deps.Summaries is not { IsReady: true } engine || _deps.SummaryStore is not { } store)
+            return HttpResponse.Error(503, "summaries_unavailable", Loc.Key("This server cannot write summaries: no language model for them is installed."));
+        if (entry.Job.State != JobState.Complete) return HttpResponse.Error(409, "not_ready", Loc.Key("Only a finished transcription can be summarized."));
+        lock (_summaries)
+        {
+            if (_summaries.TryGetValue(entry.Id, out var running) && !running.Work.IsCompleted) return HttpResponse.Json(202, new RemoteSummary("running", null, null));
+            var finished = new TaskCompletionSource();
+            _summaries[entry.Id] = (finished.Task, null);
+            _ = Task.Run(async () =>
+            {
+                string? failure = null;
+                try
+                {
+                    var transcript = await _deps.LoadTranscript(entry.Id, _summaryLifetime.Token);
+                    await store.SaveAsync(entry.Id, await engine.SummarizeAsync(transcript, null, _summaryLifetime.Token), _summaryLifetime.Token);
+                }
+                catch (OperationCanceledException) { failure = Loc.Key("The server stopped before the summary was finished."); }
+                catch (Exception error) when (error is InvalidOperationException or IOException or TimeoutException or System.Net.Http.HttpRequestException or System.Text.Json.JsonException) { failure = error.Message; }
+                _summaries[entry.Id] = (Task.CompletedTask, failure);
+                finished.TrySetResult();
+            });
+        }
+        return HttpResponse.Json(202, new RemoteSummary("running", null, null));
+    }
+
     /// <summary>Every transcript of the API's recordings searched at once (<see cref="ProjectSearch"/>): case and accents do not matter.</summary>
     private async Task<HttpResponse> SearchAsync(HttpRequest request, CancellationToken token)
     {
@@ -656,7 +715,8 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true, SpeakerNames: true, Search: true));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true, SpeakerNames: true, Search: true,
+            Summaries: _deps.Summaries?.IsReady == true && _deps.SummaryStore is not null));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

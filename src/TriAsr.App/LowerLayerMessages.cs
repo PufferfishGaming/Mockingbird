@@ -25,7 +25,9 @@ public static partial class LowerLayerMessages
         Loc.Key("Canary ABI version mismatch: {0}"),
         Loc.Key("llama.cpp exited {0}: {1}"),
         Loc.Key("The microphone could not be opened (Windows error {0}). Check that it is connected and not in use by another program."),
-        Loc.Key("The link could not be downloaded: {0}")
+        Loc.Key("The link could not be downloaded: {0}"),
+        Loc.Key("The summary model stopped while loading ({0}). {1}"),
+        Loc.Key("The summary model refused the request ({0}). {1}")
     ];
 
     private static readonly (Regex Pattern, string Template)[] Patterns = Templates.Select(template => (Pattern(template), template)).ToArray();

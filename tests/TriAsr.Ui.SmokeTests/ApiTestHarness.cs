@@ -101,6 +101,29 @@ internal sealed class FakeLive : ILiveRecognizer
     }
 }
 
+/// <summary>Stands in for the language model that writes summaries, and keeps them as a server would (beside the transcript).</summary>
+internal sealed class FakeSummaries : ISummaryEngine, ISummaryKeeper
+{
+    public bool IsReady { get; set; } = true;
+    public string? Fail { get; set; }
+    public TaskCompletionSource? Hold { get; set; }
+    public List<FinalTranscript> Asked { get; } = [];
+    public Dictionary<Guid, MeetingSummary> Kept { get; } = [];
+
+    public async Task<MeetingSummary> SummarizeAsync(FinalTranscript transcript, IProgress<double>? progress, CancellationToken token)
+    {
+        lock (Asked) Asked.Add(transcript);
+        if (Hold is { } hold) await hold.Task.WaitAsync(token);
+        progress?.Report(1);
+        if (Fail is { } message) throw new InvalidOperationException(message);
+        var first = transcript.Regions.FirstOrDefault()?.FinalText ?? "";
+        return new MeetingSummary("They talked about: " + first, ["A point"], [], [new SummaryAction("Anna", "Send the figures", "Friday")], [], transcript.Language, "fake-model.gguf", DateTimeOffset.UtcNow);
+    }
+
+    public Task<MeetingSummary?> LoadAsync(Guid id, CancellationToken token) { lock (Kept) return Task.FromResult(Kept.TryGetValue(id, out var summary) ? summary : null); }
+    public Task SaveAsync(Guid id, MeetingSummary summary, CancellationToken token) { lock (Kept) Kept[id] = summary; return Task.CompletedTask; }
+}
+
 /// <summary>Stands in for the program that downloads the sound of a link: it records what it was asked, can be held, can fail, and writes a small file.</summary>
 internal sealed class FakeLinks : ILinkFetcher
 {
@@ -146,6 +169,8 @@ internal sealed class Harness : IAsyncDisposable
     public INoteStore? Notes { get; set; }
     /// <summary>Whether the server tells speakers apart (has the speaker program).</summary>
     public bool Speakers { get; set; }
+    /// <summary>Writes summaries for <c>/v1/transcriptions/{id}/summary</c>; null makes the server one that does not.</summary>
+    public FakeSummaries? Summaries { get; set; }
     /// <summary>The transcript of a finished job, as it was last saved; by default the two German regions of <see cref="ApiTestData.Transcript"/>.</summary>
     public Func<Guid, FinalTranscript>? Transcript { get; set; }
     private FinalTranscript TranscriptOf(Guid id) => Transcript?.Invoke(id) ?? ApiTestData.Transcript(id, Native);
@@ -174,7 +199,8 @@ internal sealed class Harness : IAsyncDisposable
             (id, _) => Task.FromResult(harness.TranscriptOf(id)), harness.Incoming, Path.Combine(harness.Root, "Api", "Exports"), "0.0.0-test",
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
             () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(harness.TranscriptOf(id), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
-            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes, () => harness.Speakers));
+            (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes, () => harness.Speakers,
+            harness.Summaries, harness.Summaries));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();
         harness.Identity = ServerIdentity.LoadOrCreate(Path.Combine(harness.Root, "Identity"));

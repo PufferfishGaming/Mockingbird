@@ -205,5 +205,7 @@
  "The note is too long.",
  "Telling the speakers apart",
  "The speaker program did not report a result.",
- "The speaker program listed a turn that ends before it starts."
+ "The speaker program listed a turn that ends before it starts.",
+ "The transcript has no text to summarize.",
+ "The summary model did not load in five minutes."
 ]
