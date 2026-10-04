@@ -6,6 +6,8 @@ Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishG
 
 **Version 0.1.21 — release candidate**
 
+**New on `main`, not in the installers yet** (they come with the next release): search every transcript at once, meeting summaries, the web page as an app on a phone with a QR code to open it, a Server window with Studio's own setup pages, Resume and a watch folder in the Client, a button that opens the recordings folder, and a livelier look. To use them now, build from source (see [Build](#build)).
+
 <div align="center">
 
 [![Download Mockingbird Studio](https://img.shields.io/badge/Studio-Download_for_Windows-2ea44f?style=for-the-badge)](https://github.com/PufferfishGaming/Mockingbird/releases/download/download/Mockingbird-Studio-Setup.exe)
@@ -70,12 +72,12 @@ Native Linux support is pending; there is currently no native Linux build.
 - Removal of Whisper's runaway repetition, and an optional "Skip silence and music" setting for recordings with long quiet or noisy stretches (it removes songs, so it is off by default).
 - TXT, Markdown, JSON, CSV, SRT, VTT and DOCX export.
 - Persistent model downloads, CPU/Vulkan backends, optional compatible CUDA/ROCm runtimes and measured auto-tuning.
-- Live activity output, an interactive PowerShell panel and light/dark/system themes.
+- Live activity output, an interactive PowerShell panel and light/dark/system themes. Buttons, list rows and choices light up under the pointer and press in when clicked, the field or button the keyboard is on is clearly marked, and pages fade in (only when Windows' animation effects are on).
 - Karaoke-style playback in the review: while the recording plays, the words already said are coloured, the word being said is bold, and the selection follows the recording (in Studio, the Client and the web page).
 - A history of your transcripts: the Projects page (in Studio, the Client and the web page) lists every project with its date and state; click a finished one to open its transcript in Review, and delete a project you no longer need (its transcript, edits and working files go; the recording file you chose stays).
 - Search every transcript at once: type in the box on the Projects page (Studio, the Client and the web page) and every project whose transcript or name holds the words is listed with its matching passages, the words picked out; a click opens the transcript right there. Capital letters, accents and extra spaces do not matter ("kotelezo" finds "kötelező").
 - Summaries: open a transcript, unfold **Summary** and press **Summarize** (Studio, the Client and the web page). A language model on this computer, or on the server, writes what the conversation was about, the key points, the decisions, who does what and the open questions, in the language of the transcript and with the names given to the speakers; copy it or save it as Markdown. It is a draft to check against the transcript. Studio uses its correction model (Qwen3 4B) for it; for better summaries, above all in Hungarian, download the optional **Summary** model (Gemma 3 12B, 7.3 GB, Gemma Terms of Use) on the Models page. Measured on English meetings and a Hungarian podcast before it was built: with Gemma every checked statement held, with the small model one to three per summary were wrong. A summary takes seconds on a graphics card and about a minute on the processor.
-- An in-app recorder: record with the microphone in Studio, in the Client or in the browser; the recording becomes the file to transcribe or to send.
+- An in-app recorder: record with the microphone in Studio, in the Client or in the browser; the recording becomes the file to transcribe or to send. **Open folder** on the recorder opens the folder the recordings are kept in.
 - Dictation: a small window floats above your other programs (it never takes the keyboard from them); start it with its button or with keys (`Ctrl+Alt+Space` to begin with; press *Change keys*, press the keys you want, click *Done*), speak, and every phrase is typed (or pasted) where your cursor is, in any program. Studio reads the phrases on this computer; the Client, and Studio's *Remote server* page, send each phrase to the server. It needs a Whisper model; it types only into programs that are not running as administrator.
 - Two languages: if you speak (or a recording switches between) two languages, English and Hungarian say, choose both, and each part is written in the language it was spoken in, in dictation, notes and recordings alike. With one language chosen, whatever is said in another one is written translated into it, and auto-detection can mistake an accent for another language. A phrase the program is not sure about is read in both languages and takes a moment longer; a recording is divided into stretches of one language, and each is transcribed in its own. A recording that turns out to be in one of the two only is transcribed exactly as with that language chosen.
 - Speakers: choose *Tell speakers apart* (or how many people speak) when you start a transcription, and every part of the transcript is marked with its speaker, cut where the speaker changes; the exports say who speaks ("Speaker 1: ...", WebVTT voice tags, a CSV column). Studio's watched folder has the same choice for the recordings it picks up. In the review (Studio, the Client and the web page) give the speakers their names, *Anna* instead of *Speaker 1*: they show in the transcript at once, are saved with the edits and are used in every export. It runs on the processor and takes a few percent of the recording's length. Measured on English meetings of four people, 95 % of the words went to the right speaker.
@@ -152,6 +154,8 @@ Install the .NET SDK specified in `global.json`. From PowerShell:
 ./scripts/build.ps1
 ./scripts/test.ps1
 ```
+
+To look at what you built, `./scripts/try-edition.ps1` starts all three editions (or one, with `-Edition Studio`, `Server` or `Client`); Studio uses your usual data, Server and Client keep theirs under `artifacts/try`.
 
 For complete app smoke checks, supply the Windows native runtimes under `Runtimes/` and run `scripts/verify.ps1`. Packaging additionally requires the app-local Visual C++ runtime inputs:
 
