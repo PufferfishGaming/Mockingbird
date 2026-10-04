@@ -180,6 +180,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         _polling?.Cancel(); _audio?.Cancel();
         _connection = connection;
+        _search?.Cancel(); SearchResults.Clear(); ProjectSearchStatus = ""; ProjectSearchText = "";
         Jobs.Clear(); Regions.Clear(); SpeakerNaming.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
         if (connection is null && _dictation is { IsListening: true } running) _ = running.StopAsync();      // the server is gone: nothing can read the phrases
         if (_notes is not null) _ = _notes.SourceChangedAsync();
@@ -201,6 +202,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _notes?.RefreshAvailability();
         OnPropertyChanged(nameof(CanChooseSecondLanguage));
         OnPropertyChanged(nameof(CanTellSpeakersApart));
+        OnPropertyChanged(nameof(CanSearch)); OnPropertyChanged(nameof(HasProjectSearch));
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -213,6 +215,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _dictation?.RefreshTexts();
         _notes?.RefreshTexts();
         foreach (var row in Jobs) row.RefreshTexts();
+        foreach (var hit in SearchResults) hit.RefreshTexts();
         foreach (var region in Regions) region.NotifyLanguageChanged();
         SpeakerNaming.RefreshTexts();
         if (Regions.Count > 0) ShowReviewSummary();
@@ -398,6 +401,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
             Interlocked.Increment(ref _localChanges);
             if (_reviewJob == row.Id) ClearReview();
             Jobs.Remove(row);
+            if (SearchResults.FirstOrDefault(hit => hit.JobId == row.Id) is { } found) SearchResults.Remove(found);
             if (SelectedJob == row) SelectedJob = null;
             OnPropertyChanged(nameof(HasNoJobs));
             ForgetDownloadedAudio(row.Id);
@@ -437,6 +441,65 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException) { await Task.Delay(300); }
             }
         });
+    }
+
+    // ---- searching every transcript on the server -----------------------------------------------------------------------------------------
+
+    [ObservableProperty] private string _projectSearchText = "";
+    [ObservableProperty] private string _projectSearchStatus = "";
+    public ObservableCollection<SearchHitRow> SearchResults { get; } = [];
+    /// <summary>Whether the server searches its transcripts; an older one does not, and the box is not shown.</summary>
+    public bool CanSearch => _connection?.Info.Search == true;
+    public bool HasProjectSearch => CanSearch && TriAsr.Application.ProjectSearch.Normalize(ProjectSearchText).Length > 0;
+    private CancellationTokenSource? _search;
+
+    partial void OnProjectSearchTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasProjectSearch));
+        _ = SearchProjectsAsync();
+    }
+
+    private async Task SearchProjectsAsync()
+    {
+        _search?.Cancel();
+        var cancellation = _search = new CancellationTokenSource();
+        var query = TriAsr.Application.ProjectSearch.Normalize(ProjectSearchText);
+        if (query.Length == 0 || _connection is not { } connection || !CanSearch) { SearchResults.Clear(); ProjectSearchStatus = ""; return; }
+        ProjectSearchStatus = Loc.T("Searching…");
+        try
+        {
+            var found = await connection.Client.SearchAsync(query, cancellation.Token);
+            if (cancellation.IsCancellationRequested) return;
+            SearchResults.Clear();
+            foreach (var hit in found.Data) SearchResults.Add(new SearchHitRow(hit));
+            ProjectSearchStatus = found.Data.Count == 0 ? Loc.T("Nothing found for “{0}”.", query) : Loc.T("Projects found: {0}", found.Data.Count);
+        }
+        catch (OperationCanceledException) { }
+        catch (RemoteException error)
+        {
+            if (cancellation.IsCancellationRequested) return;
+            ProjectSearchStatus = Loc.T("The search failed: {0}", Loc.Describe(error.Message));
+            if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message);
+        }
+    }
+
+    /// <summary>Opens the transcript of a passage and selects its region.</summary>
+    [RelayCommand]
+    private async Task OpenSearchPassageAsync(SearchPassageRow? passage)
+    {
+        if (passage is null) return;
+        await OpenReviewAsync(passage.JobId);
+        if (_reviewJob == passage.JobId && passage.Index >= 0 && passage.Index < Regions.Count) SelectedRegion = Regions[passage.Index];
+    }
+
+    /// <summary>Opens a project of the results at its first matching passage (or its start, when only its name matched).</summary>
+    [RelayCommand]
+    private async Task OpenSearchHitAsync(SearchHitRow? hit)
+    {
+        if (hit is null) return;
+        await OpenReviewAsync(hit.JobId);
+        var index = hit.Passages.FirstOrDefault()?.Index ?? 0;
+        if (_reviewJob == hit.JobId && index < Regions.Count) SelectedRegion = Regions[index];
     }
 
     // ---- reviewing ---------------------------------------------------------------------------------------------------------------------

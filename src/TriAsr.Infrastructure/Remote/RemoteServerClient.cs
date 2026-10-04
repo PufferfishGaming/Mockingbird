@@ -195,6 +195,9 @@ public sealed class RemoteServerClient : IDisposable
 
     public Task<RemoteReview> ReviewAsync(Guid id, CancellationToken token) => GetAsync<RemoteReview>($"/v1/transcriptions/{id}/review", token);
 
+    /// <summary>Every transcript on the server searched at once; ask only a server whose <see cref="RemoteServerInfo.Search"/> is true.</summary>
+    public Task<RemoteSearch> SearchAsync(string query, CancellationToken token) => GetAsync<RemoteSearch>($"/v1/search?q={Uri.EscapeDataString(query)}", token);
+
     /// <param name="speakerNames">The names of the speakers as they now stand (empty to take them all away); null leaves them as they are.</param>
     public async Task SaveEditsAsync(Guid id, IReadOnlyList<RemoteEdit> edits, CancellationToken token, IReadOnlyDictionary<string, string>? speakerNames = null)
     {

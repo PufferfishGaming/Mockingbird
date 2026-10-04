@@ -52,6 +52,8 @@
         <!-- Projects -->
         <StackPanel local:Motion.FadeIn="True" Visibility="{Binding IsProjectsTab, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{local:T 'Click a finished project to open its transcript.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+          <local:SearchResultsPanel Visibility="{Binding CanSearch, Converter={StaticResource BoolVisibility}}" />
+          <StackPanel Visibility="{Binding HasProjectSearch, Converter={StaticResource InverseBoolVisibility}}">
           <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" MinHeight="200" PreviewMouseLeftButtonUp="ProjectClick" PreviewKeyDown="ProjectKeyDown" AutomationProperties.Name="{local:T 'Recordings on the server'}">
             <ListBox.ItemTemplate><DataTemplate>
               <Grid>
@@ -68,6 +70,7 @@
             </DataTemplate></ListBox.ItemTemplate>
           </ListBox>
           <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,16,0,0" Visibility="{Binding HasNoJobs, Converter={StaticResource BoolVisibility}}" />
+          </StackPanel>
           <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Open transcript'}" Command="{Binding OpenSelectedCommand}" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelSelectedCommand}" Margin="12,0,0,0" /></WrapPanel>
         </StackPanel>
 

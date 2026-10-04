@@ -99,6 +99,23 @@
       </ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
   </Style>
+  <!-- A row that opens something (a search result): flat, lights up under the pointer, its content left-aligned. -->
+  <Style x:Key="SearchRowButton" TargetType="Button">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /><Setter Property="Padding" Value="10,8" /><Setter Property="Cursor" Value="Hand" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="FocusVisualStyle" Value="{StaticResource FocusIndicator}" />
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+      <Grid>
+        <Border x:Name="Hover" Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="8" Opacity="0" />
+        <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+      </Grid>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12" /></Storyboard></BeginStoryboard></Trigger.EnterActions>
+          <Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2" /></Storyboard></BeginStoryboard></Trigger.ExitActions>
+        </Trigger>
+        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Hover" Property="Opacity" Value="1" /></Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value></Setter>
+  </Style>
   <!-- The small Delete button on a project row (Studio, the Server window): shown only for a project that is finished, has failed or was cancelled. -->
   <Style x:Key="ProjectDeleteButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
     <Setter Property="Padding" Value="14,7" /><Setter Property="MinHeight" Value="34" /><Setter Property="VerticalAlignment" Value="Center" /><Setter Property="Visibility" Value="Collapsed" />

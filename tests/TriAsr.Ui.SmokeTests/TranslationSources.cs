@@ -58,8 +58,10 @@ internal static partial class TranslationSources
         "Time", "SpeakerLabel", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
         // a speaker's heading on the names panel, announced again by SpeakerNameRow.NotifyLanguageChanged
         "Heading",
+        // the search on the Projects page: made with T and made again when the language changes (ShellSearch.cs)
+        "ProjectSearchStatus", "MatchesText", "Speaker", "Before", "Match", "After",   // a passage of a transcript (the person's own words) and its speaker's name or "Speaker 2"
         // the user's own words, program output, paths and numbers
-        "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Folder", "Location", "DisplayTitle", "PreviewLine", "Updated",
+        "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Folder", "ProjectSearchText", "Location", "DisplayTitle", "PreviewLine", "Updated",
         "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName", "Label", "Elapsed", "CreatedUtc", "OverlayButtonLabel", "HotkeyNote", "LastText", "LinkText", "Description", "ActionLabel", "Note", "NoteActionLabel", "LinkHelper.Summary", "LinkHelper.ActionLabel",
         // the name of a language in that language
         "NativeName"

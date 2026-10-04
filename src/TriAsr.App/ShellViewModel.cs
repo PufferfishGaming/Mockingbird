@@ -414,7 +414,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
     private async Task SaveReviewAsync()
     {
         if (CurrentTranscript is not { } transcript) return;
-        try { await stages.SaveManualAsync(transcript); foreach (var region in Regions) region.AcceptSaved(); SpeakerNaming.AcceptSaved(); Status = T("Edits saved with revision history"); ReviewItems.Refresh(); }
+        try { await stages.SaveManualAsync(transcript); foreach (var region in Regions) region.AcceptSaved(); SpeakerNaming.AcceptSaved(); Status = T("Edits saved with revision history"); ReviewItems.Refresh(); if (HasProjectSearch) _ = SearchProjectsAsync(); }
         catch (Exception error) { ReportError(T("Save failed"), error.Message); }
     }
     public async Task ExportAsync(string path)

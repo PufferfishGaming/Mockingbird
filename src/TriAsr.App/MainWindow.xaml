@@ -76,6 +76,8 @@
         </StackPanel>
         <StackPanel Grid.Row="3" Margin="0,30,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsJobsPage, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{local:T 'Click a finished project to open its transcript.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+          <local:SearchResultsPanel />
+          <StackPanel Visibility="{Binding HasProjectSearch, Converter={StaticResource InverseBoolVisibility}}">
           <ListBox x:Name="ProjectList" ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" MinHeight="200" PreviewMouseLeftButtonUp="ProjectClick" PreviewKeyDown="ProjectKeyDown" AutomationProperties.Name="{local:T 'Saved transcription jobs'}">
             <ListBox.ItemTemplate><DataTemplate>
               <Grid>
@@ -92,6 +94,7 @@
             </DataTemplate></ListBox.ItemTemplate>
           </ListBox>
           <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,16,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Jobs.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+          </StackPanel>
           <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Resume'}" Command="{Binding ResumeAudioCommand}" /><Button Content="{local:T 'Open transcript'}" Command="{Binding OpenReviewCommand}" Margin="12,0,0,0" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelCommand}" Margin="12,0,0,0" /></WrapPanel>
         </StackPanel>
         <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsReviewPage, Converter={StaticResource BoolVisibility}}">

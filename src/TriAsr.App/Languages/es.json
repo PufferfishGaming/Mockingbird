@@ -1010,5 +1010,14 @@
  "The name shown and exported for this speaker. Leave it empty to keep the number.": "El nombre que se muestra y se exporta para este hablante. Déjelo vacío para conservar el número.",
  "Watch folder speakers": "Hablantes de la carpeta vigilada",
  "Open recordings folder": "Abrir la carpeta de grabaciones",
- "The recordings folder could not be opened: {0}": "No se pudo abrir la carpeta de grabaciones: {0}"
+ "The recordings folder could not be opened: {0}": "No se pudo abrir la carpeta de grabaciones: {0}",
+ "Search all transcripts": "Buscar en todas las transcripciones",
+ "Finds words in every transcript and in the names of the projects. Capital letters and accents do not matter.": "Busca palabras en todas las transcripciones y en los nombres de los proyectos. No importan las mayúsculas ni los acentos.",
+ "Search results": "Resultados de la búsqueda",
+ "Searching…": "Buscando…",
+ "Nothing found for “{0}”.": "No se encontró nada para «{0}».",
+ "Projects found: {0}": "Proyectos encontrados: {0}",
+ "Matching passages: {0}": "Fragmentos coincidentes: {0}",
+ "The name matches": "El nombre coincide",
+ "The search failed: {0}": "La búsqueda falló: {0}"
 }

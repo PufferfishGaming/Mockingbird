@@ -127,3 +127,19 @@ textarea.notetext { min-height: 340px; padding: 14px; line-height: 1.55; }
 .capture:focus { border-color: var(--accent); outline: none; }
 .capture .combo { font-size: 22px; font-weight: 600; }
 .capture .problem { color: var(--error); margin-top: 8px; }
+
+/* Searching every transcript (the Projects tab): a project per card-row, its matching passages under it, the match picked out. */
+.search label { margin-bottom: 6px; }
+.search input[type="search"] { max-width: 520px; }
+.hits { display: grid; gap: 10px; margin-top: 6px; }
+.hit { border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface); }
+.hit button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; transition: background-color .12s ease; }
+.hit button:hover { background: var(--surface-2); }
+.hit-head .name { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.hit-head .when { display: block; color: var(--muted); font-size: 12px; }
+.passage { display: grid !important; grid-template-columns: 96px 1fr; gap: 10px; }
+.passage .at { color: var(--accent); font-size: 12px; font-variant-numeric: tabular-nums; }
+.passage .who { display: block; color: var(--text); font-weight: 600; font-size: 11px; overflow-wrap: anywhere; }
+.passage .said { overflow-wrap: anywhere; }
+.passage mark { background: transparent; color: var(--accent); font-weight: 700; }
+@media (max-width: 600px) { .passage { grid-template-columns: 1fr; gap: 2px; } }

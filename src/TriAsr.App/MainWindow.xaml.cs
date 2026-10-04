@@ -45,6 +45,9 @@ public partial class MainWindow : Window
         {
             if (change.PropertyName == nameof(ShellViewModel.TerminalOutput) && viewModel.TerminalAutoScroll)
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { TerminalOutputBox.UpdateLayout(); TerminalOutputBox.ScrollToEnd(); }));
+            // A region chosen from elsewhere (a search result) is brought into view once the review page is laid out.
+            if (change.PropertyName == nameof(ShellViewModel.SelectedRegion) && viewModel.SelectedRegion is { } region)
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() => RegionList.ScrollIntoView(region)));
         };
         ReviewRegion? lastSpoken = null;
         var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };

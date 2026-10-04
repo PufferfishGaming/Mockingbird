@@ -16,8 +16,9 @@ public sealed record RemoteHealth(string Status, string Name, string Edition, st
 /// <param name="Speakers">The server tells the speakers of a recording apart when asked (<c>speakers=auto</c> or how many there are).</param>
 /// <param name="LanguagePairs">The server takes two languages for speech that switches between them (<c>language=en+hu</c>), for a phrase of live dictation and for a recording.</param>
 /// <param name="SpeakerNames">The server keeps the names given to the speakers of a transcript (<see cref="RemoteEdits.SpeakerNames"/>).</param>
+/// <param name="Search">The server searches every transcript at once (<c>GET /v1/search?q=</c>).</param>
 public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
-    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false, bool SpeakerNames = false);
+    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false, bool SpeakerNames = false, bool Search = false);
 
 /// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
 /// <param name="Speakers"><c>off</c> (or null), <c>auto</c>, or how many speakers there are.</param>
@@ -51,6 +52,9 @@ public sealed record RemoteJobs(IReadOnlyList<RemoteJob> Data);
 /// <param name="SpeakerNames">The names given to the speakers ("1" -> "Anna"), or null.</param>
 public sealed record RemoteReview(Guid Id, string Language, IReadOnlyList<FinalRegion> Regions, IReadOnlyList<string> AutomaticTexts, string RawWhisper, string RawCanary, string? RawCanaryNote,
     IReadOnlyDictionary<string, string>? SpeakerNames = null);
+
+/// <summary>The answer of <c>GET /v1/search?q=</c>: the projects whose transcript or name matches, newest first, each with its first matching passages.</summary>
+public sealed record RemoteSearch(string Query, IReadOnlyList<TriAsr.Application.SearchHit> Data);
 
 public sealed record RemoteEdit(int Index, string Text);
 

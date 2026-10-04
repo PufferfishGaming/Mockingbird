@@ -45,6 +45,7 @@ public sealed partial class ShellViewModel
         if (Jobs.FirstOrDefault(item => item.Id == id) is { } existing) Jobs.Remove(existing);
         if (SelectedJob?.Id == id) SelectedJob = null;
         if (IsReviewOf(id)) CloseReview();
+        if (SearchResults.FirstOrDefault(hit => hit.JobId == id) is { } found) SearchResults.Remove(found);
     }
 
     private bool IsReviewOf(Guid id) => _review?.JobId == id;

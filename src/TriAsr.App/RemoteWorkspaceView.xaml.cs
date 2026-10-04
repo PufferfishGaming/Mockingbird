@@ -26,6 +26,11 @@ public partial class RemoteWorkspaceView : UserControl
             { model.SelectedRegion = spoken; RegionList.ScrollIntoView(spoken); }
             _lastSpoken = spoken;
         };
+        DataContextChanged += (_, change) =>
+        {
+            if (change.OldValue is RemoteWorkspaceViewModel old) old.PropertyChanged -= ShowChosenRegion;
+            if (change.NewValue is RemoteWorkspaceViewModel model) model.PropertyChanged += ShowChosenRegion;
+        };
         Loaded += (_, _) =>
         {
             _timer.Start();
@@ -35,6 +40,13 @@ public partial class RemoteWorkspaceView : UserControl
     }
 
     private RemoteWorkspaceViewModel Model => (RemoteWorkspaceViewModel)DataContext;
+
+    /// <summary>A region chosen from elsewhere (a search result) is brought into view once the review is laid out.</summary>
+    private void ShowChosenRegion(object? sender, System.ComponentModel.PropertyChangedEventArgs change)
+    {
+        if (change.PropertyName == nameof(RemoteWorkspaceViewModel.SelectedRegion) && sender is RemoteWorkspaceViewModel { SelectedRegion: { } region })
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() => RegionList.ScrollIntoView(region)));
+    }
     private WpfOverlayPresenter? _dictationPresenter;
     private WpfHotkeys? _hotkeys;
     private WpfOverlayPresenter? _notesPresenter;

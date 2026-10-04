@@ -171,6 +171,8 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "GET" ? Languages() : MethodNotAllowed("GET");
             case ["v1", "transcriptions"]:
                 return request.Method switch { "POST" => await UploadAsync(request, token), "GET" => List(), _ => MethodNotAllowed("GET, POST") };
+            case ["v1", "search"]:
+                return request.Method == "GET" ? await SearchAsync(request, token) : MethodNotAllowed("GET");
             case ["v1", "live"]:
                 return request.Method == "POST" ? await LiveAsync(request, token) : MethodNotAllowed("POST");
             case ["v1", "links"]:
@@ -200,7 +202,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nGET  /v1/notes, POST /v1/notes             the notes kept on this server (JSON: title, text)\nGET  /v1/notes/{{id}}, PUT, DELETE        read, save (with the revision you read) and delete a note\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nGET  /v1/notes, POST /v1/notes             the notes kept on this server (JSON: title, text)\nGET  /v1/notes/{{id}}, PUT, DELETE        read, save (with the revision you read) and delete a note\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/search?q=words                  every transcript searched at once (case and accents do not matter)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- who the request is for -------------------------------------------------------------------------------------------------------
 
@@ -629,6 +631,16 @@ public sealed class ApiService : IAsyncDisposable
         };
     }
 
+    /// <summary>Every transcript of the API's recordings searched at once (<see cref="ProjectSearch"/>): case and accents do not matter.</summary>
+    private async Task<HttpResponse> SearchAsync(HttpRequest request, CancellationToken token)
+    {
+        var query = ProjectSearch.Normalize(request.Query.GetValueOrDefault("q"));
+        if (query.Length == 0) return HttpResponse.Error(400, "bad_query", $"Give at least {ProjectSearch.ShortestQuery} characters to search for (q=...).");
+        var projects = _jobs.Values.Where(entry => !entry.Fetching).Select(entry => new SearchableProject(entry.Id, entry.Name, entry.Job.CreatedUtc, entry.Job.State == JobState.Complete)).ToArray();
+        var hits = await ProjectSearch.SearchAsync(projects, async (id, cancel) => await _deps.LoadTranscript(id, cancel), query, token);
+        return HttpResponse.Json(200, new RemoteSearch(query, hits));
+    }
+
     private HttpResponse List() => HttpResponse.Json(200, new { data = _jobs.Values.OrderByDescending(job => job.Job.CreatedUtc).Select(Describe).ToArray() });
 
     private HttpResponse Languages() => HttpResponse.Json(200, new
@@ -644,7 +656,7 @@ public sealed class ApiService : IAsyncDisposable
         return HttpResponse.Json(200, new RemoteServerInfo(_deps.GetName(), _deps.Edition, _deps.Version, request.IsSecure, password,
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
-            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true, SpeakerNames: true));
+            LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true, SpeakerNames: true, Search: true));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)

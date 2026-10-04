@@ -1010,5 +1010,14 @@
   "The name shown and exported for this speaker. Leave it empty to keep the number.": "Ez a név jelenik meg és kerül az exportba ennél a beszélőnél. Ha üresen hagyja, a sorszám marad.",
   "Watch folder speakers": "Figyelt mappa beszélői",
   "Open recordings folder": "Felvételek mappájának megnyitása",
-  "The recordings folder could not be opened: {0}": "A felvételek mappáját nem sikerült megnyitni: {0}"
+  "The recordings folder could not be opened: {0}": "A felvételek mappáját nem sikerült megnyitni: {0}",
+  "Search all transcripts": "Keresés az összes átiratban",
+  "Finds words in every transcript and in the names of the projects. Capital letters and accents do not matter.": "Szavakat keres minden átiratban és a projektek nevében. A kis- és nagybetűk, valamint az ékezetek nem számítanak.",
+  "Search results": "Találatok",
+  "Searching…": "Keresés…",
+  "Nothing found for “{0}”.": "Nincs találat erre: „{0}”.",
+  "Projects found: {0}": "Talált projektek: {0}",
+  "Matching passages: {0}": "Egyező részletek: {0}",
+  "The name matches": "A név egyezik",
+  "The search failed: {0}": "A keresés nem sikerült: {0}"
 }

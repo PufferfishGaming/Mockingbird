@@ -377,6 +377,43 @@ public sealed class RemoteTests
     }
 
     [Fact]
+    public async Task TheClientSearchesTheTranscriptsOnTheServerAndOpensAPassageWhereItIs()
+    {
+        var root = NewRoot();
+        await using var api = await Harness.StartAsync(h => h.Transcript = id => ApiTestData.Conversation(id, new Dictionary<string, string> { ["1"] = "Anna" }));
+        var (workspace, browser) = await ConnectedAsync(root, api);
+        await using var _ = browser;
+        using var __ = workspace;
+        try
+        {
+            Assert.True(workspace.CanSearch);
+            var recording = Path.Combine(root, "interview.wav");
+            await File.WriteAllBytesAsync(recording, new byte[200_000]);
+            workspace.SourcePath = recording;
+            await workspace.SendCommand.ExecuteAsync(null);
+            await EventuallyAsync(() => workspace.Jobs.FirstOrDefault(job => job.CanOpen), "the job completes");
+
+            workspace.ProjectSearchText = "AT NINE";
+            await EventuallyAsync(() => workspace.ProjectSearchStatus.StartsWith("Projects found") ? workspace.ProjectSearchStatus : null, "the server answers");
+            var hit = Assert.Single(workspace.SearchResults);
+            Assert.Equal(("interview.wav", "Speaker 2", "at nine"), (hit.Name, hit.Passages[0].Speaker, hit.Passages[0].Match));
+            Assert.True(workspace.HasProjectSearch);
+            await workspace.OpenSearchPassageCommand.ExecuteAsync(hit.Passages[0]);
+            Assert.Equal("Review", workspace.SelectedTab);
+            Assert.Same(workspace.Regions[1], workspace.SelectedRegion);
+
+            // A server from before the search is not asked: the box is not shown.
+            using var older = new RemoteWorkspaceViewModel(action => action(), (_, _) => { }, Path.Combine(root, "older"));
+            older.Attach(new RemoteConnection(workspace.Client!, workspace.ServerInfo! with { Search = false }, browser.Servers[0]));
+            Assert.False(older.CanSearch);
+            older.ProjectSearchText = "at nine";
+            Assert.False(older.HasProjectSearch);
+            Assert.Empty(older.SearchResults);
+        }
+        finally { TestCleanup.Delete(root); }
+    }
+
+    [Fact]
     public async Task ARecordingInTwoLanguagesIsSentAsAPairAndAnOlderServerIsSentTheFirst()
     {
         var root = NewRoot();

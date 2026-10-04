@@ -194,6 +194,7 @@
     ui.notice = h("div");
     ui.newView = h("section", { id: "view-new" });
     ui.projectsView = h("section", { id: "view-projects" });
+    ui.projectsBuilt = false; ui.search = null;
     ui.reviewView = h("section", { id: "view-review" });
     ui.notesView = h("section", { id: "view-notes" });
     ui.tabs = h("nav", { class: "tabs", role: "tablist" });
@@ -549,6 +550,17 @@
   }
 
   function renderProjects() {
+    // Built once per workspace: the search box keeps its text and its focus while the list below it is redrawn by the polling.
+    if (!ui.projectsBuilt) {
+      ui.projectList = h("div");
+      ui.projectsView.replaceChildren(h("h1", null, t("Projects")), searchPanel(), ui.projectList);
+      ui.projectsBuilt = true;
+    }
+    ui.search.hidden = !(state.info && state.info.search);
+    renderProjectList();
+  }
+
+  function renderProjectList() {
     const list = h("ul", { class: "jobs", "aria-label": t("Recordings on the server") },
       state.jobs.map((job) => h("li", { class: "job" },
         // A finished recording opens in the review when its name is clicked (or Enter is pressed on it).
@@ -564,8 +576,68 @@
           job.state === "complete" && h("button", { class: "btn", type: "button", onClick: () => openReview(job.id) }, t("Open transcript")),
           (job.state === "queued" || job.state === "running") && h("button", { class: "btn", type: "button", onClick: () => cancelJob(job.id) }, t("Cancel")),
           (job.state === "complete" || job.state === "failed" || job.state === "cancelled") && h("button", { class: "btn", type: "button", "aria-label": t("Delete project") + ": " + job.name, title: t("Delete this project and its transcript"), onClick: () => deleteJob(job) }, t("Delete"))))));
-    ui.projectsView.replaceChildren(h("h1", null, t("Projects")),
-      h("div", { class: "card" }, state.jobs.length ? [h("p", { class: "muted" }, t("Click a finished project to open its transcript.")), list] : h("p", { class: "muted" }, t("Nothing here yet. Finished transcriptions are listed here."))));
+    ui.projectList.hidden = searching();
+    ui.projectList.replaceChildren(h("div", { class: "card" }, state.jobs.length ? [h("p", { class: "muted" }, t("Click a finished project to open its transcript.")), list] : h("p", { class: "muted" }, t("Nothing here yet. Finished transcriptions are listed here."))));
+  }
+
+  // ---- searching every transcript ------------------------------------------------------------------------------------------------------
+  // The server searches (GET /v1/search?q=): capital letters and accents do not matter. A click on a passage opens the transcript there.
+
+  function searchPanel() {
+    if (ui.search) return ui.search;
+    ui.searchInput = h("input", { type: "search", id: "project-search", autocomplete: "off", "aria-label": t("Search all transcripts"),
+      title: t("Finds words in every transcript and in the names of the projects. Capital letters and accents do not matter."), onInput: () => scheduleSearch() });
+    ui.searchStatus = h("p", { class: "muted", "aria-live": "polite" });
+    ui.searchResults = h("div", { class: "hits", "aria-label": t("Search results") });
+    ui.search = h("div", { class: "card search" }, h("label", { for: "project-search" }, t("Search all transcripts")), ui.searchInput, ui.searchStatus, ui.searchResults);
+    return ui.search;
+  }
+
+  const searchQuery = () => (ui.searchInput ? ui.searchInput.value : "").trim().replace(/\s+/g, " ");
+  const searching = () => !!(state.info && state.info.search) && searchQuery().length >= 2;
+
+  function scheduleSearch() {
+    window.clearTimeout(state.searchTimer);
+    state.searchTimer = window.setTimeout(runSearch, 300);
+  }
+
+  async function runSearch() {
+    const query = searchQuery();
+    const ticket = state.searchTicket = (state.searchTicket || 0) + 1;
+    if (!searching()) { ui.searchStatus.textContent = ""; ui.searchResults.replaceChildren(); renderProjectList(); return; }
+    ui.searchStatus.textContent = t("Searching…");
+    renderProjectList();
+    try {
+      const found = await getJson("/v1/search?q=" + encodeURIComponent(query));
+      if (ticket !== state.searchTicket) return;
+      ui.searchStatus.textContent = found.data.length ? t("Projects found: {0}", found.data.length) : t("Nothing found for “{0}”.", query);
+      ui.searchResults.replaceChildren(...found.data.map(renderHit));
+    } catch (error) {
+      if (ticket !== state.searchTicket) return;
+      ui.searchStatus.textContent = t("The search failed: {0}", error.message);
+    }
+  }
+
+  function renderHit(hit) {
+    const open = (index) => openReviewAt(hit.jobId, index);
+    const first = hit.passages.length ? hit.passages[0].index : 0;
+    return h("div", { class: "hit" },
+      h("button", { class: "hit-head", type: "button", onClick: () => open(first) },
+        h("span", { class: "name" }, hit.name),
+        h("span", { class: "when" }, new Date(hit.createdUtc).toLocaleString(text.lang) + " · " + (hit.matches ? t("Matching passages: {0}", hit.matches) : t("The name matches")))),
+      hit.passages.map((passage) => h("button", { class: "passage", type: "button", onClick: () => open(passage.index) },
+        h("span", { class: "at" }, passage.nativeTimestamps ? clock(passage.startMs) : "",
+          passage.speaker ? h("span", { class: "who" }, passage.speakerNamed ? passage.speaker : t("Speaker {0}", passage.speaker)) : null),
+        h("span", { class: "said" }, passage.before, h("mark", null, passage.match), passage.after))));
+  }
+
+  /** Opens a transcript and selects a region of it, scrolled into view. */
+  async function openReviewAt(id, index) {
+    await openReview(id);
+    if (!state.review || state.review.id !== id || index >= state.review.regions.length) return;
+    select(index);
+    const row = ui.regionList && ui.regionList.querySelector('[data-index="' + index + '"]');
+    if (row) row.scrollIntoView({ block: "center" });
   }
 
   /** Deletes a finished recording on the server after asking: its transcript, edits and the copy of the recording the server holds. */
