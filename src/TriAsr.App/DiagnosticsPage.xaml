@@ -1,0 +1,6 @@
+<UserControl x:Class="TriAsr.App.DiagnosticsPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: ShellViewModel. What the app found out about this computer. The same page in Studio and in the Server window. -->
+  <StackPanel>
+    <StackPanel Orientation="Horizontal"><Button Content="{local:T 'Refresh hardware information'}" Command="{Binding DetectHardwareCommand}" /><Button Content="{local:T 'Copy diagnostics'}" Command="{Binding CopyDiagnosticsCommand}" Margin="12,0,0,0" /></StackPanel><TextBox Text="{Binding Diagnostics, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="18" TextWrapping="Wrap" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="{local:T 'Hardware diagnostics'}" />
+  </StackPanel>
+</UserControl>

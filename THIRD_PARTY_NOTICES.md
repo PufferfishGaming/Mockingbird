@@ -15,9 +15,34 @@ Mockingbird Studio's own license does not replace dependency licenses.
 | llama.cpp / OpenMP | https://github.com/ggml-org/llama.cpp | Native runtime and OpenMP notice copied; upstream notices still require review |
 | FFmpeg 9.0.2 (ffmpeg.exe in Runtimes/FFmpeg, Studio and Server) | https://ffmpeg.org | LGPL-2.1-or-later. Built by Mockingbird from the unmodified official source release with only FFmpeg's own code and zlib (zlib License), without `--enable-gpl` ([scripts/build-ffmpeg.ps1](scripts/build-ffmpeg.ps1), [scripts/ffmpeg](scripts/ffmpeg)). Its licence and build information (configure line, compiler, SHA256) ship beside it. The complete source, the release tarball with its signature and the build files, is published as `FFmpeg-9.0.2-source.zip` on the [release page](https://github.com/PufferfishGaming/Mockingbird/releases/tag/download) next to the installers, and the tarball is also at https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz |
 | Microsoft Visual C++ runtime | https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files | App-local DLLs; redistribution terms require review |
+| Net.Codecrete.QrCodeGenerator 3.2.1 | https://github.com/manuelbl/QrCodeGenerator | Bundled .NET library (MIT) that draws the QR code of a server's address; its licence is below |
 | NuGet dependencies | Directory.Packages.props and package lock files | Package metadata inventory generated; complete notice review required |
 | Whisper / Canary / Qwen / Gemma model weights | Pinned URLs in ModelStore.cs | Not bundled; respective model licenses apply to downloads. The optional summary model, Gemma 3 12B Instruct (ggml-org GGUF conversion), is under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and its prohibited use policy |
 | yt-dlp (optional link helper) | https://github.com/yt-dlp/yt-dlp | Not bundled and not installed with Mockingbird. Downloaded on request from the project's latest release and checked against the SHA-256 published with it; the project's own code is under the Unlicense and its standalone build carries its own third-party notices |
 
 The current notice inventory is not a completed redistribution bundle: the FFmpeg source and licence are complete; the other rows marked as needing review are not yet. FFmpeg's licence terms: https://ffmpeg.org/legal.html.
 
+
+## Net.Codecrete.QrCodeGenerator
+
+MIT License
+
+Copyright (c) 2018 Manuel Bleichenbacher
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

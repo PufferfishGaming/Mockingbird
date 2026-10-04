@@ -47,7 +47,7 @@ public sealed class ArchitectureTests
     /// </summary>
     private static readonly Dictionary<string, string[]> AllowedPackages = new()
     {
-        ["TriAsr.App"] = ["CommunityToolkit.Mvvm", "Microsoft.Extensions.Hosting"],
+        ["TriAsr.App"] = ["CommunityToolkit.Mvvm", "Microsoft.Extensions.Hosting", "Net.Codecrete.QrCodeGenerator"],
         ["TriAsr.Application"] = ["Microsoft.Extensions.DependencyInjection.Abstractions"],
         ["TriAsr.Infrastructure"] = ["Microsoft.Extensions.Hosting", "Serilog.Extensions.Hosting", "Serilog.Formatting.Compact", "Serilog.Sinks.File"],
         ["TriAsr.Persistence"] = ["Microsoft.Data.Sqlite", "Microsoft.Extensions.DependencyInjection.Abstractions"],

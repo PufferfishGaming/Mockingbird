@@ -1,11 +1,23 @@
 using System.Windows;
-using Microsoft.Win32;
 
 namespace TriAsr.App;
 
-/// <summary>The window of the Server edition: a small page that shows what the server is doing. The models and the speech programs run on this computer.</summary>
+/// <summary>
+/// The window of the Server edition: what the server is doing and its hosting on the first page, then the same setup pages as Studio's.
+/// The models and the speech programs run on this computer.
+/// </summary>
 public partial class ServerWindow : Window
 {
+    public static readonly DependencyProperty IsNavigationCompactProperty = DependencyProperty.Register(
+        nameof(IsNavigationCompact), typeof(bool), typeof(ServerWindow), new PropertyMetadata(false));
+
+    /// <summary>A narrow window shows only the icons of its pages.</summary>
+    public bool IsNavigationCompact
+    {
+        get => (bool)GetValue(IsNavigationCompactProperty);
+        set => SetValue(IsNavigationCompactProperty, value);
+    }
+
     public ServerWindow(ShellViewModel viewModel)
     {
         Language = System.Windows.Markup.XmlLanguage.GetLanguage(System.Globalization.CultureInfo.CurrentCulture.IetfLanguageTag); // numbers and dates follow the Windows regional settings
@@ -15,13 +27,23 @@ public partial class ServerWindow : Window
 
     public ErrorBanner Errors => ErrorBanner;
 
-    private void ShowPrivacyPolicy(object sender, RoutedEventArgs args) => PrivacyPolicyWindow.Show(this);
+    /// <summary>The list of pages in the sidebar (the smoke test goes through them).</summary>
+    public System.Windows.Controls.ListBox NavigationList => NavigationBar.NavigationList;
 
-    private void ChooseStorageFolder(object sender, RoutedEventArgs args)
+    private void OnWindowSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        var forModels = (sender as System.Windows.Controls.Button)?.Tag?.ToString() == "models";
-        var dialog = new OpenFolderDialog { Title = forModels ? Loc.T("Choose model repository") : Loc.T("Choose project and log folder") };
-        if (dialog.ShowDialog(this) == true) ((ShellViewModel)DataContext).SetStorageLocation(dialog.FolderName, forModels);
+        IsNavigationCompact = ActualWidth < 900;
+        NavigationColumn.Width = new GridLength(IsNavigationCompact ? 72 : 230);
+    }
+
+    private async void CancelJobClick(object sender, RoutedEventArgs args)
+    {
+        if (((FrameworkElement)sender).DataContext is TriAsr.Domain.TranscriptionJob job) await ((ShellViewModel)DataContext).CancelJobAsync(job);
+    }
+
+    private async void ResumeJobClick(object sender, RoutedEventArgs args)
+    {
+        if (((FrameworkElement)sender).DataContext is TriAsr.Domain.TranscriptionJob job) await ((ShellViewModel)DataContext).ResumeJobAsync(job);
     }
 
     /// <summary>Deletes a recording of the list (after asking): its transcript, edits and working files, and the copy that was uploaded.</summary>

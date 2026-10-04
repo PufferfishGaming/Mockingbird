@@ -15,7 +15,21 @@
     <!-- Connected -->
     <Border Grid.Row="0" Padding="24,16" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Visibility="{Binding IsConnected, Converter={StaticResource BoolVisibility}}">
       <StackPanel>
-        <TextBlock Text="{Binding ServerName}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <TextBlock Text="{Binding ServerName}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <ToggleButton Grid.Column="1" Style="{StaticResource ToggleChip}" IsChecked="{Binding ShowPhone}" Content="{local:T 'Open on a phone'}" VerticalAlignment="Center" Visibility="{Binding CanShowPhone, Converter={StaticResource BoolVisibility}}" ToolTip="{local:T 'Shows a QR code: a phone on the same network opens the web page of this server with it.'}" />
+        </Grid>
+        <Border Visibility="{Binding ShowPhone, Converter={StaticResource BoolVisibility}}" Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="10" Padding="16" Margin="0,12,0,0">
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions>
+            <Border Background="White" CornerRadius="6" VerticalAlignment="Top" Margin="0,0,16,0" Visibility="{Binding HasPhoneCode, Converter={StaticResource BoolVisibility}}"><Image Source="{Binding PhoneCode}" Width="150" Height="150" RenderOptions.EdgeMode="Aliased" AutomationProperties.Name="{local:T 'QR code of the server address'}" /></Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock Text="{Binding PhoneNote}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+              <TextBlock Text="{Binding PhoneAddress}" FontFamily="Consolas" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+          </Grid>
+        </Border>
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
           <RadioButton GroupName="RemoteTabs" Content="{local:T 'New transcription'}" IsChecked="{Binding IsNewTab, Mode=OneWay}" Command="{Binding ShowTabCommand}" CommandParameter="New" Padding="14,8" Margin="0,0,8,0" Style="{StaticResource TabRadio}" />
           <RadioButton GroupName="RemoteTabs" Content="{local:T 'Projects'}" IsChecked="{Binding IsProjectsTab, Mode=OneWay}" Command="{Binding ShowTabCommand}" CommandParameter="Projects" Padding="14,8" Margin="0,0,8,0" Style="{StaticResource TabRadio}" />
@@ -39,7 +53,7 @@
               <StackPanel Margin="0,14,0,0"><TextBlock Text="{local:T 'Second language'}" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding SecondLanguages}" SelectedValue="{Binding SelectedSecondLanguage}" SelectedValuePath="Code" ItemTemplate="{StaticResource TranslatedItem}" Width="240" HorizontalAlignment="Left" IsEnabled="{Binding CanChooseSecondLanguage}" AutomationProperties.Name="{local:T 'Second speech language'}" ToolTip="{local:T 'If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.'}" ToolTipService.ShowOnDisabled="True" /></StackPanel>
               <StackPanel Margin="0,14,0,0" Visibility="{Binding CanTellSpeakersApart, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{local:T 'Speakers'}" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding SpeakerChoices}" SelectedValue="{Binding SelectedSpeakers}" SelectedValuePath="Value" ItemTemplate="{StaticResource TranslatedItem}" Width="240" HorizontalAlignment="Left" AutomationProperties.Name="{local:T 'Speakers'}" ToolTip="{local:T 'Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.'}" /></StackPanel>
               <Border Visibility="{Binding HasServerNote, Converter={StaticResource BoolVisibility}}" Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="8" Padding="14" Margin="0,20,0,0"><TextBlock Text="{Binding ServerNote}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorBrush}" /></Border>
-              <StackPanel Orientation="Horizontal" Margin="0,24,0,0"><Button Content="{local:T 'Send to server'}" Command="{Binding SendCommand}" IsEnabled="{Binding CanSend}" /></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,24,0,0"><Button Content="{local:T 'Send to server'}" Command="{Binding SendCommand}" IsEnabled="{Binding CanSend}" /><Button Content="{local:T 'Stop sending'}" Command="{Binding CancelSendCommand}" Margin="12,0,0,0" Visibility="{Binding IsSending, Converter={StaticResource BoolVisibility}}" /></StackPanel>
               <ProgressBar Minimum="0" Maximum="100" Value="{Binding SendPercent, Mode=OneWay}" Height="6" Margin="0,16,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding IsSending, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Upload progress'}" />
               <TextBlock Text="{Binding SendStatus}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" />
             </StackPanel>
@@ -47,6 +61,7 @@
           <local:RecorderCard DataContext="{Binding Recorder}" Margin="0,18,0,0" />
           <local:LinkCard DataContext="{Binding Link}" Margin="0,18,0,0" />
           <local:DictationCard DataContext="{Binding Dictation}" Margin="0,18,0,0" />
+          <Border Margin="0,18,0,0" Visibility="{Binding HasWatch, Converter={StaticResource BoolVisibility}}"><local:WatchCard DataContext="{Binding Watch}" /></Border>
         </StackPanel>
 
         <!-- Projects -->
@@ -71,7 +86,7 @@
           </ListBox>
           <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,16,0,0" Visibility="{Binding HasNoJobs, Converter={StaticResource BoolVisibility}}" />
           </StackPanel>
-          <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Open transcript'}" Command="{Binding OpenSelectedCommand}" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelSelectedCommand}" Margin="12,0,0,0" /></WrapPanel>
+          <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Open transcript'}" Command="{Binding OpenSelectedCommand}" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelSelectedCommand}" Margin="12,0,0,0" /><Button Content="{local:T 'Resume'}" Command="{Binding ResumeSelectedCommand}" Margin="12,0,0,0" ToolTip="{local:T 'Runs a cancelled or failed recording again on the server. What was already finished is reused.'}" /></WrapPanel>
         </StackPanel>
 
         <!-- Notes -->

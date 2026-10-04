@@ -1,5 +1,6 @@
-<Window x:Class="TriAsr.App.ServerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App" Icon="Assets/TriASR.ico" Title="{x:Static local:AppInfo.WindowTitle}" Width="640" Height="800" MinWidth="500" MinHeight="460" WindowStartupLocation="CenterScreen" UseLayoutRounding="True" Closing="OnWindowClosing">
-  <!-- DataContext: ShellViewModel. The Server edition: a small window that shows what the server is doing; the models and the speech programs live on this computer. -->
+<Window x:Class="TriAsr.App.ServerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App" Icon="Assets/TriASR.ico" Title="{x:Static local:AppInfo.WindowTitle}" Width="1120" Height="820" MinWidth="640" MinHeight="460" WindowStartupLocation="CenterScreen" UseLayoutRounding="True" SizeChanged="OnWindowSizeChanged" Closing="OnWindowClosing">
+  <!-- DataContext: ShellViewModel. The Server edition: what the server is doing and its hosting on the first page, then the same setup pages as Studio's
+       (models, settings, and the Advanced ones), so that a server is set up and tuned here as Studio is. The models and the speech programs live on this computer. -->
   <Grid Background="{DynamicResource WindowBackgroundBrush}">
     <Grid.RowDefinitions><RowDefinition Height="68" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="36" /></Grid.RowDefinitions>
     <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,0">
@@ -13,58 +14,79 @@
         </Border>
       </Grid>
     </Border>
-    <StackPanel Grid.Row="1">
-      <local:ErrorBanner x:Name="ErrorBanner" />
-      <local:UpdateBanner />
-      <local:SetupBanner />
-    </StackPanel>
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Margin="24,20,24,24" MaxWidth="600">
-        <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
-          <StackPanel>
-            <TextBlock Text="{Binding Host.DisplayName}" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold" />
-            <TextBlock Text="{local:T 'Not hosting. Press Start hosting to let other computers send recordings here.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="12" Visibility="{Binding Host.Enabled, Converter={StaticResource InverseBoolVisibility}}" />
-            <TextBlock Text="{local:T 'Waiting for recordings from other computers.'}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" FontSize="12"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Host.Enabled}" Value="True" /><Condition Binding="{Binding HasTranscriptionProgress}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
-            <StackPanel Visibility="{Binding HasTranscriptionProgress, Converter={StaticResource BoolVisibility}}" Margin="0,12,0,0">
-              <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding TranscriptionStage}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Text="{Binding TranscriptionProgressSummary}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="16,0,0,0" FontSize="12" /></Grid>
-              <ProgressBar Minimum="0" Maximum="100" Value="{Binding TranscriptionPercent, Mode=OneWay}" Height="8" Margin="0,10,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" AutomationProperties.Name="{local:T 'Overall transcription progress'}" />
+    <local:ErrorBanner x:Name="ErrorBanner" Grid.Row="1" />
+    <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition x:Name="NavigationColumn" Width="230" /><ColumnDefinition /></Grid.ColumnDefinitions>
+      <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="12,22,12,20">
+        <local:NavigationPanel x:Name="NavigationBar" Pages="{Binding ServerNavigation}" />
+      </Border>
+      <Grid Grid.Column="1"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <StackPanel>
+          <local:UpdateBanner />
+          <local:SetupBanner />
+        </StackPanel>
+        <local:TerminalPage Grid.Row="1" Margin="24,18" local:Motion.FadeIn="True" Visibility="{Binding IsTerminalPage, Converter={StaticResource BoolVisibility}}" />
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ScrollViewer.Style><Style TargetType="ScrollViewer"><Style.Triggers><DataTrigger Binding="{Binding IsTerminalPage}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></ScrollViewer.Style>
+          <Grid Margin="{Binding ContentMargin}"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <TextBlock Grid.Row="1" Text="{local:Tr SelectedPage.Title}" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap" />
+
+            <!-- The server: what it is doing, what it still needs, how it is reached, and the recordings it was sent -->
+            <StackPanel Grid.Row="3" Margin="0,24,0,0" MaxWidth="760" HorizontalAlignment="Left" local:Motion.FadeIn="True" Visibility="{Binding IsServerPage, Converter={StaticResource BoolVisibility}}">
+              <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
+                <StackPanel>
+                  <TextBlock Text="{Binding Host.DisplayName}" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold" />
+                  <TextBlock Text="{local:T 'Not hosting. Press Start hosting to let other computers send recordings here.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0" FontSize="12" Visibility="{Binding Host.Enabled, Converter={StaticResource InverseBoolVisibility}}" />
+                  <TextBlock Text="{local:T 'Waiting for recordings from other computers.'}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0" FontSize="12"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding Host.Enabled}" Value="True" /><Condition Binding="{Binding HasTranscriptionProgress}" Value="False" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                  <StackPanel Visibility="{Binding HasTranscriptionProgress, Converter={StaticResource BoolVisibility}}" Margin="0,12,0,0">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding TranscriptionStage}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="1" Text="{Binding TranscriptionProgressSummary}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="16,0,0,0" FontSize="12" /></Grid>
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding TranscriptionPercent, Mode=OneWay}" Height="8" Margin="0,10,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" AutomationProperties.Name="{local:T 'Overall transcription progress'}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              <Border Visibility="{Binding ShowReadinessCard, Converter={StaticResource BoolVisibility}}" Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="10" Padding="18" Margin="0,14,0,0">
+                <StackPanel>
+                  <TextBlock Text="{Binding Readiness}" TextWrapping="Wrap" />
+                  <WrapPanel Margin="0,12,0,0"><Button Content="{local:T 'Download models'}" Command="{Binding InstallSelectedModelsCommand}" Margin="0,0,10,0" /><Button Content="{local:T 'Pause'}" Command="{Binding CancelModelCommand}" /></WrapPanel>
+                  <ProgressBar Value="{Binding ModelDownloadPercent, Mode=OneWay}" Maximum="100" Height="6" Margin="0,12,0,0" Foreground="{DynamicResource AccentBrush}" Visibility="{Binding IsModelBusy, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Model download progress'}" />
+                  <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,8,0,0" />
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,14,0,0">
+                <StackPanel>
+                  <TextBlock Text="{local:T 'Transcription'}" FontSize="17" FontWeight="SemiBold" />
+                  <TextBlock Text="{local:T 'The preset chooses the speech models the server uses for every recording it is sent. Download the ones that are missing on Models; the other choices are on Settings.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0" FontSize="12" />
+                  <TextBlock Text="{local:T 'Preset'}" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6" />
+                  <ComboBox ItemsSource="{Binding PerformancePresets}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding SelectedPreset}" Width="240" HorizontalAlignment="Left" AutomationProperties.Name="{local:T 'Performance preset'}" />
+                </StackPanel>
+              </Border>
+              <local:HostPanel DataContext="{Binding Host}" Margin="0,14,0,0" />
+              <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,14,0,0">
+                <StackPanel>
+                  <TextBlock Text="{local:T 'Recent recordings'}" FontSize="17" FontWeight="SemiBold" />
+                  <ListBox ItemsSource="{Binding Jobs}" MaxHeight="300" Margin="0,12,0,0" AutomationProperties.Name="{local:T 'Recent recordings'}">
+                    <ListBox.ItemTemplate><DataTemplate><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding SourcePath, Converter={x:Static local:FileNameConverter.Instance}}" ToolTip="{Binding SourcePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="{local:Tr State}" Foreground="{DynamicResource AccentBrush}" Margin="16,0,0,0" VerticalAlignment="Center" />
+                      <Button Grid.Column="2" Content="{local:T 'Cancel'}" Click="CancelJobClick" Padding="10,4" Margin="12,0,0,0" AutomationProperties.Name="{local:T 'Cancel'}"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Complete"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger><DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger><DataTrigger Binding="{Binding State}" Value="Cancelled"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+                      <Button Grid.Column="3" Content="{local:T 'Resume'}" Click="ResumeJobClick" Padding="10,4" Margin="12,0,0,0" ToolTip="{local:T 'Runs a cancelled or failed recording again. What was already finished is reused.'}"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Visibility" Value="Visible" /></DataTrigger><DataTrigger Binding="{Binding State}" Value="Cancelled"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+                      <Button Grid.Column="4" Style="{StaticResource ProjectDeleteButton}" Content="{local:T 'Delete'}" Click="DeleteProjectClick" Margin="12,0,0,0" ToolTip="{local:T 'Delete this project and its transcript'}" AutomationProperties.Name="{local:T 'Delete project'}" />
+                    </Grid></DataTemplate></ListBox.ItemTemplate>
+                  </ListBox>
+                  <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,10,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Jobs.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </StackPanel>
-        </Border>
-        <Border Visibility="{Binding ShowReadinessCard, Converter={StaticResource BoolVisibility}}" Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="10" Padding="18" Margin="0,14,0,0">
-          <StackPanel>
-            <TextBlock Text="{Binding Readiness}" TextWrapping="Wrap" />
-            <WrapPanel Margin="0,12,0,0"><Button Content="{local:T 'Download models'}" Command="{Binding InstallSelectedModelsCommand}" Margin="0,0,10,0" /><Button Content="{local:T 'Pause'}" Command="{Binding CancelModelCommand}" /></WrapPanel>
-            <ProgressBar Value="{Binding ModelDownloadPercent, Mode=OneWay}" Maximum="100" Height="6" Margin="0,12,0,0" Foreground="{DynamicResource AccentBrush}" Visibility="{Binding IsModelBusy, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Model download progress'}" />
-            <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,8,0,0" />
-          </StackPanel>
-        </Border>
-        <local:HostPanel DataContext="{Binding Host}" Margin="0,14,0,0" />
-        <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,14,0,0">
-          <StackPanel>
-            <TextBlock Text="{local:T 'Recent recordings'}" FontSize="17" FontWeight="SemiBold" />
-            <ListBox ItemsSource="{Binding Jobs}" MaxHeight="220" Margin="0,12,0,0" AutomationProperties.Name="{local:T 'Recent recordings'}">
-              <ListBox.ItemTemplate><DataTemplate><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding SourcePath, Converter={x:Static local:FileNameConverter.Instance}}" ToolTip="{Binding SourcePath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="{local:Tr State}" Foreground="{DynamicResource AccentBrush}" Margin="16,0,0,0" VerticalAlignment="Center" /><Button Grid.Column="2" Style="{StaticResource ProjectDeleteButton}" Content="{local:T 'Delete'}" Click="DeleteProjectClick" Margin="12,0,0,0" ToolTip="{local:T 'Delete this project and its transcript'}" AutomationProperties.Name="{local:T 'Delete project'}" /></Grid></DataTemplate></ListBox.ItemTemplate>
-            </ListBox>
-            <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,10,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Jobs.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
-          </StackPanel>
-        </Border>
-        <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,14,0,0">
-          <StackPanel>
-            <TextBlock Text="{local:T 'Appearance'}" FontSize="17" FontWeight="SemiBold" />
-            <TextBlock Text="{local:T 'Theme'}" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6" />
-            <ComboBox ItemsSource="{Binding Themes}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding SelectedTheme}" AutomationProperties.Name="{local:T 'Appearance theme'}" />
-            <TextBlock Text="{local:T 'Language'}" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6" />
-            <ComboBox ItemsSource="{Binding UiLanguages}" SelectedValue="{Binding Language}" SelectedValuePath="Code" ItemTemplate="{StaticResource NativeNameItem}" AutomationProperties.Name="{local:T 'Interface language'}" />
-            <TextBlock Text="{local:T 'Storage'}" FontSize="17" FontWeight="SemiBold" Margin="0,22,0,0" />
-            <TextBlock Text="{Binding StorageSummary}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,10" />
-            <WrapPanel><Button Content="{local:T 'Choose projects folder'}" Tag="data" Click="ChooseStorageFolder" Margin="0,0,10,8" /><Button Content="{local:T 'Choose models folder'}" Tag="models" Click="ChooseStorageFolder" Margin="0,0,10,8" /></WrapPanel>
-            <TextBlock Text="{local:T 'Changes apply after restart.'}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" />
-            <Button Content="{local:T 'Read privacy policy'}" Click="ShowPrivacyPolicy" HorizontalAlignment="Left" Margin="0,18,0,0" />
-          </StackPanel>
-        </Border>
-      </StackPanel>
-    </ScrollViewer>
-    <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="18,0"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" MaxWidth="260" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="{Binding EngineStatus}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" /></Grid></Border>
+
+            <!-- The same setup pages as Studio's -->
+            <local:ModelsPage Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsModelsPage, Converter={StaticResource BoolVisibility}}" />
+            <local:TuningPage Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsBenchmarkPage, Converter={StaticResource BoolVisibility}}" />
+            <local:LanguagesPage Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsLanguagesPage, Converter={StaticResource BoolVisibility}}" />
+            <local:BackendsPage Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsBackendsPage, Converter={StaticResource BoolVisibility}}" />
+            <local:DiagnosticsPage Grid.Row="3" Margin="0,30,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsDiagnosticsPage, Converter={StaticResource BoolVisibility}}" />
+            <local:SettingsPage Grid.Row="3" Margin="0,30,0,0" Visibility="{Binding IsSettings, Converter={StaticResource BoolVisibility}}" />
+          </Grid>
+        </ScrollViewer>
+      </Grid>
+    </Grid>
+    <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="18,0"><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" MaxWidth="330" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="{Binding EngineStatus}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center" /></Grid></Border>
   </Grid>
 </Window>

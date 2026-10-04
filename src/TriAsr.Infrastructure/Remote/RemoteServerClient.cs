@@ -126,6 +126,16 @@ public sealed class RemoteServerClient : IDisposable
         return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
     }
 
+    /// <summary>Runs a cancelled or failed recording again, reusing what was finished; ask only a server whose <see cref="RemoteServerInfo.Resume"/> is true.</summary>
+    public async Task<RemoteJob> ResumeAsync(Guid id, CancellationToken token)
+    {
+        using var response = await SendAsync(new HttpRequestMessage(HttpMethod.Post, $"/v1/transcriptions/{id}/resume"), 30, token);
+        return (await response.Content.ReadJsonAsync<RemoteJob>(token))!;
+    }
+
+    /// <summary>Where a phone on the same network opens the web page of the server; ask only a server whose <see cref="RemoteServerInfo.Phone"/> is true.</summary>
+    public Task<RemotePhone> PhoneAsync(CancellationToken token) => GetAsync<RemotePhone>("/v1/phone", token);
+
     /// <summary>Has the server read one phrase of live dictation (a WAV file of a few seconds) and returns the words and the language they are in.</summary>
     /// <param name="recent">The language of the previous phrase, for a choice of two languages; null when there is none.</param>
     public async Task<LivePhrase> LiveAsync(byte[] wav, string language, string? recent, CancellationToken token)

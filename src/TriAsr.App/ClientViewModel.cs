@@ -63,8 +63,12 @@ public sealed partial class ClientViewModel : ObservableObject
     }
 
     /// <summary>Whether the alert pulses to catch the eye (the same rule as in Studio).</summary>
-    public bool PulseError => HasError && _settings.AnimateErrors && System.Windows.SystemParameters.ClientAreaAnimation && !System.Windows.SystemParameters.HighContrast;
+    public bool PulseError => HasError && AnimateErrors && System.Windows.SystemParameters.ClientAreaAnimation && !System.Windows.SystemParameters.HighContrast;
     partial void OnHasErrorChanged(bool value) => OnPropertyChanged(nameof(PulseError));
+
+    /// <summary>Whether alerts pulse (Studio's "Pulse error alerts"; Windows' animation setting can still turn it off).</summary>
+    [ObservableProperty] private bool _animateErrors = true;
+    partial void OnAnimateErrorsChanged(bool value) { OnPropertyChanged(nameof(PulseError)); if (_initialized) Persist(); }
 
     [RelayCommand] private void DismissError() => HasError = false;
 
@@ -107,6 +111,7 @@ public sealed partial class ClientViewModel : ObservableObject
     {
         _settings = await _store.LoadAsync();
         SelectedTheme = _settings.Theme;
+        AnimateErrors = _settings.AnimateErrors;
         LanguageChosen = Loc.IsSupported(_settings.Language) && _settings.Language.Length > 0;
         // TRIASR_LANGUAGE lets a test or screenshot run use a language without choosing it.
         var forced = Environment.GetEnvironmentVariable("TRIASR_LANGUAGE");
@@ -134,7 +139,7 @@ public sealed partial class ClientViewModel : ObservableObject
         await previous; // never faults: a failed save is reported below
         try
         {
-            _settings = _settings with { Theme = SelectedTheme, Language = LanguageChosen ? Language : "", CheckForUpdates = AutoCheckUpdates, SkippedUpdateVersion = _skippedUpdateVersion, LastUpdateCheckUtc = _lastUpdateCheck };
+            _settings = _settings with { Theme = SelectedTheme, AnimateErrors = AnimateErrors, Language = LanguageChosen ? Language : "", CheckForUpdates = AutoCheckUpdates, SkippedUpdateVersion = _skippedUpdateVersion, LastUpdateCheckUtc = _lastUpdateCheck };
             await _store.SaveAsync(_settings);
         }
         catch (Exception error)

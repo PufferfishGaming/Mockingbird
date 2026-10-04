@@ -688,11 +688,12 @@ public partial class App : System.Windows.Application
     {
         var window = _host!.Services.GetRequiredService<ServerWindow>();
         MainWindow = window;
+        shell.SelectedPage = shell.ServerNavigation[0];
         if (smoke)
         {
             if (shell.Hardware is null) throw new InvalidOperationException(shell.Diagnostics);
             await ShowHiddenAsync(window);
-            var renders = await EditionSmoke.RunAsync(window, shell.ChooseLanguage, dataRoot);
+            var renders = await EditionSmoke.RunAsync(window, shell.ChooseLanguage, dataRoot, shell);
             await EditionSmoke.WriteReportAsync(dataRoot, renders);
             logger.LogInformation("Server smoke passed: {RenderCount} renders", renders);
             window.Close();

@@ -18,8 +18,15 @@ public sealed record RemoteHealth(string Status, string Name, string Edition, st
 /// <param name="SpeakerNames">The server keeps the names given to the speakers of a transcript (<see cref="RemoteEdits.SpeakerNames"/>).</param>
 /// <param name="Search">The server searches every transcript at once (<c>GET /v1/search?q=</c>).</param>
 /// <param name="Summaries">The server writes summaries of transcripts (<c>/v1/transcriptions/{id}/summary</c>): it has a language model for them.</param>
+/// <param name="Phone">The server tells the address a phone on the same network opens its web page at (<c>GET /v1/phone</c>).</param>
+/// <param name="Resume">The server resumes a recording whose transcription was stopped part way (<c>POST /v1/transcriptions/{id}/resume</c>).</param>
 public sealed record RemoteServerInfo(string Name, string Edition, string Version, bool Encrypted, bool PasswordRequired, bool ModelsReady, string[] MissingModels, bool Busy, int Queued,
-    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false, bool SpeakerNames = false, bool Search = false, bool Summaries = false);
+    bool LinksEnabled = false, bool LinkPages = false, bool LiveEnabled = false, bool NotesEnabled = false, bool LanguagePairs = false, bool Speakers = false, bool SpeakerNames = false, bool Search = false, bool Summaries = false, bool Phone = false, bool Resume = false);
+
+/// <summary>Where a phone on the same network opens the web page of the server (<c>GET /v1/phone</c>), with the modules of its QR code.</summary>
+/// <param name="Address">Null when the server can be reached from its own computer only.</param>
+/// <param name="Rows">The QR code of the address, one string per row ('1' dark), without the light border around it; empty without an address.</param>
+public sealed record RemotePhone(string? Address, string[] Rows);
 
 /// <summary>The body of <c>POST /v1/links</c>: a web address to fetch the sound of and transcribe.</summary>
 /// <param name="Speakers"><c>off</c> (or null), <c>auto</c>, or how many speakers there are.</param>
@@ -37,7 +44,8 @@ public sealed record RemoteNotes(IReadOnlyList<RemoteNoteSummary> Data);
 public sealed record RemoteNoteEdit(string? Title, string? Text, int? Revision);
 
 /// <param name="State"><c>queued</c>, <c>running</c>, <c>complete</c>, <c>failed</c> or <c>cancelled</c>.</param>
-public sealed record RemoteJob(Guid Id, string State, string? Stage, int Percent, string Language, string Name, DateTimeOffset CreatedUtc, string? Error)
+/// <param name="Resumable">A cancelled or failed recording that the server can run again (<c>POST /v1/transcriptions/{id}/resume</c>); an older server never says so.</param>
+public sealed record RemoteJob(Guid Id, string State, string? Stage, int Percent, string Language, string Name, DateTimeOffset CreatedUtc, string? Error, bool Resumable = false)
 {
     public bool IsFinished => State is "complete" or "failed" or "cancelled";
 }

@@ -21,10 +21,10 @@ One file each. Download it, double-click it, accept the license and click **Inst
 | Edition | What it is | Installer |
 | --- | --- | --- |
 | **Mockingbird Studio** | The whole program on one computer. It can also host a server and connect to one. | `Mockingbird-Studio-Setup.exe` |
-| **Mockingbird Server** | Only the server: the models and the speech programs live on that computer, in a small light window. Other computers send their recordings to it. | `Mockingbird-Server-Setup.exe` |
+| **Mockingbird Server** | Only the server: the models and the speech programs live on that computer. Its window shows what the server is doing and has Studio's Models, Settings and Advanced pages to set it up. Other computers send their recordings to it. | `Mockingbird-Server-Setup.exe` |
 | **Mockingbird Client** | Only the window you work in. Nothing is transcribed on that computer: recordings go to a server and the transcripts come back to be read, edited and exported. | `Mockingbird-Client-Setup.exe` |
 
-Server and Client are new in 0.1.20. Each edition installs, updates and keeps its data on its own (`TriASR`, `TriASR-Server`, `TriASR-Client`), and has its own checksum file (`SHA256SUMS.txt`, `SHA256SUMS-server.txt`, `SHA256SUMS-client.txt`) and update file (`latest.json`, `latest-server.json`, `latest-client.json`).
+Server and Client are new in 0.1.20. Together they do what Studio does: the Server holds and tunes the models, the Client (or the web page) does the rest. Each edition installs, updates and keeps its data on its own (`TriASR`, `TriASR-Server`, `TriASR-Client`), and has its own checksum file (`SHA256SUMS.txt`, `SHA256SUMS-server.txt`, `SHA256SUMS-client.txt`) and update file (`latest.json`, `latest-server.json`, `latest-client.json`).
 
 ## Quick install
 
@@ -63,7 +63,8 @@ Native Linux support is pending; there is currently no native Linux build.
 
 ## Features
 
-- Audio/video import with progress, cancellation and resumable jobs.
+- Audio/video import with progress, cancellation and resumable jobs: a recording that was stopped or failed is resumed where it stopped (**Resume** in Studio, the Server window, the Client and the web page; the stages already finished are reused).
+- A watch folder: recordings added to a chosen folder are transcribed one after another and the transcript is saved next to each one, as text or subtitles. Studio transcribes them itself; the Client sends them to the connected server (they wait while there is no connection).
 - Whisper's 100-language catalog and independent Canary comparison for 25 languages.
 - Waveform playback and manual transcript review, with the places where the two engines disagree marked for listening. A local correction model chooses between them where it is at least 90% sure (on by default; it can be switched off in Settings).
 - Removal of Whisper's runaway repetition, and an optional "Skip silence and music" setting for recordings with long quiet or noisy stretches (it removes songs, so it is off by default).
@@ -90,7 +91,7 @@ Recognition can be wrong, particularly with music, noise or silence. Review impo
 
 ## Servers on the network
 
-In Studio the **Servers** page (in the sidebar, below Models) lists the servers found on your network, and next to it you can host one of your own. The Server edition is that hosting box on a small page of its own; the Client edition has only the list, in a panel on the right.
+In Studio the **Servers** page (in the sidebar, below Models) lists the servers found on your network, and next to it you can host one of your own. The Server edition opens on that hosting box, with the recordings it was sent (cancel, resume or delete them there), and has Studio's Models, Settings and Advanced pages (languages, backends, tuning, diagnostics, terminal) to set the server up; the Client edition has only the list, in a panel on the right.
 
 **Hosting.** Press **Start hosting** (it becomes *Stop hosting* while the server runs). Give the server a **name** (shown to the others; empty uses the computer's name) and, if you like, a **password**: type one or press *Make a password*; with none, anyone who can reach the server may use it. *Who can use it* chooses between *This computer only* and *Computers on the network*; with the first only programs on the same computer can connect. The server runs while the app is open, and starts again next time if you left it on. A newly installed Server edition does not host until you press Start hosting. The first time on the network, Windows may ask whether to let it through its firewall.
 
@@ -104,7 +105,7 @@ In Studio the **Servers** page (in the sidebar, below Models) lists the servers 
 
 Every hosted server also serves a web page, **Mockingbird Client Webview**, at its own address, for computers that do not have Mockingbird installed. Open the address in a browser (*Open web page* in the hosting box does it for this computer), enter the password if there is one, and you can send a recording, follow the recordings on the server, review and edit a transcript with its audio, and export it: the same pages as the Client, in the five languages of the program. On the network the address starts with `https://`. The certificate is the server's own, so the browser warns the first time; compare the fingerprint in the certificate details with the one in the server's *Identity* box before you continue. The page loads nothing from any other address, sets no cookies and keeps the password only for the browser tab. A server without a password only answers requests addressed to its IP address, `localhost` or its computer's name.
 
-**On a phone** the page works like an app: the tabs are a bar at the bottom with icons, the fields are large enough to tap, and nothing scrolls sideways. Open the server's network address in the phone's browser (the `https://` one from the hosting box, with the phone on the same Wi-Fi), accept the certificate once as above, then put it on the home screen: on an iPhone **Share → Add to Home Screen**, on Android **⋮ → Add to Home screen** (or **Install**). It then opens full screen with its own icon. Recording with the phone's microphone needs the `https://` address; on a plain `http://` address the page says so and links to the encrypted one.
+**On a phone** the page works like an app: the tabs are a bar at the bottom with icons, the fields are large enough to tap, and nothing scrolls sideways. Point the phone's camera at the **QR code** in the hosting box (Studio's Servers page or the Server window; it appears while the server is on with *Computers on the network*), or at the one behind **Open on a phone** in the Client and on the web page opened on a computer, with the phone on the same Wi-Fi; or type the server's `https://` network address. Accept the certificate once as above, then put it on the home screen: on an iPhone **Share → Add to Home Screen**, on Android **⋮ → Add to Home screen** (or **Install**). It then opens full screen with its own icon. Recording with the phone's microphone needs the `https://` address; on a plain `http://` address the page says so and links to the encrypted one.
 
 ### The HTTP API
 
@@ -132,6 +133,8 @@ curl.exe -H "Authorization: Bearer PASSWORD" "http://127.0.0.1:8642/v1/transcrip
 | `GET /v1/notes`, `POST /v1/notes` | the notes kept on this server (id, title, the first words, times, revision); `POST` makes one from JSON `{"title": "...", "text": "..."}` and answers `201`. `GET /v1/server` has `notesEnabled` |
 | `GET`, `PUT` and `DELETE /v1/notes/{id}` | read a note with its text, save it (JSON `{"title", "text", "revision"}`: the revision you read; `409 note_changed` if someone saved it since), delete it |
 | `POST /v1/transcriptions/{id}/cancel` | stops a waiting or running recording |
+| `POST /v1/transcriptions/{id}/resume` | runs a cancelled or failed recording again while its upload is still on the server, reusing the stages it finished (`202`); `409 not_resumable` otherwise. A job says `resumable`; `GET /v1/server` says `resume` |
+| `GET /v1/phone` | where a phone on the same network opens the web page: `{"address": "https://192.168.1.20:8642", "rows": ["1111111001...", ...]}`, the rows being the QR code of the address (`1` dark, without the light border); `address` is `null` while the server listens for its own computer only. `GET /v1/server` says `phone` |
 | `DELETE /v1/transcriptions/{id}` | deletes a finished, failed or cancelled recording with its transcript, edits and the uploaded copy; `409 still_running` while it is being worked on |
 | `POST /v1/audio/transcriptions` | OpenAI-compatible: a multipart form with `file`, `language`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`); answers when the transcript is ready, so existing tools that speak that API can use it with the base URL `http://127.0.0.1:8642/v1` |
 

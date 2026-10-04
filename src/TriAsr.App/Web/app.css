@@ -152,6 +152,13 @@ textarea.notetext { min-height: 340px; padding: 14px; line-height: 1.55; }
 .summary-text li { margin: 3px 0; }
 .small { font-size: 12px; }
 
+/* The QR code for opening the page on a phone (from a computer: on the phone itself the button is not shown). */
+dialog.phone { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); padding: 22px; max-width: min(380px, calc(100vw - 32px)); }
+dialog.phone::backdrop { background: rgba(0, 0, 0, .45); }
+dialog.phone h2 { margin: 0 0 12px; font-size: 19px; }
+dialog.phone .qr { display: block; width: 220px; height: 220px; border-radius: 8px; }
+.mono { font-family: Consolas, ui-monospace, monospace; overflow-wrap: anywhere; }
+
 /* ---- phones ----------------------------------------------------------------------------------------------------------------------------
    The tabs become a bar at the bottom of the screen with icons (where a thumb reaches them, as in a phone's own apps), the header gets small,
    and every field uses 16 px text so that a phone does not zoom in when it is tapped. The page can be put on the home screen (manifest). */
@@ -178,4 +185,5 @@ textarea.notetext { min-height: 340px; padding: 14px; line-height: 1.55; }
   .regions { max-height: 48vh; }
   .region { grid-template-columns: 72px 1fr; }
   .drop { padding: 22px 14px; }
+  .phone-button { display: none; }
 }

@@ -5,19 +5,6 @@ namespace TriAsr.App;
 
 public partial class MainWindow : Window
 {
-    private void ShowPrivacyPolicy(object sender, RoutedEventArgs args) => PrivacyPolicyWindow.Show(this);
-
-    private async void ImportRuntimeClick(object sender, RoutedEventArgs args)
-    {
-        var picker = new OpenFolderDialog { Title = Loc.T("Choose a compatible engine runtime folder with its DLL dependencies") };
-        if (picker.ShowDialog(this) == true) await ((ShellViewModel)DataContext).ImportBackendAsync(picker.FolderName);
-    }
-    private void ChooseStorageFolder(object sender, RoutedEventArgs args)
-    {
-        var forModels = (sender as System.Windows.Controls.Button)?.Tag?.ToString() == "models";
-        var dialog = new OpenFolderDialog { Title = forModels ? Loc.T("Choose model repository") : Loc.T("Choose project and log folder") };
-        if (dialog.ShowDialog(this) == true) ((ShellViewModel)DataContext).SetStorageLocation(dialog.FolderName, forModels);
-    }
     private bool _playing;
     private readonly WpfOverlayPresenter _dictationPresenter;
     private readonly WpfHotkeys _hotkeys = new();
@@ -29,6 +16,8 @@ public partial class MainWindow : Window
         get => (bool)GetValue(IsNavigationCompactProperty);
         set => SetValue(IsNavigationCompactProperty, value);
     }
+    /// <summary>The list of pages in the sidebar (the smoke test checks which are shown).</summary>
+    public System.Windows.Controls.ListBox NavigationList => NavigationBar.NavigationList;
     public MainWindow(ShellViewModel viewModel)
     {
         Language = System.Windows.Markup.XmlLanguage.GetLanguage(System.Globalization.CultureInfo.CurrentCulture.IetfLanguageTag); // numbers and dates follow the Windows regional settings
@@ -43,8 +32,6 @@ public partial class MainWindow : Window
         viewModel.Notes.Hotkeys = _hotkeys;
         viewModel.PropertyChanged += (_, change) =>
         {
-            if (change.PropertyName == nameof(ShellViewModel.TerminalOutput) && viewModel.TerminalAutoScroll)
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { TerminalOutputBox.UpdateLayout(); TerminalOutputBox.ScrollToEnd(); }));
             // A region chosen from elsewhere (a search result) is brought into view once the review page is laid out.
             if (change.PropertyName == nameof(ShellViewModel.SelectedRegion) && viewModel.SelectedRegion is { } region)
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() => RegionList.ScrollIntoView(region)));
@@ -63,14 +50,6 @@ public partial class MainWindow : Window
             lastSpoken = spoken;
         };
         timer.Start(); Closed += (_, _) => { timer.Stop(); Player.Close(); };
-    }
-    private void TerminalInputKeyDown(object sender, System.Windows.Input.KeyEventArgs args)
-    {
-        var vm = (ShellViewModel)DataContext;
-        if (args.Key == System.Windows.Input.Key.Enter && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.None)
-        { if (vm.SubmitTerminalCommand.CanExecute(null)) vm.SubmitTerminalCommand.Execute(null); args.Handled = true; }
-        else if (args.Key is System.Windows.Input.Key.Up or System.Windows.Input.Key.Down && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.None)
-        { vm.RecallTerminalCommand(args.Key == System.Windows.Input.Key.Up ? -1 : 1); args.Handled = true; }
     }
     private void OnWindowSizeChanged(object sender, SizeChangedEventArgs args)
     {
@@ -154,12 +133,6 @@ public partial class MainWindow : Window
         vm.Host.StopForExit();
         vm.Remote.Dispose();
         _ = vm.Servers.DisposeAsync().AsTask();
-    }
-    private void ChooseWatchFolderClick(object sender, RoutedEventArgs args)
-    {
-        var vm = (ShellViewModel)DataContext;
-        var dialog = new OpenFolderDialog { Title = Loc.T("Choose the folder to watch for new recordings"), InitialDirectory = System.IO.Directory.Exists(vm.WatchFolder) ? vm.WatchFolder : null };
-        if (dialog.ShowDialog(this) == true) vm.SetWatchFolder(dialog.FolderName);
     }
     private void WaveformSeek(object sender, System.Windows.Input.MouseButtonEventArgs args)
     {

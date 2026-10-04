@@ -251,7 +251,7 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         OnPropertyChanged(nameof(IsNotesPage));
         if (value?.Name == "Notes" && _initialized) _ = Notes.RefreshAsync();      // another window may have saved notes meanwhile
         OnPropertyChanged(nameof(IsModelsPage)); OnPropertyChanged(nameof(IsServersPage));
-        OnPropertyChanged(nameof(IsBenchmarkPage));
+        OnPropertyChanged(nameof(IsBenchmarkPage)); OnPropertyChanged(nameof(IsServerPage));
         OnPropertyChanged(nameof(IsLanguagesPage)); OnPropertyChanged(nameof(IsBackendsPage));
         OnPropertyChanged(nameof(IsTerminalPage)); RefreshTerminal();
         if (value?.IsSettings == true) RefreshResourceSummary(); // the computer may have been plugged in or unplugged since the summary was built
@@ -301,12 +301,16 @@ public sealed partial class ShellViewModel(SettingsStore store, ThemeManager the
         finally { _jobCancellation.Dispose(); _jobCancellation = null; IsProcessing = false; }
     }
     [RelayCommand]
-    private async Task ResumeAudioAsync()
+    private Task ResumeAudioAsync() => SelectedJob is { } job ? ResumeLocallyAsync(job, openReview: true) : Task.CompletedTask;
+
+    /// <summary>Runs a cancelled or failed job again here, reusing the stages it finished; a window with a review page opens the transcript when it is done.</summary>
+    private async Task ResumeLocallyAsync(TranscriptionJob resumed, bool openReview)
     {
-        if (SelectedJob is null || IsProcessing || IsBenchmarking || IsModelBusy || SetupRunning) return;
+        if (IsProcessing || IsBenchmarking || IsModelBusy || SetupRunning) return;
+        SelectedJob = resumed;
         IsProcessing = true;
         _jobCancellation = new();
-        try { using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing"); var job = await pipeline.RunAsync(SelectedJob, _jobCancellation.Token); if (job.State == JobState.Complete) await OpenReviewAsync(); }
+        try { using var awake = SleepGuard.Begin("Mockingbird Studio is transcribing"); var job = await pipeline.RunAsync(resumed, _jobCancellation.Token); if (job.State == JobState.Complete && openReview) await OpenReviewAsync(); }
         catch (OperationCanceledException) { Status = T("Operation cancelled."); }
         catch (Exception error) { ReportError(T("Operation failed"), error.Message); }
         finally { _jobCancellation.Dispose(); _jobCancellation = null; IsProcessing = false; }

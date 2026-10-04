@@ -1,0 +1,21 @@
+<UserControl x:Class="TriAsr.App.WatchCard" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: an IWatchFolderOwner (ShellViewModel in Studio, RemoteWatchViewModel in the Client). Recordings added to a folder are transcribed one after another. -->
+  <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="32">
+    <StackPanel>
+      <TextBlock Text="{local:T 'Watch a folder'}" FontSize="21" FontWeight="SemiBold" />
+      <TextBlock Text="{local:T 'Recordings added to the folder are transcribed automatically, one after another. Files already in the folder are left alone.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,16" />
+      <WrapPanel>
+        <Button Content="{local:T 'Choose folder…'}" Click="ChooseFolderClick" Margin="0,0,10,8" AutomationProperties.Name="{local:T 'Choose watch folder'}" />
+        <Button Content="{local:T 'Open folder'}" Command="{Binding OpenWatchFolderCommand}" Margin="0,0,10,8" IsEnabled="{Binding HasWatchFolder}" />
+        <CheckBox Content="{local:T 'Watching'}" IsChecked="{Binding WatchEnabled}" IsEnabled="{Binding HasWatchFolder}" VerticalAlignment="Center" Margin="6,0,0,8" AutomationProperties.Name="{local:T 'Watch this folder'}" />
+      </WrapPanel>
+      <WrapPanel Margin="0,4,0,0">
+        <StackPanel Margin="0,0,16,0"><TextBlock Text="{local:T 'Language'}" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding Languages}" SelectedValue="{Binding WatchLanguage}" SelectedValuePath="Code" ItemTemplate="{StaticResource TranslatedItem}" Width="220" AutomationProperties.Name="{local:T 'Watch folder language'}" /></StackPanel>
+        <StackPanel Margin="0,0,16,0"><TextBlock Text="{local:T 'Second language'}" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding WatchSecondLanguages}" SelectedValue="{Binding WatchSecondLanguage}" SelectedValuePath="Code" ItemTemplate="{StaticResource TranslatedItem}" Width="220" IsEnabled="{Binding CanChooseWatchSecondLanguage}" AutomationProperties.Name="{local:T 'Second watch folder language'}" ToolTip="{local:T 'If the recording switches between two languages, choose both: each part is written in the language it was spoken in, not translated. Finding the parts takes a little longer.'}" ToolTipService.ShowOnDisabled="True" /></StackPanel>
+        <StackPanel Margin="0,0,16,0" Visibility="{Binding CanTellSpeakersApart, Converter={StaticResource BoolVisibility}}"><TextBlock Text="{local:T 'Speakers'}" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding SpeakerChoices}" SelectedValue="{Binding WatchSpeakers}" SelectedValuePath="Value" ItemTemplate="{StaticResource TranslatedItem}" Width="220" AutomationProperties.Name="{local:T 'Watch folder speakers'}" ToolTip="{local:T 'Mockingbird can tell the voices apart and mark each part of the transcript with its speaker. If you know how many people speak, choose the number: exactly that many are kept.'}" /></StackPanel>
+        <StackPanel><TextBlock Text="{local:T 'Save transcript as'}" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding WatchOutputs}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding WatchOutput}" Width="220" AutomationProperties.Name="{local:T 'Watch folder output'}" ToolTip="{local:T 'Text and subtitle files are saved next to the recording and never replace an existing file; Project only saves none. Every transcript is also kept in Projects.'}" /></StackPanel>
+      </WrapPanel>
+      <TextBlock Text="{Binding WatchStatus}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,16,0,0" />
+    </StackPanel>
+  </Border>
+</UserControl>

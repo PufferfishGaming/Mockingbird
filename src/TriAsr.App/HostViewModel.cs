@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -45,6 +46,10 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _status = Loc.Key("The server is off.");
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _fingerprint = "";
+    /// <summary>The network address the QR code shows, when this server has more than one (a cable and Wi-Fi, say).</summary>
+    [ObservableProperty] private string? _selectedPhoneAddress;
+    /// <summary>The QR code of <see cref="SelectedPhoneAddress"/>: a phone on the same network opens the web page by pointing its camera at it.</summary>
+    [ObservableProperty] private ImageSource? _phoneCode;
 
     private enum State { Off, Listening, BadPort, Failed }
     private State _state;
@@ -98,6 +103,8 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     partial void OnNameChanged(string value) { OnPropertyChanged(nameof(DisplayName)); SettingsChangedOnly(); }
     partial void OnPasswordChanged(string value) { OnPropertyChanged(nameof(HasPassword)); OnPropertyChanged(nameof(Example)); SettingsChangedOnly(); }
     partial void OnFingerprintChanged(string value) => OnPropertyChanged(nameof(HasFingerprint));
+    partial void OnSelectedPhoneAddressChanged(string? value) => PhoneCode = value is null ? null : QrCodes.Image(value);
+    partial void OnPhoneCodeChanged(ImageSource? value) => OnPropertyChanged(nameof(HasPhoneCode));
     partial void OnIsBusyChanged(bool value) => RefreshStatus();
 
     private void SettingsChangedOnly() { if (!_restoring) SettingsChanged?.Invoke(); }
@@ -136,7 +143,7 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
     [RelayCommand]
     private void CopyAddress()
     {
-        try { System.Windows.Clipboard.SetText(Addresses()[^1]); }
+        try { System.Windows.Clipboard.SetText(SelectedPhoneAddress ?? Addresses()[0]); }
         catch (Exception error) { _reportError(Loc.T("Could not copy the address"), error.Message); }
     }
 
@@ -224,22 +231,56 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
         _onUi(RefreshStatus);
     }
 
-    /// <summary>The addresses clients can use: this computer, and (with the network on) each address of this computer on the network.</summary>
+    /// <summary>
+    /// The addresses clients can use: this computer, and (with the network on) each address of this computer on the network. Those on a network
+    /// with a router come first: the others are usually virtual adapters (virtual machines, containers) that a phone or another computer cannot reach.
+    /// </summary>
     public IReadOnlyList<string> Addresses()
     {
         var port = Port == 0 ? DefaultPort : Port;
         var scheme = AllowNetwork ? "https" : "http";
         var list = new List<string> { $"{scheme}://127.0.0.1:{port}" };
         if (!AllowNetwork) return list;
+        var routed = new List<string>(); var other = new List<string>();
         try
         {
             foreach (var adapter in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
                 .Where(item => item.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && item.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback))
-                foreach (var unicast in adapter.GetIPProperties().UnicastAddresses.Where(item => item.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(item.Address)))
-                    list.Add($"https://{unicast.Address}:{port}");
+            {
+                var properties = adapter.GetIPProperties();
+                var hasRouter = properties.GatewayAddresses.Any(gateway => gateway.Address.AddressFamily == AddressFamily.InterNetwork && !gateway.Address.Equals(IPAddress.Any));
+                foreach (var unicast in properties.UnicastAddresses.Where(item => item.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(item.Address)))
+                    (hasRouter && !IsSelfAssigned(unicast.Address) ? routed : other).Add($"https://{unicast.Address}:{port}");
+            }
         }
         catch (System.Net.NetworkInformation.NetworkInformationException) { }
+        list.AddRange(routed); list.AddRange(other);
         return list;
+    }
+
+    /// <summary>169.254.x.x: what Windows gives itself when no network handed it an address.</summary>
+    private static bool IsSelfAssigned(IPAddress address) => address.GetAddressBytes() is [169, 254, ..];
+
+    /// <summary>Where a phone (or another computer) on the same network reaches this server; null while it listens for this computer only. Read by the API from its own thread.</summary>
+    public string? NetworkAddress => AllowNetwork && IsListening ? Addresses().Skip(1).FirstOrDefault() : null;
+
+    /// <summary>The addresses of this server on the network, for the QR code; empty while it is off or listens for this computer only.</summary>
+    public IReadOnlyList<string> PhoneAddresses { get; private set; } = [];
+    public bool HasSeveralPhoneAddresses => PhoneAddresses.Count > 1;
+    public bool HasPhoneCode => PhoneCode is not null;
+    /// <summary>The server is on but only this computer can reach it, so a phone cannot open its web page.</summary>
+    public bool ShowPhoneHint => IsListening && !AllowNetwork;
+
+    private void RefreshPhone()
+    {
+        IReadOnlyList<string> addresses = IsListening && AllowNetwork ? Addresses().Skip(1).ToArray() : [];
+        if (!addresses.SequenceEqual(PhoneAddresses))
+        {
+            PhoneAddresses = addresses;
+            OnPropertyChanged(nameof(PhoneAddresses)); OnPropertyChanged(nameof(HasSeveralPhoneAddresses));
+        }
+        if (SelectedPhoneAddress is null || !addresses.Contains(SelectedPhoneAddress)) SelectedPhoneAddress = addresses.FirstOrDefault();
+        OnPropertyChanged(nameof(ShowPhoneHint));
     }
 
     public void RefreshStatus()
@@ -254,6 +295,7 @@ public sealed partial class HostViewModel : ObservableObject, IAsyncDisposable
             _ => Loc.T("The server is off.")
         };
         OnPropertyChanged(nameof(Example));
+        RefreshPhone();
     }
 
     /// <summary>The commands for trying the server from a terminal. They are program text, not interface text, so they are not translated.</summary>

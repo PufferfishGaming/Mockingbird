@@ -121,6 +121,7 @@
       h("span", { class: "spacer" }),
       health && h("span", { class: "pill" }, health.name),
       health && health.encrypted && h("span", { class: "pill", title: t("Connections are encrypted") }, t("encrypted")),
+      state.info && state.info.phone && h("button", { class: "btn phone-button", type: "button", title: t("Shows a QR code: a phone on the same network opens the web page of this server with it."), onClick: showPhone }, t("Open on a phone")),
       h("select", { "aria-label": t("Interface language"), onChange: async (event) => { await chooseLanguage(event.target.value); await remount(); } },
         LANGUAGES.map(([code, name]) => h("option", { value: code, selected: code === text.lang }, name))),
       health && health.passwordRequired && state.password && h("button", { class: "btn", type: "button", onClick: () => signOut("") }, t("Sign out")));
@@ -136,6 +137,49 @@
     const path = document.createElementNS(ns, "path");
     path.setAttribute("d", "M8 16V10M13 23V5M18 19V9M23 16v-4");
     svg.append(path);
+    return svg;
+  }
+
+  /** The QR code of the address a phone on the same network opens this page at. The server says which: the address this page came from may work on its own computer only. */
+  async function showPhone() {
+    const phone = await guard(() => getJson("/v1/phone"));
+    if (!phone) return;
+    const dialog = h("dialog", { class: "phone", "aria-label": t("Open on a phone") },
+      h("h2", null, t("Open on a phone")),
+      phone.address
+        ? [qrPicture(phone.rows),
+          h("p", { class: "muted" }, t("Point the camera of a phone on the same network at the code to open the web page of this server. The first time, the browser of the phone warns about the certificate of the server: open the details and continue.")),
+          h("p", { class: "mono" }, phone.address)]
+        : h("p", { class: "muted" }, t("Only its own computer can reach this server, so a phone cannot open its web page. The server can allow computers on the network in its window.")),
+      h("div", { class: "row" }, h("button", { class: "btn", type: "button", onClick: () => dialog.close() }, t("Close"))));
+    dialog.addEventListener("close", () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+
+  /** The modules of a QR code (rows of '1' for dark) as a picture: dark on white with a light border of four modules, whatever the theme, because readers need that. */
+  function qrPicture(rows) {
+    const ns = "http://www.w3.org/2000/svg", side = rows.length + 8;
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + side + " " + side);
+    svg.setAttribute("class", "qr");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", t("QR code of the server address"));
+    svg.setAttribute("shape-rendering", "crispEdges");
+    const back = document.createElementNS(ns, "rect");
+    back.setAttribute("width", side); back.setAttribute("height", side); back.setAttribute("fill", "#fff");
+    let outline = "";
+    rows.forEach((row, y) => {
+      for (let x = 0; x < row.length;) {
+        if (row[x] !== "1") { x++; continue; }
+        const start = x;
+        while (x < row.length && row[x] === "1") x++;
+        outline += "M" + (start + 4) + " " + (y + 4) + "h" + (x - start) + "v1h" + (start - x) + "z";     // a run of dark modules is one rectangle
+      }
+    });
+    const dark = document.createElementNS(ns, "path");
+    dark.setAttribute("d", outline); dark.setAttribute("fill", "#000");
+    svg.append(back, dark);
     return svg;
   }
 
@@ -205,6 +249,7 @@
       const catalog = await getJson("/v1/languages");
       state.languages = catalog.data;
     });
+    renderHeader();      // what the server can do decides some of its buttons
     buildNew();
     buildNotes();
     renderTabs();
@@ -598,6 +643,7 @@
         h("div", { class: "row" },
           job.state === "complete" && h("button", { class: "btn", type: "button", onClick: () => openReview(job.id) }, t("Open transcript")),
           (job.state === "queued" || job.state === "running") && h("button", { class: "btn", type: "button", onClick: () => cancelJob(job.id) }, t("Cancel")),
+          job.resumable && h("button", { class: "btn", type: "button", title: t("Runs a cancelled or failed recording again on the server. What was already finished is reused."), onClick: () => resumeJob(job.id) }, t("Resume")),
           (job.state === "complete" || job.state === "failed" || job.state === "cancelled") && h("button", { class: "btn", type: "button", "aria-label": t("Delete project") + ": " + job.name, title: t("Delete this project and its transcript"), onClick: () => deleteJob(job) }, t("Delete"))))));
     ui.projectList.hidden = searching();
     ui.projectList.replaceChildren(h("div", { class: "card" }, state.jobs.length ? [h("p", { class: "muted" }, t("Click a finished project to open its transcript.")), list] : h("p", { class: "muted" }, t("Nothing here yet. Finished transcriptions are listed here."))));
@@ -683,6 +729,11 @@
     state.review = null; state.dirty = false;
     if (ui.player) { ui.player.pause(); ui.player.removeAttribute("src"); ui.player.load(); }
     if (state.tab === "review") selectTab("projects");
+  }
+
+  async function resumeJob(id) {
+    await guard(async () => { await api("/v1/transcriptions/" + id + "/resume", { method: "POST" }); await refreshJobs(); },
+      (message) => t("Could not resume the recording") + ": " + message);
   }
 
   async function cancelJob(id) {

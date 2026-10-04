@@ -35,7 +35,7 @@ public sealed class RemoteTests
         }
     }
 
-    private static string NewRoot() => Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));
+    internal static string NewRoot() => Path.Combine(Path.GetTempPath(), "TriAsr.Tests", Guid.NewGuid().ToString("N"));
 
     private static ServerBrowserViewModel Browser(string root, ScriptedDialogs dialogs, int beaconPort = 0, TimeSpan? lifetime = null) =>
         new(new SavedServerStore(Path.Combine(root, "servers.json")), dialogs, action => action(), beaconPort == 0 ? FreeUdpPort() : beaconPort, lifetime);
@@ -48,7 +48,7 @@ public sealed class RemoteTests
 
     private static string AddressOf(Harness api) => $"127.0.0.1:{api.Server.Port}";
 
-    private static async Task<T> EventuallyAsync<T>(Func<T?> read, string because) where T : class
+    internal static async Task<T> EventuallyAsync<T>(Func<T?> read, string because) where T : class
     {
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline) { if (read() is { } value) return value; await Task.Delay(30); }
@@ -285,7 +285,7 @@ public sealed class RemoteTests
 
     // ---- working with a connected server -----------------------------------------------------------------------------------------------
 
-    private static async Task<(RemoteWorkspaceViewModel Workspace, ServerBrowserViewModel Browser)> ConnectedAsync(string root, Harness api, List<(string, string)>? errors = null)
+    internal static async Task<(RemoteWorkspaceViewModel Workspace, ServerBrowserViewModel Browser)> ConnectedAsync(string root, Harness api, List<(string, string)>? errors = null)
     {
         var dialogs = new ScriptedDialogs { Passwords = { ApiTestData.Key } };
         var browser = Browser(root, dialogs);

@@ -1,0 +1,25 @@
+<UserControl x:Class="TriAsr.App.ModelsPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: ShellViewModel. The speech models of this computer: the recommendation, downloading, checking and choosing them. The same page in Studio and in the Server window. -->
+  <StackPanel>
+    <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel>
+      <TextBlock Text="{local:T 'Recommended for this computer'}" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding SystemSummary}" TextWrapping="Wrap" Margin="0,12,0,8" />
+      <TextBlock Text="{Binding Recommendation}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,12" />
+      <TextBlock Text="{Binding RecommendedDownloadSummary}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,16" />
+      <WrapPanel><Button Content="{local:T 'Set up automatically'}" Command="{Binding RunSetupCommand}" Margin="0,0,10,10" ToolTip="{local:T 'Checks this computer, downloads the recommended speech models if needed and measures its speed with a short test recording.'}" /><Button Content="{local:T 'Check my computer'}" Command="{Binding DetectHardwareCommand}" Margin="0,0,10,10" /><Button Content="{local:T 'Download recommended models'}" Command="{Binding InstallRecommendedCommand}" Margin="0,0,10,10" /><Button Content="{local:T 'Tune performance'}" Command="{Binding GoBenchmarkCommand}" Margin="0,0,0,10" /></WrapPanel>
+      <ProgressBar IsIndeterminate="True" Height="3" Visibility="{Binding IsCheckingSystem, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Checking your system'}" />
+    </StackPanel></Border>
+    <ListBox ItemsSource="{Binding ModelCards}" SelectedItem="{Binding SelectedModel}" Margin="0,18,0,0" MaxHeight="440" AutomationProperties.Name="{local:T 'Local models'}"><ListBox.ItemTemplate><DataTemplate>
+      <Border Padding="14" CornerRadius="6"><Border.Style><Style TargetType="Border"><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" /><Setter Property="BorderThickness" Value="1" /><Setter Property="Background" Value="{DynamicResource SurfaceElevatedBrush}" /><Style.Triggers><DataTrigger Binding="{Binding Highlighted}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /><Setter Property="Background" Value="{DynamicResource SurfaceSecondaryBrush}" /></DataTrigger></Style.Triggers></Style></Border.Style><StackPanel>
+        <WrapPanel><TextBlock Text="{Binding Title}" FontWeight="SemiBold" /><TextBlock Text="{local:T 'RECOMMENDED'}" Margin="12,0,0,0" Visibility="{Binding Recommended, Converter={StaticResource BoolVisibility}}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" /><TextBlock Text="{local:T 'IN USE'}" Margin="12,0,0,0" Visibility="{Binding Selected, Converter={StaticResource BoolVisibility}}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" /></WrapPanel>
+        <TextBlock Text="{Binding Details}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" />
+        <TextBlock Text="{Binding Status}" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+        <ProgressBar Value="{Binding DownloadPercent, Mode=OneWay}" Maximum="100" Height="4" Margin="0,8,0,0" Foreground="{DynamicResource AccentBrush}" AutomationProperties.Name="{local:T 'Model download progress'}" />
+        <TextBlock Text="{Binding Location}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0" />
+      </StackPanel></Border>
+    </DataTemplate></ListBox.ItemTemplate></ListBox>
+    <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Download'}" Command="{Binding InstallModelCommand}" Margin="0,0,8,10" /><Button Content="{local:T 'Verify'}" Command="{Binding VerifyModelCommand}" Margin="0,0,8,10" /><Button Content="{local:T 'Use this model'}" Command="{Binding SelectModelCommand}" Margin="0,0,8,10" /><Button Content="{local:T 'Open folder'}" Command="{Binding OpenModelFolderCommand}" Margin="0,0,8,10" /><Button Content="{local:T 'Pause'}" Command="{Binding CancelModelCommand}" Margin="0,0,0,10" /></WrapPanel>
+    <ProgressBar Value="{Binding ModelDownloadPercent, Mode=OneWay}" Maximum="100" Height="8" Visibility="{Binding IsModelBusy, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Current model download'}" />
+    <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" Margin="0,12,0,0" />
+  </StackPanel>
+</UserControl>

@@ -389,7 +389,7 @@
       "triasr.alignment": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Domain": "[1.0.0, )"
+          "TriAsr.Domain": "[0.1.21, )"
         }
       },
       "triasr.app": {
@@ -397,37 +397,38 @@
         "dependencies": {
           "CommunityToolkit.Mvvm": "[8.4.2, )",
           "Microsoft.Extensions.Hosting": "[10.0.12, )",
-          "TriAsr.Alignment": "[1.0.0, )",
-          "TriAsr.Application": "[1.0.0, )",
-          "TriAsr.Audio": "[1.0.0, )",
-          "TriAsr.Benchmark": "[1.0.0, )",
-          "TriAsr.Engine.Canary": "[1.0.0, )",
-          "TriAsr.Engine.Llm": "[1.0.0, )",
-          "TriAsr.Engine.Whisper": "[1.0.0, )",
-          "TriAsr.Export": "[1.0.0, )",
-          "TriAsr.Fusion": "[1.0.0, )",
-          "TriAsr.Hardware": "[1.0.0, )",
-          "TriAsr.Infrastructure": "[1.0.0, )",
-          "TriAsr.Persistence": "[1.0.0, )"
+          "Net.Codecrete.QrCodeGenerator": "[3.2.1, )",
+          "TriAsr.Alignment": "[0.1.21, )",
+          "TriAsr.Application": "[0.1.21, )",
+          "TriAsr.Audio": "[0.1.21, )",
+          "TriAsr.Benchmark": "[0.1.21, )",
+          "TriAsr.Engine.Canary": "[0.1.21, )",
+          "TriAsr.Engine.Llm": "[0.1.21, )",
+          "TriAsr.Engine.Whisper": "[0.1.21, )",
+          "TriAsr.Export": "[0.1.21, )",
+          "TriAsr.Fusion": "[0.1.21, )",
+          "TriAsr.Hardware": "[0.1.21, )",
+          "TriAsr.Infrastructure": "[0.1.21, )",
+          "TriAsr.Persistence": "[0.1.21, )"
         }
       },
       "triasr.application": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
-          "TriAsr.Domain": "[1.0.0, )"
+          "TriAsr.Domain": "[0.1.21, )"
         }
       },
       "triasr.audio": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.benchmark": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.domain": {
@@ -436,38 +437,38 @@
       "triasr.engine.canary": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.engine.llm": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.engine.whisper": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.export": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.fusion": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Alignment": "[1.0.0, )",
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Alignment": "[0.1.21, )",
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.hardware": {
         "type": "Project",
         "dependencies": {
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.infrastructure": {
@@ -477,7 +478,7 @@
           "Serilog.Extensions.Hosting": "[10.0.0, )",
           "Serilog.Formatting.Compact": "[3.0.0, )",
           "Serilog.Sinks.File": "[7.0.0, )",
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "triasr.persistence": {
@@ -485,7 +486,7 @@
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
-          "TriAsr.Application": "[1.0.0, )"
+          "TriAsr.Application": "[0.1.21, )"
         }
       },
       "CommunityToolkit.Mvvm": {
@@ -540,6 +541,12 @@
           "Microsoft.Extensions.Logging.EventSource": "10.0.12",
           "Microsoft.Extensions.Options": "10.0.12"
         }
+      },
+      "Net.Codecrete.QrCodeGenerator": {
+        "type": "CentralTransitive",
+        "requested": "[3.2.1, )",
+        "resolved": "3.2.1",
+        "contentHash": "MLseDo4x2T8+7gbXDt5vLjC4b6v4SavtrwoM+adKjlicnTHAqII4zAWy8VL5D94oB3VA8qz7bvMyOxfVLJnARg=="
       },
       "Serilog.Extensions.Hosting": {
         "type": "CentralTransitive",

@@ -30,13 +30,14 @@ namespace TriAsr.App;
 /// <param name="SpeakersReady">Whether this server can tell the speakers of a recording apart (the speaker program and its models are installed); null means it cannot.</param>
 /// <param name="Summaries">Writes the summary of a transcript for <c>/v1/transcriptions/{id}/summary</c>. Null: this server does not make summaries.</param>
 /// <param name="SummaryStore">Reads and keeps the summary of a job (beside its transcript); needed with <paramref name="Summaries"/>.</param>
+/// <param name="NetworkAddress">The address of this server on the network (<c>https://192.168.1.20:8642</c>), read for every request; null while it can be reached from this computer only. Null: this server does not tell phones where to go.</param>
 public sealed record ApiServiceDependencies(AudioJobQueue Queue, TranscriptionPipeline Pipeline, IJobRepository Repository,
     Func<Guid, CancellationToken, Task<FinalTranscript>> LoadTranscript, string IncomingFolder, string ExportFolder, string Version,
     Func<string> GetPassword, Func<string, string[]> MissingModels, Func<bool> CanRun, Action<bool> BusyChanged,
     Func<string> GetName, string Edition, Func<Guid, CancellationToken, Task<ReviewBundle>> LoadReview, Func<FinalTranscript, CancellationToken, Task> SaveReview,
     Func<Guid, string, string?> AudioPath, ILinkFetcher? Links = null, Func<TranscriptionJob, CancellationToken, Task>? DeleteJob = null,
     ILiveRecognizer? Live = null, Func<bool>? LiveReady = null, INoteStore? Notes = null, Func<bool>? SpeakersReady = null,
-    ISummaryEngine? Summaries = null, ISummaryKeeper? SummaryStore = null);
+    ISummaryEngine? Summaries = null, ISummaryKeeper? SummaryStore = null, Func<string?>? NetworkAddress = null);
 
 /// <summary>Where the summary of a job is kept.</summary>
 public interface ISummaryKeeper
@@ -179,6 +180,8 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "GET" ? HttpResponse.Json(200, new { @object = "list", data = new[] { new { id = "mockingbird-studio", @object = "model", owned_by = "local" } } }) : MethodNotAllowed("GET");
             case ["v1", "languages"]:
                 return request.Method == "GET" ? Languages() : MethodNotAllowed("GET");
+            case ["v1", "phone"]:
+                return request.Method == "GET" ? Phone(request) : MethodNotAllowed("GET");
             case ["v1", "transcriptions"]:
                 return request.Method switch { "POST" => await UploadAsync(request, token), "GET" => List(), _ => MethodNotAllowed("GET, POST") };
             case ["v1", "search"]:
@@ -197,6 +200,8 @@ public sealed class ApiService : IAsyncDisposable
                 return request.Method == "GET" ? await TranscriptAsync(id, request, token) : MethodNotAllowed("GET");
             case ["v1", "transcriptions", var id, "cancel"]:
                 return request.Method == "POST" ? await CancelAsync(id) : MethodNotAllowed("POST");
+            case ["v1", "transcriptions", var id, "resume"]:
+                return request.Method == "POST" ? await ResumeAsync(id) : MethodNotAllowed("POST");
             case ["v1", "transcriptions", var id, "review"]:
                 return request.Method switch { "GET" => await ReviewAsync(id, token), "PUT" => await SaveEditsAsync(id, request, token), _ => MethodNotAllowed("GET, PUT") };
             case ["v1", "transcriptions", var id, "summary"]:
@@ -214,7 +219,7 @@ public sealed class ApiService : IAsyncDisposable
     private static HttpResponse MethodNotAllowed(string allow) => HttpResponse.Error(405, "method_not_allowed", "This address does not accept that method.").With("Allow", allow);
 
     private HttpResponse RootPage() => HttpResponse.Text(200,
-        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nGET  /v1/notes, POST /v1/notes             the notes kept on this server (JSON: title, text)\nGET  /v1/notes/{{id}}, PUT, DELETE        read, save (with the revision you read) and delete a note\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/search?q=words                  every transcript searched at once (case and accents do not matter)\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
+        $"Mockingbird {_deps.Edition} {_deps.Version}: local transcription API.\n\nGET  /v1/health                        server check (no password needed)\nGET  /v1/languages                     the languages\nPOST /v1/transcriptions?language=auto  upload a recording (the request body is the file)\nPOST /v1/live?language=auto             read one phrase of live dictation (the body is a WAV file)\nGET  /v1/notes, POST /v1/notes             the notes kept on this server (JSON: title, text)\nGET  /v1/notes/{{id}}, PUT, DELETE        read, save (with the revision you read) and delete a note\nPOST /v1/links                         fetch the sound of a web address and transcribe it (JSON: url, language; needs a password)\nGET  /v1/search?q=words                  every transcript searched at once (case and accents do not matter)\nGET  /v1/phone                         the address a phone on the same network opens, with its QR code\nGET  /v1/transcriptions/{{id}}           state and progress (?wait=30 waits for the end)\nGET  /v1/transcriptions/{{id}}/transcript?format=json|txt|md|srt|vtt|csv|docx\nPOST /v1/transcriptions/{{id}}/cancel\nPOST /v1/transcriptions/{{id}}/resume   run a cancelled or failed one again (finished stages are reused)\nDELETE /v1/transcriptions/{{id}}         delete a finished recording with its transcript\nPOST /v1/audio/transcriptions          OpenAI-compatible (multipart form: file, language, response_format)\n\nOpen this address in a browser for the web page. Send the password (if the server has one) as \"Authorization: Bearer <password>\".\n");
 
     // ---- who the request is for -------------------------------------------------------------------------------------------------------
 
@@ -638,8 +643,8 @@ public sealed class ApiService : IAsyncDisposable
         return new
         {
             id = entry.Id, state, stage = entry.Fetching ? TranscriptionProgressTracker.LinkStage : state == "running" ? TranscriptionProgressTracker.StageName(job.State) : null, percent,
-            language = job.Language, name = entry.Name, createdUtc = job.CreatedUtc, error = job.Error is null ? null : Plain(job.Error),
-            links = new { self = $"/v1/transcriptions/{entry.Id}", transcript = $"/v1/transcriptions/{entry.Id}/transcript", cancel = $"/v1/transcriptions/{entry.Id}/cancel" }
+            language = job.Language, name = entry.Name, createdUtc = job.CreatedUtc, error = job.Error is null ? null : Plain(job.Error), resumable = Resumable(entry),
+            links = new { self = $"/v1/transcriptions/{entry.Id}", transcript = $"/v1/transcriptions/{entry.Id}/transcript", cancel = $"/v1/transcriptions/{entry.Id}/cancel", resume = $"/v1/transcriptions/{entry.Id}/resume" }
         };
     }
 
@@ -716,7 +721,7 @@ public sealed class ApiService : IAsyncDisposable
             missing.Length == 0, missing, _jobs.Values.Any(job => StateName(job) == "running"), _jobs.Values.Count(job => job.Job.State == JobState.Queued && !job.Fetching),
             LinksEnabled: password && _deps.Links is not null, LinkPages: _deps.Links?.PagesReady == true,
             LiveEnabled: _deps.Live is not null && (_deps.LiveReady?.Invoke() ?? true), NotesEnabled: _deps.Notes is not null, LanguagePairs: true, Speakers: _deps.SpeakersReady?.Invoke() == true, SpeakerNames: true, Search: true,
-            Summaries: _deps.Summaries?.IsReady == true && _deps.SummaryStore is not null));
+            Summaries: _deps.Summaries?.IsReady == true && _deps.SummaryStore is not null, Phone: _deps.NetworkAddress is not null, Resume: true));
     }
 
     private async Task<HttpResponse> ReviewAsync(string id, CancellationToken token)
@@ -805,6 +810,20 @@ public sealed class ApiService : IAsyncDisposable
     private async Task<HttpResponse> CancelAsync(string id)
     {
         if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        await CancelEntryAsync(entry);
+        return HttpResponse.Json(200, Describe(entry));
+    }
+
+    /// <summary>Cancels a recording that was sent through the API (the Server window's Cancel); false when the API does not know it.</summary>
+    public async Task<bool> CancelJobAsync(Guid id)
+    {
+        if (!_jobs.TryGetValue(id, out var entry)) return false;
+        await CancelEntryAsync(entry);
+        return true;
+    }
+
+    private async Task CancelEntryAsync(ApiJob entry)
+    {
         entry.CancelRequested = true;
         if (entry.Running is { } running) running.Cancel();
         else if (entry.Job.State == JobState.Queued)
@@ -813,7 +832,41 @@ public sealed class ApiService : IAsyncDisposable
             await _deps.Repository.SaveAsync(entry.Job);
             JobChangedByApi?.Invoke(this, entry.Job);
         }
-        return HttpResponse.Json(200, Describe(entry));
+    }
+
+    /// <summary>A transcription that was cancelled, failed or stopped with the server can run again while its recording is still here; the stages it finished are reused.</summary>
+    private static bool Resumable(ApiJob entry) =>
+        !entry.Fetching && entry.Running is null && entry.Job.State is JobState.Cancelled or JobState.Failed && File.Exists(entry.Job.SourcePath);
+
+    private async Task<HttpResponse> ResumeAsync(string id)
+    {
+        if (!TryFind(id, out var entry)) return HttpResponse.Error(404, "not_found", "There is no such transcription.");
+        return await ResumeEntryAsync(entry) ?? HttpResponse.Json(202, Describe(entry));
+    }
+
+    /// <summary>Runs a recording that was sent through the API again (the Server window's Resume): true when it was queued, false when it cannot be, null when the API does not know it.</summary>
+    public async Task<bool?> ResumeJobAsync(Guid id) => _jobs.TryGetValue(id, out var entry) ? await ResumeEntryAsync(entry) is null : null;
+
+    /// <returns>Null when the recording was queued again; otherwise why it was not.</returns>
+    private async Task<HttpResponse?> ResumeEntryAsync(ApiJob entry)
+    {
+        if (!Resumable(entry))
+            return HttpResponse.Error(409, "not_resumable", $"The transcription is {StateName(entry)}; only a cancelled or failed one can be resumed, and only while its recording is still on the server.");
+        if (CannotStart(entry.Job.Language, entry.Options) is { } refusal) return refusal;
+        entry.CancelRequested = false; entry.Progress = null;
+        entry.Job = entry.Job with { State = JobState.Queued, Error = null };
+        await _deps.Repository.SaveAsync(entry.Job);
+        JobChangedByApi?.Invoke(this, entry.Job);
+        _queue.Writer.TryWrite(entry.Id);
+        return null;
+    }
+
+    // ---- a phone on the same network ------------------------------------------------------------------------------------------------------
+
+    private HttpResponse Phone(HttpRequest request)
+    {
+        var address = QrCodes.PhoneAddress(request.Header("Host"), request.IsSecure, _deps.NetworkAddress?.Invoke());
+        return HttpResponse.Json(200, new RemotePhone(address, address is null ? [] : QrCodes.Rows(address)));
     }
 
     // ---- the transcript ---------------------------------------------------------------------------------------------------------------

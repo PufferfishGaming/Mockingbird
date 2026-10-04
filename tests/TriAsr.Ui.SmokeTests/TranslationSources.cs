@@ -53,7 +53,7 @@ internal static partial class TranslationSources
         "ErrorTitle", "ErrorMessage", "UpdateTitle", "UpdateDetail", "UpdateStatusText", "SetupTitle", "SetupDetail", "TranscriptionStage", "TranscriptionProgressSummary",
         "TerminalStatus", "Readiness", "ModelProgress", "WatchStatus", "ReviewSummary", "SystemSummary", "Recommendation", "RecommendedDownloadSummary",
         "BenchmarkProgress", "BenchmarkSummary", "SavedLanguageSummary", "LanguageCoverage", "LanguageSetupStatus", "BackendProgress", "ActiveBackendSummary",
-        "ThemeSummary", "ResourceSummary", "StorageSummary", "EngineStatus", "Status", "Title", "Details", "SetupStartLabel", "SetupDismissLabel", "TerminalSendLabel", "CurrentText", "CaptureText", "Message", "NoSourceText", "Notice", "RecordButtonLabel",
+        "ThemeSummary", "ResourceSummary", "StorageSummary", "EngineStatus", "Status", "Title", "Details", "SetupStartLabel", "SetupDismissLabel", "TerminalSendLabel", "CurrentText", "CaptureText", "Message", "NoSourceText", "Notice", "RecordButtonLabel", "PhoneNote",
         // a review region's texts, announced again by ReviewRegion.NotifyLanguageChanged
         "Time", "SpeakerLabel", "SelectedRegion.Evidence", "SelectedRegion.CanaryHeading",
         // a speaker's heading on the names panel, announced again by SpeakerNameRow.NotifyLanguageChanged
@@ -62,7 +62,7 @@ internal static partial class TranslationSources
         "ProjectSearchStatus", "MatchesText", "Intro", "Unavailable", "SummarizeLabel", "MadeWith", "Speaker", "Before", "Match", "After",   // a passage of a transcript (the person's own words) and its speaker's name or "Speaker 2"
         // the user's own words, program output, paths and numbers
         "Text", "SelectedRegion.Text", "SelectedRegion.Whisper", "SelectedRegion.Canary", "RawWhisper", "RawCanary", "SearchText", "LanguageSearch", "SourcePath", "Folder", "ProjectSearchText", "Location", "DisplayTitle", "PreviewLine", "Updated",
-        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName", "Label", "Elapsed", "CreatedUtc", "OverlayButtonLabel", "HotkeyNote", "LastText", "LinkText", "Description", "ActionLabel", "Note", "NoteActionLabel", "LinkHelper.Summary", "LinkHelper.ActionLabel",
+        "TerminalOutput", "TerminalDirectory", "TerminalInput", "Diagnostics", "Model", "ThreadLabel", "MedianSeconds", "RealTimeFactor", "Backend", "PortText", "Name", "Password", "Fingerprint", "Example", "ServerName", "ServerNote", "SendStatus", "StateText", "Created", "ErrorText", "ReviewName", "AudioStatus", "Detail", "AddressText", "Host.Status", "Host.DisplayName", "Label", "Elapsed", "CreatedUtc", "OverlayButtonLabel", "HotkeyNote", "LastText", "LinkText", "Description", "ActionLabel", "Note", "NoteActionLabel", "LinkHelper.Summary", "LinkHelper.ActionLabel", "PhoneAddress", "SelectedPhoneAddress",
         // the name of a language in that language
         "NativeName"
     };

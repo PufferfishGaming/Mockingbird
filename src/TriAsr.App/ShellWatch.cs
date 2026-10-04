@@ -10,7 +10,7 @@ using TriAsr.Infrastructure;
 namespace TriAsr.App;
 
 /// <summary>Watch folder: recordings added to a chosen folder are transcribed automatically, one after another, and saved next to the recording.</summary>
-public sealed partial class ShellViewModel
+public sealed partial class ShellViewModel : IWatchFolderOwner
 {
     // Stored in settings and compared as written, so the values stay English; the lists below show them translated.
     public static readonly string WatchAsText = Loc.Key("Text (.txt)");

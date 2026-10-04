@@ -272,6 +272,39 @@ public sealed class WebAppTests
     }
 
     [Fact]
+    public async Task ThePageShowsTheCodeForAPhoneOnAComputerAndResumesAStoppedRecording()
+    {
+        var script = File.ReadAllText(Path.Combine(WebFolder(), "app.js"));
+        Assert.Contains("state.info && state.info.phone && h(\"button\", { class: \"btn phone-button\"", script);   // only a server that tells where a phone goes
+        Assert.Contains("getJson(\"/v1/phone\")", script);                                                            // the server knows the address a phone can reach
+        Assert.Contains("qrPicture(phone.rows)", script);
+        Assert.Contains("job.resumable && h(\"button\"", script);
+        Assert.Contains("api(\"/v1/transcriptions/\" + id + \"/resume\", { method: \"POST\" })", script);
+        var style = File.ReadAllText(Path.Combine(WebFolder(), "app.css")).Replace("\r", "");
+        var phone = style[style.IndexOf("@media (max-width: 640px) {\n  html, body", StringComparison.Ordinal)..];
+        Assert.Contains(".phone-button { display: none; }", phone);                                                    // on the phone itself the button has no use
+
+        await using var api = await Harness.StartAsync();
+        using var anonymous = new HttpClient { BaseAddress = api.Client.BaseAddress };
+        foreach (var code in new[] { "hu", "de", "es", "fr" })
+        {
+            var table = JsonSerializer.Deserialize<Dictionary<string, string>>(await anonymous.GetStringAsync("/ui/strings.json?lang=" + code))!;
+            foreach (var text in new[]
+            {
+                "Open on a phone", "QR code of the server address", "Close", "Resume", "Could not resume the recording",
+                "Shows a QR code: a phone on the same network opens the web page of this server with it.",
+                "Point the camera of a phone on the same network at the code to open the web page of this server. The first time, the browser of the phone warns about the certificate of the server: open the details and continue.",
+                "Only its own computer can reach this server, so a phone cannot open its web page. The server can allow computers on the network in its window.",
+                "Runs a cancelled or failed recording again on the server. What was already finished is reused."
+            })
+            {
+                Assert.True(table.ContainsKey(text), $"{code}: {text}");
+                Assert.NotEqual(text, table[text]);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ThePagesTranslationsIncludeTheTextsOfTheHistory()
     {
         await using var api = await Harness.StartAsync();

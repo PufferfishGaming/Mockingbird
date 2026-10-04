@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Windows.Data;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TriAsr.Domain;
@@ -23,6 +24,8 @@ public sealed partial class RemoteJobRow(RemoteJob job) : ObservableObject
     public bool CanCancel => !Job.IsFinished;
     /// <summary>A recording can be deleted once it is finished, has failed or was cancelled.</summary>
     public bool CanDelete => Job.IsFinished;
+    /// <summary>A cancelled or failed recording the server can run again, reusing what it had finished.</summary>
+    public bool CanResume => Job.Resumable;
     public string Created => Job.CreatedUtc.ToLocalTime().ToString("g");
     public string ErrorText => Job.Error is { } error ? Loc.Describe(error) : "";
     public bool HasError => Job.Error is not null;
@@ -36,7 +39,7 @@ public sealed partial class RemoteJobRow(RemoteJob job) : ObservableObject
     public void Update(RemoteJob job)
     {
         Job = job;
-        foreach (var property in new[] { nameof(Name), nameof(Percent), nameof(IsRunning), nameof(IsFinished), nameof(CanOpen), nameof(CanCancel), nameof(CanDelete), nameof(StateText), nameof(ErrorText), nameof(HasError), nameof(Created) })
+        foreach (var property in new[] { nameof(Name), nameof(Percent), nameof(IsRunning), nameof(IsFinished), nameof(CanOpen), nameof(CanCancel), nameof(CanDelete), nameof(CanResume), nameof(StateText), nameof(ErrorText), nameof(HasError), nameof(Created) })
             OnPropertyChanged(property);
     }
 
@@ -135,6 +138,25 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         SpeakerNaming.Changed += ShowSpeakerNames;
         _recordingsFolder = recordingsFolder ?? System.IO.Path.Combine(tempRoot, "Recordings");
         Loc.Instance.PropertyChanged += (_, change) => { if (change.PropertyName == nameof(Loc.Version)) _onUi(RefreshTexts); };
+        if (Edition.IsClient)
+        {
+            Watch = new RemoteWatchViewModel(() => _connection, () => SelectedExportMode, _reportError, _onUi, _dataRoot, ShowWatched);
+            _ = Watch.RestartAsync();
+        }
+    }
+
+    /// <summary>
+    /// The Client's watch folder: new recordings in a folder go to the connected server and the transcripts come back next to them. Null in Studio,
+    /// whose own watch folder (on its New page) transcribes with its own engines.
+    /// </summary>
+    public RemoteWatchViewModel? Watch { get; }
+    public bool HasWatch => Watch is not null;
+
+    /// <summary>A recording the watch folder sent appears in the project list; the page stays where it is.</summary>
+    private void ShowWatched(RemoteJob job)
+    {
+        Interlocked.Increment(ref _localChanges);
+        Merge([job]);
     }
 
     /// <summary>Raised when the server stops answering; the window then shows that the connection is gone.</summary>
@@ -181,6 +203,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _polling?.Cancel(); _audio?.Cancel();
         _connection = connection;
         _search?.Cancel(); SearchResults.Clear(); ProjectSearchStatus = ""; ProjectSearchText = "";
+        ShowPhone = false; PhoneCode = null; PhoneAddress = ""; PhoneNote = "";
         Jobs.Clear(); Regions.Clear(); SpeakerNaming.Clear(); _summary?.Clear(); SelectedJob = null; _reviewJob = Guid.Empty; ReviewSummary = ""; RawWhisper = ""; RawCanary = "";
         if (connection is null && _dictation is { IsListening: true } running) _ = running.StopAsync();      // the server is gone: nothing can read the phrases
         if (_notes is not null) _ = _notes.SourceChangedAsync();
@@ -203,6 +226,42 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(CanChooseSecondLanguage));
         OnPropertyChanged(nameof(CanTellSpeakersApart));
         OnPropertyChanged(nameof(CanSearch)); OnPropertyChanged(nameof(HasProjectSearch));
+        OnPropertyChanged(nameof(CanShowPhone));
+        ResumeSelectedCommand.NotifyCanExecuteChanged();
+        Watch?.ServerChanged();
+    }
+
+    // ---- opening the server's web page on a phone -----------------------------------------------------------------------------------------
+
+    /// <summary>Whether the server tells where a phone opens its web page; an older one does not, and the button is not shown.</summary>
+    public bool CanShowPhone => _connection?.Info.Phone == true;
+    [ObservableProperty] private bool _showPhone;
+    [ObservableProperty] private ImageSource? _phoneCode;
+    [ObservableProperty] private string _phoneAddress = "";
+    [ObservableProperty] private string _phoneNote = "";
+    public bool HasPhoneCode => PhoneCode is not null;
+
+    partial void OnPhoneCodeChanged(ImageSource? value) => OnPropertyChanged(nameof(HasPhoneCode));
+    partial void OnShowPhoneChanged(bool value) { if (value) _ = LoadPhoneAsync(); }
+
+    /// <summary>Asks the server where a phone on the same network opens its web page, and shows that address as a QR code.</summary>
+    private async Task LoadPhoneAsync()
+    {
+        if (_connection is not { } connection) return;
+        PhoneCode = null; PhoneAddress = ""; PhoneNote = Loc.T("Asking the server for its address…");
+        try
+        {
+            var phone = await connection.Client.PhoneAsync(CancellationToken.None);
+            if (!ReferenceEquals(_connection?.Client, connection.Client)) return;
+            if (phone.Address is not { } address) { PhoneNote = Loc.T("Only its own computer can reach this server, so a phone cannot open its web page. The server can allow computers on the network in its window."); return; }
+            PhoneAddress = address; PhoneCode = QrCodes.Image(address);
+            PhoneNote = Loc.T("Point the camera of a phone on the same network at the code to open the web page of this server. The first time, the browser of the phone warns about the certificate of the server: open the details and continue.");
+        }
+        catch (RemoteException error)
+        {
+            PhoneNote = Loc.T("The server did not say its address: {0}", Loc.Describe(error.Message));
+            if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message);
+        }
     }
 
     private void UpdateCanSend() => CanSend = IsConnected && !IsSending && File.Exists(SourcePath) && _connection?.Info.ModelsReady != false;
@@ -211,6 +270,8 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     {
         RefreshServerNote(_connection?.Info);
         _recorder?.RefreshTexts();
+        Watch?.RefreshTexts();
+        if (ShowPhone) _ = LoadPhoneAsync();                 // the note under the code, in the new language
         Link.RefreshTexts();
         _dictation?.RefreshTexts();
         _notes?.RefreshTexts();
@@ -287,9 +348,10 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         if (_connection is not { } connection || !File.Exists(SourcePath) || IsSending) return;
         IsSending = true; HasSendError = false; SendPercent = 0; SendStatus = Loc.T("Sending to {0}…", ServerName);
         var length = Math.Max(1, new FileInfo(SourcePath).Length);
+        using var sending = _sending = new CancellationTokenSource();
         try
         {
-            var job = await connection.Client.UploadAsync(SourcePath, LanguageChoice, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), CancellationToken.None, SpeakersChoice);
+            var job = await connection.Client.UploadAsync(SourcePath, LanguageChoice, new Progress<long>(bytes => SendPercent = Math.Min(100, bytes * 100d / length)), sending.Token, SpeakersChoice);
             Interlocked.Increment(ref _localChanges);
             Merge([job]);
             SelectedJob = Jobs.FirstOrDefault(row => row.Id == job.Id);
@@ -306,8 +368,15 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
             HasSendError = true; SendStatus = Loc.T("The recording could not be sent: {0}", Loc.Describe(error.Message));
             if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message);
         }
-        finally { IsSending = false; }
+        catch (OperationCanceledException) when (sending.IsCancellationRequested) { SendStatus = Loc.T("Sending stopped. Nothing was left on the server."); }
+        finally { _sending = null; IsSending = false; }
     }
+
+    private CancellationTokenSource? _sending;
+
+    /// <summary>Stops sending a recording; the server drops what it had received.</summary>
+    [RelayCommand]
+    private void CancelSend() => _sending?.Cancel();
 
     // ---- the recordings on the server -----------------------------------------------------------------------------------------------------
 
@@ -315,7 +384,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     [ObservableProperty] private RemoteJobRow? _selectedJob;
     public bool HasNoJobs => Jobs.Count == 0;
 
-    partial void OnSelectedJobChanged(RemoteJobRow? value) { OpenSelectedCommand.NotifyCanExecuteChanged(); CancelSelectedCommand.NotifyCanExecuteChanged(); }
+    partial void OnSelectedJobChanged(RemoteJobRow? value) { OpenSelectedCommand.NotifyCanExecuteChanged(); CancelSelectedCommand.NotifyCanExecuteChanged(); ResumeSelectedCommand.NotifyCanExecuteChanged(); }
 
     private void Merge(IReadOnlyList<RemoteJob> list, bool replace = false)
     {
@@ -327,7 +396,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         }
         if (replace) foreach (var gone in Jobs.Where(row => list.All(job => job.Id != row.Id)).ToArray()) Jobs.Remove(gone);
         OnPropertyChanged(nameof(HasNoJobs));
-        OpenSelectedCommand.NotifyCanExecuteChanged(); CancelSelectedCommand.NotifyCanExecuteChanged();
+        OpenSelectedCommand.NotifyCanExecuteChanged(); CancelSelectedCommand.NotifyCanExecuteChanged(); ResumeSelectedCommand.NotifyCanExecuteChanged();
     }
 
     // Counts what this window itself added to or removed from the list. An answer that was asked for before such a change is out of date and must not undo it
@@ -379,6 +448,23 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     }
 
     private bool CanCancelSelected() => SelectedJob?.CanCancel == true;
+
+    /// <summary>Runs the selected cancelled or failed recording again on the server; what it had finished is reused.</summary>
+    [RelayCommand(CanExecute = nameof(CanResumeSelected))]
+    private async Task ResumeSelectedAsync()
+    {
+        if (SelectedJob is not { } row || _connection is not { } connection) return;
+        try { Merge([await connection.Client.ResumeAsync(row.Id, CancellationToken.None)]); }
+        catch (RemoteException error) when (error.Code == "models_missing")
+        { _reportError(Loc.T("Could not resume the recording"), Loc.T("The server cannot transcribe this language yet: its speech models are not downloaded.")); }
+        catch (RemoteException error)
+        {
+            _reportError(Loc.T("Could not resume the recording"), Loc.Describe(error.Message));
+            if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message);
+        }
+    }
+
+    private bool CanResumeSelected() => SelectedJob?.CanResume == true && _connection?.Info.Resume == true;
 
     /// <summary>A click on a recording of the list: a finished one opens in Review, any other is only selected (so that Cancel applies to it).</summary>
     [RelayCommand]
@@ -566,6 +652,10 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
             OnPropertyChanged(nameof(HasReview)); OnPropertyChanged(nameof(NoReview)); OnPropertyChanged(nameof(ShowPlayer));
             SelectedTab = "Review";
             _ = DownloadAudioAsync(connection, id);
+            // The same warning as Studio's own review: the server marked the passages where a program may have repeated itself.
+            var loops = Regions.Count(region => region.Original.Warnings?.Contains(TriAsr.Fusion.TranscriptQuality.RepetitionWarning) == true);
+            if (loops > 0)
+                _reportError(Loc.T("Possible transcription repetition loop"), Loc.T("Regions with a long consecutive repeating pattern: {0}. Use Needs listening and play those regions before exporting. Repeated text is preserved because it may be genuinely sung or spoken.", loops));
         }
         catch (RemoteException error) { _reportError(Loc.T("Cannot open transcript"), Loc.Describe(error.Message)); if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message); }
     }
@@ -632,6 +722,8 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
             () => Loc.T("This server cannot write summaries: it has no language model for them, or it is an older version."),
             async (progress, token) =>
             {
+                // The server summarizes what it has kept: edits that were not saved yet are sent first, so the summary is of the text on screen (as in Studio).
+                if (_reviewJob == id && PendingEdits() is { } pending) await SendEditsAsync(connection, pending.Edits, pending.Names, token);
                 var state = await connection.Client.StartSummaryAsync(id, token);
                 var waited = 0.0;
                 while (state.State == "running")
@@ -651,20 +743,30 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
     [RelayCommand]
     private async Task SaveReviewAsync()
     {
-        if (_connection is not { } connection || Regions.Count == 0) return;
+        if (_connection is not { } connection || PendingEdits() is not { } pending) return;
+        try { await SendEditsAsync(connection, pending.Edits, pending.Names, CancellationToken.None); }
+        catch (RemoteException error) { _reportError(Loc.T("Save failed"), Loc.Describe(error.Message)); if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message); }
+    }
+
+    /// <summary>The texts changed since the last save, and the speakers' names when they changed; null when nothing changed.</summary>
+    private (RemoteEdit[] Edits, IReadOnlyDictionary<string, string>? Names)? PendingEdits()
+    {
+        if (Regions.Count == 0) return null;
         var edits = Regions.Select((region, index) => (region, index)).Where(item => item.region.Text != item.region.Original.FinalText).Select(item => new RemoteEdit(item.index, item.region.Text)).ToArray();
         // Names are sent as they now stand; with every name taken away that is an empty list, not "unchanged".
-        var names = SpeakerNaming.IsChanged ? SpeakerNaming.Current() ?? new Dictionary<string, string>() : null;
-        if (edits.Length == 0 && names is null) return;
-        try
-        {
-            await connection.Client.SaveEditsAsync(_reviewJob, edits, CancellationToken.None, names);
-            foreach (var region in Regions) region.AcceptSaved();
-            SpeakerNaming.AcceptSaved();
-            ReviewItems.Refresh();
-            ReviewSaved?.Invoke();
-        }
-        catch (RemoteException error) { _reportError(Loc.T("Save failed"), Loc.Describe(error.Message)); if (error.IsUnreachable) ConnectionLost?.Invoke(error.Message); }
+        IReadOnlyDictionary<string, string>? names = SpeakerNaming.IsChanged ? SpeakerNaming.Current() ?? new Dictionary<string, string>() : null;
+        return edits.Length == 0 && names is null ? null : (edits, names);
+    }
+
+    private async Task SendEditsAsync(RemoteConnection connection, RemoteEdit[] edits, IReadOnlyDictionary<string, string>? names, CancellationToken token)
+    {
+        var job = _reviewJob;
+        await connection.Client.SaveEditsAsync(job, edits, token, names);
+        if (_reviewJob != job) return;
+        foreach (var region in Regions) region.AcceptSaved();
+        SpeakerNaming.AcceptSaved();
+        ReviewItems.Refresh();
+        ReviewSaved?.Invoke();
     }
 
     /// <summary>Raised after the edits reached the server (the window says so in its status line).</summary>
@@ -687,6 +789,7 @@ public sealed partial class RemoteWorkspaceViewModel : ObservableObject, IDispos
         _polling?.Cancel(); _audio?.Cancel();
         _polling?.Dispose(); _audio?.Dispose();
         _recorder?.Dispose();   // a recording that is running is saved
+        Watch?.StopForExit();   // a recording being sent is sent again at the next start
         _dictation?.Dispose();
         _notes?.Dispose();
     }

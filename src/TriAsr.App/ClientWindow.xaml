@@ -37,6 +37,7 @@
               <TextBlock Text="{local:T 'Appearance'}" FontSize="17" FontWeight="SemiBold" />
               <TextBlock Text="{local:T 'Theme'}" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6" />
               <ComboBox ItemsSource="{Binding Themes}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding SelectedTheme}" AutomationProperties.Name="{local:T 'Appearance theme'}" />
+              <CheckBox Content="{local:T 'Pulse error alerts'}" IsChecked="{Binding AnimateErrors}" Margin="0,12,0,0" />
               <TextBlock Text="{local:T 'Language'}" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6" />
               <ComboBox ItemsSource="{Binding UiLanguages}" SelectedValue="{Binding Language}" SelectedValuePath="Code" ItemTemplate="{StaticResource NativeNameItem}" AutomationProperties.Name="{local:T 'Interface language'}" />
             </StackPanel>

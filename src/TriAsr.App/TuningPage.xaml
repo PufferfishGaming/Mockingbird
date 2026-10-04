@@ -1,0 +1,22 @@
+<UserControl x:Class="TriAsr.App.TuningPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:TriAsr.App">
+  <!-- DataContext: ShellViewModel. Measuring the settings on this computer and keeping the fastest. The same page in Studio and in the Server window. -->
+  <StackPanel>
+    <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel>
+      <TextBlock Text="{local:T 'Measures every setting on this computer and keeps the fastest. Use at least three seconds of typical speech; CPU tests can take several minutes. Download the recommended models first (Models).'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,14" />
+      <Button Content="{local:T 'Choose tuning recording…'}" Click="SelectFileClick" HorizontalAlignment="Left" /><TextBlock Text="{Binding SourcePath}" TextWrapping="Wrap" Margin="0,8,0,12" Foreground="{DynamicResource TextMutedBrush}" />
+      <WrapPanel><Button Content="{local:T 'Run auto-tuning'}" Command="{Binding OptimizeCommand}" Margin="0,0,10,8" /><Button Content="{local:T 'Cancel tuning'}" Command="{Binding CancelBenchmarkCommand}" Margin="0,0,0,8" /></WrapPanel>
+    </StackPanel></Border>
+    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,18,0,0" Visibility="{Binding IsBenchmarking, Converter={StaticResource BoolVisibility}}" />
+    <TextBlock Text="{Binding BenchmarkProgress}" TextWrapping="Wrap" Margin="0,18,0,18" />
+    <Border Background="{DynamicResource SurfaceSecondaryBrush}" CornerRadius="8" Padding="18"><StackPanel><TextBlock Text="{Binding BenchmarkSummary}" TextWrapping="Wrap" /><Button Content="{local:T 'Apply all best settings'}" Command="{Binding ApplyBestSettingsCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" ToolTip="{local:T 'Apply the measured backend, CPU threads and speech execution strategy for every engine. Saved models are unchanged.'}" /></StackPanel></Border>
+    <Expander Header="{local:T 'How to read the results'}" Margin="0,22,0,12">
+      <StackPanel Margin="20,6,0,0">
+        <TextBlock Text="{local:T 'Seconds (median): the middle of three timings, lower is faster; engine timings include model loading. Time/audio ratio: processing time divided by audio length, so 0.5 means 10 seconds of audio took 5 seconds.'}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10" />
+        <TextBlock Text="{local:T 'These are speed tests, not accuracy tests, and short samples do not predict the exact time of a long recording.'}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+      </StackPanel>
+    </Expander>
+    <DataGrid ItemsSource="{Binding BenchmarkResults}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" CanUserAddRows="False" MaxHeight="430" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderBrush}" RowBackground="{DynamicResource SurfaceElevatedBrush}" AlternatingRowBackground="{DynamicResource SurfaceSecondaryBrush}"><DataGrid.Columns>
+      <DataGridTextColumn Header="{local:T 'Engine'}" Binding="{local:Tr Engine}" /><DataGridTextColumn Header="{local:T 'Model'}" Binding="{Binding Model}" /><DataGridTextColumn Header="{local:T 'Runs on'}" Binding="{local:Tr ., Kind=BenchmarkBackend}" /><DataGridTextColumn Header="{local:T 'Threads'}" Binding="{Binding ThreadLabel}" /><DataGridTextColumn Header="{local:T 'Strategy'}" Binding="{local:Tr Strategy}" /><DataGridTextColumn Header="{local:T 'Seconds (median)'}" Binding="{Binding MedianSeconds, StringFormat=F3}" /><DataGridTextColumn Header="{local:T 'Time/audio ratio'}" Binding="{Binding RealTimeFactor, StringFormat=F3}" /><DataGridTextColumn Header="{local:T 'What this means'}" Binding="{local:Tr ., Kind=BenchmarkMeaning}" /><DataGridTextColumn Header="{local:T 'Issue (excluded)'}" Binding="{local:Tr Error}" />
+    </DataGrid.Columns></DataGrid>
+  </StackPanel>
+</UserControl>

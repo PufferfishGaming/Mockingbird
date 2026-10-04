@@ -171,6 +171,10 @@ internal sealed class Harness : IAsyncDisposable
     public bool Speakers { get; set; }
     /// <summary>Writes summaries for <c>/v1/transcriptions/{id}/summary</c>; null makes the server one that does not.</summary>
     public FakeSummaries? Summaries { get; set; }
+    /// <summary>The server's address on the network that <c>GET /v1/phone</c> gives; null is a server that listens for its own computer only.</summary>
+    public string? NetworkAddress { get; set; }
+    /// <summary>False makes the server one from before <c>GET /v1/phone</c>.</summary>
+    public bool Phone { get; set; } = true;
     /// <summary>The transcript of a finished job, as it was last saved; by default the two German regions of <see cref="ApiTestData.Transcript"/>.</summary>
     public Func<Guid, FinalTranscript>? Transcript { get; set; }
     private FinalTranscript TranscriptOf(Guid id) => Transcript?.Invoke(id) ?? ApiTestData.Transcript(id, Native);
@@ -200,7 +204,7 @@ internal sealed class Harness : IAsyncDisposable
             () => harness.CurrentKey, language => harness.MissingModels(language), () => true, busy => { lock (harness.Busy) harness.Busy.Add(busy); },
             () => harness.Name, "Studio", (id, _) => Task.FromResult(new ReviewBundle(harness.TranscriptOf(id), ApiTestData.Automatic(id, harness.Native), "raw whisper", "raw canary", null)),
             (transcript, _) => { harness.Saved = transcript; return Task.CompletedTask; }, (id, kind) => harness.AudioFile(kind), harness.Links, (job, token) => harness.Removal.DeleteAsync(job, token), harness.Live, () => harness.Live?.Ready ?? true, harness.Notes, () => harness.Speakers,
-            harness.Summaries, harness.Summaries));
+            harness.Summaries, harness.Summaries, harness.Phone ? () => harness.NetworkAddress : null));
         if (before is not null) await before(harness);
         await harness.Service.StartAsync();
         harness.Identity = ServerIdentity.LoadOrCreate(Path.Combine(harness.Root, "Identity"));
