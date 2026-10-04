@@ -46,6 +46,25 @@ public sealed partial class RecorderViewModel : ObservableObject, IDisposable
     public bool CanRecord => IsRecording || SelectedDevice is not null;
     public string Folder => _session.Folder;
 
+    /// <summary>Shows a folder in Explorer. Only a test changes it.</summary>
+    public Action<string> ShowFolder { get; set; } = folder =>
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true });
+
+    /// <summary>Opens the folder the recordings are saved in (made first, if nothing was recorded yet).</summary>
+    [RelayCommand]
+    private void OpenFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(Folder);
+            ShowFolder(Folder);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            SetStatus(() => Loc.T("The recordings folder could not be opened: {0}", Loc.Describe(error.Message)));
+        }
+    }
+
     /// <summary>Raised on the window's thread when a recording was stopped and saved. The file is complete.</summary>
     public event Action<RecordedFile>? Recorded;
 

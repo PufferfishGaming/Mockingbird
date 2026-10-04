@@ -20,7 +20,7 @@
         </StackPanel>
       </Border>
       </StackPanel>
-      <Grid Grid.Row="1" Margin="24,18" Visibility="{Binding IsTerminalPage, Converter={StaticResource BoolVisibility}}">
+      <Grid Grid.Row="1" Margin="24,18" local:Motion.FadeIn="True" Visibility="{Binding IsTerminalPage, Converter={StaticResource BoolVisibility}}">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <StackPanel Margin="0,0,0,14"><TextBlock Text="{local:Tr SelectedPage.Title}" FontSize="24" FontWeight="SemiBold" /></StackPanel>
         <WrapPanel Grid.Row="1"><ComboBox ItemsSource="{Binding TerminalViews}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding TerminalView}" Width="155" Margin="0,0,12,10" AutomationProperties.Name="{local:T 'Terminal view'}" /><Button Content="{local:T 'Start PowerShell'}" Command="{Binding StartTerminalCommand}" Margin="0,0,10,10" /><Button Content="{local:T 'Stop session'}" Command="{Binding StopTerminalCommand}" Margin="0,0,10,10" /><Button Content="{local:T 'Clear view'}" Command="{Binding ClearTerminalCommand}" Margin="0,0,10,10" /><Button Content="{local:T 'Copy output'}" Command="{Binding CopyTerminalCommand}" Margin="0,0,10,10" /><CheckBox Content="{local:T 'Auto-scroll'}" IsChecked="{Binding TerminalAutoScroll}" VerticalAlignment="Center" Margin="0,0,0,10" /></WrapPanel>
@@ -31,7 +31,7 @@
       </Grid>
       <ScrollViewer x:Name="ContentScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ScrollViewer.Style><Style TargetType="ScrollViewer"><Style.Triggers><DataTrigger Binding="{Binding IsTerminalPage}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger><DataTrigger Binding="{Binding IsRemotePage}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></ScrollViewer.Style><Grid Margin="{Binding ContentMargin}"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <TextBlock Grid.Row="1" Text="{local:Tr SelectedPage.Title}" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <StackPanel Grid.Row="3" Margin="0,30,0,0" Visibility="{Binding IsNewPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,30,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsNewPage, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="32" AllowDrop="True" Drop="OnFileDrop"><StackPanel>
             <TextBlock Text="{local:T 'Drop audio or video here'}" FontSize="23" FontWeight="SemiBold" /><TextBlock Text="{local:T 'WAV, MP3, M4A, FLAC, MP4, MKV and more'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,20" />
             <Button Content="{local:T 'Select file'}" Click="SelectFileClick" HorizontalAlignment="Left" AutomationProperties.Name="{local:T 'Select media file'}" />
@@ -50,7 +50,7 @@
                 <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,8,0,0" />
               </StackPanel>
             </Border>
-            <StackPanel Orientation="Horizontal" Margin="0,28,0,0"><Button Content="{local:T 'Start transcription'}" Command="{Binding PrepareAudioCommand}" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelCommand}" Margin="12,0,0,0" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,28,0,0"><Button Style="{StaticResource PrimaryButton}" Content="{local:T 'Start transcription'}" Command="{Binding PrepareAudioCommand}" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelCommand}" Margin="12,0,0,0" /></StackPanel>
           </StackPanel></Border>
           <local:RecorderCard DataContext="{Binding Recorder}" Margin="0,18,0,0" />
           <local:LinkCard DataContext="{Binding Link}" Margin="0,18,0,0" />
@@ -74,7 +74,7 @@
             </StackPanel>
           </Border>
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,30,0,0" Visibility="{Binding IsJobsPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,30,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsJobsPage, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{local:T 'Click a finished project to open its transcript.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
           <ListBox x:Name="ProjectList" ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" MinHeight="200" PreviewMouseLeftButtonUp="ProjectClick" PreviewKeyDown="ProjectKeyDown" AutomationProperties.Name="{local:T 'Saved transcription jobs'}">
             <ListBox.ItemTemplate><DataTemplate>
@@ -94,7 +94,7 @@
           <TextBlock Text="{local:T 'Nothing here yet. Finished transcriptions are listed here.'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,16,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Jobs.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
           <WrapPanel Margin="0,18,0,0"><Button Content="{local:T 'Resume'}" Command="{Binding ResumeAudioCommand}" /><Button Content="{local:T 'Open transcript'}" Command="{Binding OpenReviewCommand}" Margin="12,0,0,0" /><Button Content="{local:T 'Cancel'}" Command="{Binding CancelCommand}" Margin="12,0,0,0" /></WrapPanel>
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsReviewPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsReviewPage, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{Binding ReviewSummary}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
           <WrapPanel Margin="0,16,0,16"><TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="220" Padding="9" AutomationProperties.Name="{local:T 'Search transcript'}" ToolTip="{local:T 'Search final and original text'}" /><CheckBox Content="{local:T 'Needs listening'}" IsChecked="{Binding UncertainOnly}" VerticalAlignment="Center" Margin="16,0,16,0" /><Button Content="{local:T 'Save edits'}" Command="{Binding SaveReviewCommand}" /><ComboBox ItemsSource="{Binding ExportModes}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding SelectedExportMode}" Width="150" Margin="12,0,0,0" AutomationProperties.Name="{local:T 'Export mode'}" ToolTip="{local:T 'Readable adjusts spacing without changing the spoken words. Strict Verbatim exports the current transcript without readability adjustments.'}" /><Button Content="{local:T 'Export…'}" Click="ExportClick" Margin="12,0,0,0" /></WrapPanel>
           <local:SpeakerNamesPanel DataContext="{Binding SpeakerNaming}" />
@@ -105,10 +105,10 @@
             <TabItem Header="{local:T 'Raw'}"><StackPanel Margin="16"><TextBlock Text="{local:T 'Original engine output (read-only).'}" Foreground="{DynamicResource TextMutedBrush}" Margin="0,0,0,12" /><TextBox Text="{Binding RawWhisper, Mode=OneWay}" IsReadOnly="True" MaxHeight="250" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" /><TextBox Text="{Binding RawCanary, Mode=OneWay}" IsReadOnly="True" MaxHeight="250" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" Padding="8" Margin="0,12,0,0" /></StackPanel></TabItem>
           </TabControl>
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsNotesPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsNotesPage, Converter={StaticResource BoolVisibility}}">
           <local:NotesView DataContext="{Binding Notes}" />
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsModelsPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsModelsPage, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel>
             <TextBlock Text="{local:T 'Recommended for this computer'}" FontSize="20" FontWeight="SemiBold" />
             <TextBlock Text="{Binding SystemSummary}" TextWrapping="Wrap" Margin="0,12,0,8" />
@@ -130,11 +130,11 @@
           <ProgressBar Value="{Binding ModelDownloadPercent, Mode=OneWay}" Maximum="100" Height="8" Visibility="{Binding IsModelBusy, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Current model download'}" />
           <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" Margin="0,12,0,0" />
         </StackPanel>
-        <WrapPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsServersPage, Converter={StaticResource BoolVisibility}}">
+        <WrapPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsServersPage, Converter={StaticResource BoolVisibility}}">
           <local:ServerListPanel DataContext="{Binding Servers}" Width="400" Margin="0,0,18,18" VerticalAlignment="Top" />
           <local:HostPanel DataContext="{Binding Host}" Width="400" Margin="0,0,18,18" VerticalAlignment="Top" />
         </WrapPanel>
-        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsBenchmarkPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsBenchmarkPage, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="20"><StackPanel>
             <TextBlock Text="{local:T 'Measures every setting on this computer and keeps the fastest. Use at least three seconds of typical speech; CPU tests can take several minutes. Download the recommended models first (Models).'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,14" />
             <Button Content="{local:T 'Choose tuning recording…'}" Click="SelectFileClick" HorizontalAlignment="Left" /><TextBlock Text="{Binding SourcePath}" TextWrapping="Wrap" Margin="0,8,0,12" Foreground="{DynamicResource TextMutedBrush}" />
@@ -153,7 +153,7 @@
             <DataGridTextColumn Header="{local:T 'Engine'}" Binding="{local:Tr Engine}" /><DataGridTextColumn Header="{local:T 'Model'}" Binding="{Binding Model}" /><DataGridTextColumn Header="{local:T 'Runs on'}" Binding="{local:Tr ., Kind=BenchmarkBackend}" /><DataGridTextColumn Header="{local:T 'Threads'}" Binding="{Binding ThreadLabel}" /><DataGridTextColumn Header="{local:T 'Strategy'}" Binding="{local:Tr Strategy}" /><DataGridTextColumn Header="{local:T 'Seconds (median)'}" Binding="{Binding MedianSeconds, StringFormat=F3}" /><DataGridTextColumn Header="{local:T 'Time/audio ratio'}" Binding="{Binding RealTimeFactor, StringFormat=F3}" /><DataGridTextColumn Header="{local:T 'What this means'}" Binding="{local:Tr ., Kind=BenchmarkMeaning}" /><DataGridTextColumn Header="{local:T 'Issue (excluded)'}" Binding="{local:Tr Error}" />
           </DataGrid.Columns></DataGrid>
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsLanguagesPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsLanguagesPage, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="22"><StackPanel>
             <TextBlock Text="{local:T '100 languages, one model'}" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap" />
             <TextBlock Text="{local:T 'Whisper can transcribe all the languages listed below. Canary provides a second transcription for 25 of them. Transcripts in the other languages are marked for listening.'}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,16" />
@@ -167,7 +167,7 @@
             <TextBlock Text="{Binding ModelProgress}" TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" />
           </StackPanel></Border>
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,24,0,0" Visibility="{Binding IsBackendsPage, Converter={StaticResource BoolVisibility}}">
+        <StackPanel Grid.Row="3" Margin="0,24,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsBackendsPage, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{Binding SystemSummary}" TextWrapping="Wrap" Margin="0,0,0,14" />
           <TextBlock Text="{local:T 'CPU works everywhere and Vulkan is bundled for compatible GPUs. CUDA (NVIDIA) and ROCm (AMD) need matching GPU drivers.'}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,16" />
           <DataGrid ItemsSource="{Binding BackendStatus}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MaxHeight="300" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextPrimaryBrush}" RowBackground="{DynamicResource SurfaceElevatedBrush}" AlternatingRowBackground="{DynamicResource SurfaceSecondaryBrush}" BorderBrush="{DynamicResource BorderBrush}"><DataGrid.Columns><DataGridTextColumn Header="{local:T 'Engine'}" Binding="{local:Tr Engine}" /><DataGridTextColumn Header="{local:T 'Backend'}" Binding="{Binding Backend}" /><DataGridTextColumn Header="{local:T 'Availability'}" Binding="{Binding Status}" Width="*" /></DataGrid.Columns></DataGrid>
@@ -187,7 +187,7 @@
             <WrapPanel><Button Content="{local:T 'Save these settings'}" Command="{Binding SaveBackendSettingsCommand}" Margin="0,0,12,10" /><Button Content="{local:T 'Find best settings with auto-tuning'}" Command="{Binding GoBenchmarkCommand}" Margin="0,0,0,10" /></WrapPanel>
           </StackPanel></Border>
         </StackPanel>
-        <StackPanel Grid.Row="3" Margin="0,30,0,0" Visibility="{Binding IsDiagnosticsPage, Converter={StaticResource BoolVisibility}}"><StackPanel Orientation="Horizontal"><Button Content="{local:T 'Refresh hardware information'}" Command="{Binding DetectHardwareCommand}" /><Button Content="{local:T 'Copy diagnostics'}" Command="{Binding CopyDiagnosticsCommand}" Margin="12,0,0,0" /></StackPanel><TextBox Text="{Binding Diagnostics, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="18" TextWrapping="Wrap" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="{local:T 'Hardware diagnostics'}" /></StackPanel>
+        <StackPanel Grid.Row="3" Margin="0,30,0,0" local:Motion.FadeIn="True" Visibility="{Binding IsDiagnosticsPage, Converter={StaticResource BoolVisibility}}"><StackPanel Orientation="Horizontal"><Button Content="{local:T 'Refresh hardware information'}" Command="{Binding DetectHardwareCommand}" /><Button Content="{local:T 'Copy diagnostics'}" Command="{Binding CopyDiagnosticsCommand}" Margin="12,0,0,0" /></StackPanel><TextBox Text="{Binding Diagnostics, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" Padding="18" TextWrapping="Wrap" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="{local:T 'Hardware diagnostics'}" /></StackPanel>
         <StackPanel Grid.Row="3" Margin="0,30,0,0" Visibility="{Binding IsSettings, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="26"><StackPanel><TextBlock Text="{local:T 'Appearance'}" FontSize="21" FontWeight="SemiBold" /><TextBlock Text="{local:T 'Theme'}" FontWeight="SemiBold" Margin="0,14,0,8" /><ComboBox ItemsSource="{Binding Themes}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding SelectedTheme}" MaxWidth="300" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.Name="{local:T 'Appearance theme'}" /><CheckBox Content="{local:T 'Pulse error alerts'}" IsChecked="{Binding AnimateErrors}" Margin="0,16,0,8" /><TextBlock Text="{Binding ThemeSummary}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" Margin="0,9,0,24" /><TextBlock Text="{local:T 'Density'}" FontWeight="SemiBold" Margin="0,0,0,8" /><ComboBox ItemsSource="{Binding Densities}" ItemTemplate="{StaticResource TranslatedItem}" SelectedItem="{Binding SelectedDensity}" MaxWidth="300" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.Name="{local:T 'Interface density'}" /><TextBlock Text="{local:T 'Language'}" FontWeight="SemiBold" Margin="0,24,0,8" /><ComboBox ItemsSource="{Binding UiLanguages}" SelectedValue="{Binding Language}" SelectedValuePath="Code" ItemTemplate="{StaticResource NativeNameItem}" MaxWidth="300" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.Name="{local:T 'Interface language'}" /></StackPanel></Border>
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="26" Margin="0,18,0,0"><StackPanel><TextBlock Text="{local:T 'Privacy'}" FontSize="21" FontWeight="SemiBold" /><TextBlock Text="{local:T 'Transcription runs on this computer. Downloading models, runtimes or updates, and checking for updates, connects to GitHub or Hugging Face.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0" LineHeight="24" /><Button Content="{local:T 'Read privacy policy'}" Click="ShowPrivacyPolicy" HorizontalAlignment="Left" Margin="0,14,0,0" /></StackPanel></Border>

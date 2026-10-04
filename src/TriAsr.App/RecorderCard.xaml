@@ -17,6 +17,7 @@
           <Ellipse Width="11" Height="11" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
           <TextBlock Text="{Binding Elapsed}" FontSize="18" FontWeight="SemiBold" Margin="9,0,0,0" FontFamily="Consolas" AutomationProperties.Name="{local:T 'Recording time'}" />
         </StackPanel>
+        <Button Content="{local:T 'Open recordings folder'}" Command="{Binding OpenFolderCommand}" Margin="12,0,0,0" ToolTip="{Binding Folder}" AutomationProperties.Name="{local:T 'Open recordings folder'}" />
       </StackPanel>
       <ProgressBar Minimum="0" Maximum="100" Value="{Binding Level, Mode=OneWay}" Height="6" Margin="0,16,0,0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource SurfaceSecondaryBrush}" Visibility="{Binding IsRecording, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{local:T 'Microphone level'}" />
       <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite" />

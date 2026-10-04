@@ -1008,5 +1008,7 @@
  "The speaker program listed a turn that ends before it starts.": "El programa de hablantes indicó un turno que termina antes de empezar.",
  "Speaker names": "Nombres de los hablantes",
  "The name shown and exported for this speaker. Leave it empty to keep the number.": "El nombre que se muestra y se exporta para este hablante. Déjelo vacío para conservar el número.",
- "Watch folder speakers": "Hablantes de la carpeta vigilada"
+ "Watch folder speakers": "Hablantes de la carpeta vigilada",
+ "Open recordings folder": "Abrir la carpeta de grabaciones",
+ "The recordings folder could not be opened: {0}": "No se pudo abrir la carpeta de grabaciones: {0}"
 }

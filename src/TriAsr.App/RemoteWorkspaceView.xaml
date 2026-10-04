@@ -28,7 +28,7 @@
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="{Binding IsConnected, Converter={StaticResource BoolVisibility}}">
       <Grid Margin="24,20,24,24">
         <!-- New -->
-        <StackPanel Visibility="{Binding IsNewTab, Converter={StaticResource BoolVisibility}}">
+        <StackPanel local:Motion.FadeIn="True" Visibility="{Binding IsNewTab, Converter={StaticResource BoolVisibility}}">
           <Border Background="{DynamicResource SurfaceElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="28" AllowDrop="True" Drop="OnFileDrop">
             <StackPanel>
               <TextBlock Text="{local:T 'Drop audio or video here'}" FontSize="21" FontWeight="SemiBold" />
@@ -50,7 +50,7 @@
         </StackPanel>
 
         <!-- Projects -->
-        <StackPanel Visibility="{Binding IsProjectsTab, Converter={StaticResource BoolVisibility}}">
+        <StackPanel local:Motion.FadeIn="True" Visibility="{Binding IsProjectsTab, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{local:T 'Click a finished project to open its transcript.'}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
           <ListBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" MinHeight="200" PreviewMouseLeftButtonUp="ProjectClick" PreviewKeyDown="ProjectKeyDown" AutomationProperties.Name="{local:T 'Recordings on the server'}">
             <ListBox.ItemTemplate><DataTemplate>
@@ -72,12 +72,12 @@
         </StackPanel>
 
         <!-- Notes -->
-        <StackPanel Visibility="{Binding IsNotesTab, Converter={StaticResource BoolVisibility}}">
+        <StackPanel local:Motion.FadeIn="True" Visibility="{Binding IsNotesTab, Converter={StaticResource BoolVisibility}}">
           <local:NotesView DataContext="{Binding Notes}" />
         </StackPanel>
 
         <!-- Review -->
-        <StackPanel Visibility="{Binding IsReviewTab, Converter={StaticResource BoolVisibility}}">
+        <StackPanel local:Motion.FadeIn="True" Visibility="{Binding IsReviewTab, Converter={StaticResource BoolVisibility}}">
           <TextBlock Text="{local:T 'Open a finished recording from Projects to review its transcript.'}" Foreground="{DynamicResource TextMutedBrush}" Visibility="{Binding NoReview, Converter={StaticResource BoolVisibility}}" />
           <StackPanel Visibility="{Binding HasReview, Converter={StaticResource BoolVisibility}}">
             <TextBlock Text="{Binding ReviewName}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />

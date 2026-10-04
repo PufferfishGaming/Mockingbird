@@ -1008,5 +1008,7 @@
   "The speaker program listed a turn that ends before it starts.": "A beszélőfelismerő program olyan szakaszt adott, amely előbb ér véget, mint ahogy kezdődik.",
   "Speaker names": "Beszélők neve",
   "The name shown and exported for this speaker. Leave it empty to keep the number.": "Ez a név jelenik meg és kerül az exportba ennél a beszélőnél. Ha üresen hagyja, a sorszám marad.",
-  "Watch folder speakers": "Figyelt mappa beszélői"
+  "Watch folder speakers": "Figyelt mappa beszélői",
+  "Open recordings folder": "Felvételek mappájának megnyitása",
+  "The recordings folder could not be opened: {0}": "A felvételek mappáját nem sikerült megnyitni: {0}"
 }

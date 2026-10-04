@@ -195,6 +195,18 @@ public sealed class RecorderTests
     }
 
     [Fact]
+    public void TheRecordingsFolderOpensEvenBeforeAnythingWasRecorded()
+    {
+        var root = Path.Combine(NewRoot(), "Recordings");
+        using var recorder = new RecorderViewModel(new Room(), root, action => action());
+        var shown = new List<string>();
+        recorder.ShowFolder = shown.Add;
+        recorder.OpenFolderCommand.Execute(null);
+        Assert.Equal([root], shown);
+        Assert.True(Directory.Exists(root));                                // made first, so Explorer has something to open
+    }
+
+    [Fact]
     public void TheWordsFollowTheInterfaceLanguage()
     {
         var before = Loc.Instance.Language;

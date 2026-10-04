@@ -88,6 +88,7 @@ public partial class App : System.Windows.Application
         // window does not exist yet. The program ends with the main window once that is shown.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         var smoke = e.Args.Contains("--smoke-test", StringComparer.Ordinal);
+        if (smoke) Motion.Enabled = false;   // its pictures of the pages are taken at once, before a fade could finish
         try
         {
             var dataRoot = Environment.GetEnvironmentVariable("TRIASR_DATA_ROOT")
