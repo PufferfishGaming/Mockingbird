@@ -202,7 +202,9 @@ public sealed class HostTests
             var store = host.Services.GetRequiredService<SettingsStore>();
             await shell.InitializeAsync();
             shell.Host.BeaconPort = beaconPort;
-            await using var listener = new BeaconListener(beaconPort, TimeSpan.FromSeconds(2));
+            // Longer than the 2 s between beacons: a listener that forgot the server after 2 s lost it for a moment before each next one,
+            // and an empty list would not have meant that the announcements stopped.
+            await using var listener = new BeaconListener(beaconPort, TimeSpan.FromSeconds(5));
             Assert.True(listener.Start());
             shell.Host.Name = "Kitchen";
             shell.Host.PortText = port.ToString();
@@ -230,7 +232,7 @@ public sealed class HostTests
             Assert.True(probe.Health.Encrypted);
 
             shell.Host.Password = "";                                               // a password change reaches the announcement
-            await WaitForAsync(() => Task.FromResult(!listener.Servers.Single().Announcement.PasswordRequired), "the announcement follows the password");
+            await WaitForAsync(() => Task.FromResult(listener.Servers is [{ Announcement.PasswordRequired: false }]), "the announcement follows the password");
 
             shell.Host.Enabled = false;
             await WaitForAsync(() => Task.FromResult(listener.Servers.Count == 0), "switching it off stops the announcements");
