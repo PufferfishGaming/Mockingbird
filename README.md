@@ -4,9 +4,9 @@ A local transcription workstation for Windows x64, using Whisper and Canary to r
 
 Source: [github.com/PufferfishGaming/Mockingbird](https://github.com/PufferfishGaming/Mockingbird)
 
-**Version 0.1.21 — release candidate**
+**Version 0.1.22 — release candidate**
 
-**New on `main`, not in the installers yet** (they come with the next release): search every transcript at once, meeting summaries, the web page as an app on a phone with a QR code to open it, a Server window with Studio's own setup pages, Resume and a watch folder in the Client, a button that opens the recordings folder, and a livelier look. To use them now, build from source (see [Build](#build)).
+**New in 0.1.22:** search every transcript at once, meeting summaries, the web page as an app on a phone with a QR code to open it, a Server window with Studio's own setup pages, Resume and a watch folder in the Client, a button that opens the recordings folder, and a livelier look.
 
 <div align="center">
 
